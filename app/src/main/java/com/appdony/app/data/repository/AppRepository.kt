@@ -1,8 +1,8 @@
 package com.appdony.app.data.repository
 
 import com.appdony.app.data.api.ApiClient
-import com.appdony.app.data.model.HomeData
-import com.appdony.app.data.model.HomeSection
+import com.appdony.app.data.model.Category
+import com.appdony.app.data.model.InitialData
 import com.appdony.app.data.model.Post
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -17,87 +17,81 @@ class AppRepository {
         Result.failure(e)
     }
 
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 20): Result<List<Post>> = try {
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 15): Result<List<Post>> = try {
         Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
     } catch (e: Exception) {
         Result.failure(e)
     }
 
+    suspend fun searchPosts(query: String): Result<List<Post>> = try {
+        Result.success(api.searchPosts(query = query, perPage = 30))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     /**
-     * فقط ۳ درخواست موازی → سریع مثل برق!
-     * ۱. ۵۰ پست آخر
-     * ۲. ۵۰ پست قدیمی‌تر (page=2)
-     * ۳. لیست دسته‌بندی‌ها
+     * فقط ۲ درخواست موازی → سریع!
      */
-    suspend fun loadHome(type: String = "all"): Result<HomeData> = try {
+    suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
-            val postsPage1 = async { api.getPosts(perPage = 50, page = 1) }
-            val postsPage2 = async { api.getPosts(perPage = 50, page = 2) }
+            val postsDeferred = async { api.getPosts(perPage = 15, page = 1) }
             val categoriesDeferred = async { api.getCategories(perPage = 100) }
 
-            val allPosts = (postsPage1.await() + postsPage2.await()).distinctBy { it.id }
+            val posts = postsDeferred.await()
             val allCategories = categoriesDeferred.await()
 
-            // پیدا کردن ID والدها
-            val gamesParentId = allCategories.firstOrNull {
-                it.parent == 0 && (it.name.contains("بازی") || it.slug.contains("game"))
-            }?.id
-            val appsParentId = allCategories.firstOrNull {
-                it.parent == 0 && (it.name.contains("برنامه") || it.name.contains("اپ") || it.slug.contains("app"))
-            }?.id
-            val blogParentId = allCategories.firstOrNull {
-                it.parent == 0 && (it.name.contains("وبلاگ") || it.name.contains("مقال") || it.slug.contains("blog"))
-            }?.id
-
-            val gamesChildIds = allCategories.filter { it.parent == gamesParentId }.map { it.id }.toSet()
-            val appsChildIds = allCategories.filter { it.parent == appsParentId }.map { it.id }.toSet()
-            val blogChildIds = allCategories.filter { it.parent == blogParentId }.map { it.id }.toSet()
-
-            // فیلتر پست‌ها بر اساس نوع
-            val filteredPosts = when (type) {
-                "games" -> allPosts.filter { p -> p.categories.any { it in gamesChildIds || it == gamesParentId } }
-                "apps" -> allPosts.filter { p -> p.categories.any { it in appsChildIds || it == appsParentId } }
-                "blog" -> allPosts.filter { p -> p.categories.any { it in blogChildIds || it == blogParentId } }
-                else -> allPosts
+            // پیدا کردن والدهای اصلی با slug/name
+            val gamesParent = allCategories.firstOrNull {
+                it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
+            }
+            val appsParent = allCategories.firstOrNull {
+                it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
+            }
+            val blogParent = allCategories.firstOrNull {
+                it.parent == 0 && matchesAny(it, listOf("blog", "وبلاگ", "article", "مقاله", "news", "خبر"))
             }
 
-            // گروه‌بندی بر اساس دسته اصلی
-            val groupKey: (Post) -> Pair<Int, String>? = { post ->
-                val term = post.embedded?.terms?.firstOrNull()
-                    ?.firstOrNull { it.id != gamesParentId && it.id != appsParentId && it.id != blogParentId }
-                    ?: post.embedded?.terms?.firstOrNull()?.firstOrNull()
-                term?.let { it.id to it.name }
+            val relevantParent = when (feedType) {
+                "games" -> gamesParent
+                "apps" -> appsParent
+                "blog" -> blogParent
+                else -> null
             }
 
-            val grouped = filteredPosts
-                .mapNotNull { p -> groupKey(p)?.let { it to p } }
-                .groupBy({ it.first }, { it.second })
-                .filter { it.value.size >= 2 }
-
-            val sections = grouped.entries
-                .sortedByDescending { it.value.size }
-                .take(25)
-                .map { (key, posts) ->
-                    HomeSection(
-                        categoryId = key.first,
-                        title = key.second,
-                        posts = posts
-                    )
+            // اگه والد پیدا شد → فرزنداش
+            // اگه نه → همه دسته‌های سطح اول
+            val sections = if (relevantParent != null) {
+                val children = allCategories.filter {
+                    it.parent == relevantParent.id && it.count > 0
                 }
-
-            // بنر و ویژگی تکی
-            val banner = filteredPosts.getOrNull(0)
-            val single = filteredPosts.getOrNull(1)
+                if (children.isNotEmpty()) {
+                    children.sortedByDescending { it.count }.take(30)
+                } else {
+                    // اگه فرزندی نداره، خودش
+                    listOf(relevantParent)
+                }
+            } else {
+                allCategories.filter { it.parent == 0 && it.count > 0 }
+                    .sortedByDescending { it.count }
+                    .take(25)
+            }
 
             Result.success(
-                HomeData(
-                    banner = banner,
-                    singleFeature = single,
-                    sections = sections
+                InitialData(
+                    banner = posts.getOrNull(0),
+                    singleFeature = posts.getOrNull(1),
+                    featured = posts.take(6),
+                    categories = sections
                 )
             )
         }
     } catch (e: Exception) {
         Result.failure(e)
     }
+}
+
+private fun matchesAny(cat: Category, keywords: List<String>): Boolean {
+    val name = cat.name.lowercase()
+    val slug = cat.slug.lowercase()
+    return keywords.any { name.contains(it.lowercase()) || slug.contains(it.lowercase()) }
 }
