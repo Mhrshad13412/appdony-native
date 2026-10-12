@@ -12,8 +12,8 @@ android {
         applicationId = "com.appdony.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 34
+        versionName = "2.5.33"
     }
 
     buildTypes {
@@ -60,4 +60,4 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
-} 
+}
