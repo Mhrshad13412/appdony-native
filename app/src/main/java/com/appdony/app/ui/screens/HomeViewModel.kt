@@ -15,21 +15,19 @@ sealed class HomeUiState {
     data class Error(val message: String) : HomeUiState()
 }
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(private val feedType: String = "all") : ViewModel() {
 
     private val repo = AppRepository()
 
     private val _state = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    init {
-        load()
-    }
+    init { load() }
 
     fun load() {
         viewModelScope.launch {
             _state.value = HomeUiState.Loading
-            repo.loadHome()
+            repo.loadHome(type = feedType)
                 .onSuccess { _state.value = HomeUiState.Success(it) }
                 .onFailure {
                     _state.value = HomeUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
