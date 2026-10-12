@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -28,28 +29,32 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.BannerCard
 import com.appdony.app.ui.components.CategoryRow
-import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SingleFeatureCard
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 
+/**
+ * این یه صفحه عمومی‌ست که برای بازی/برنامه/وبلاگ استفاده می‌شه.
+ */
 @Composable
-fun HomeScreen(
-    onPostClick: (Int) -> Unit = {},
-    onCategoryClick: (Int) -> Unit = {},
-    viewModel: HomeViewModel = viewModel()
+fun FeedScreen(
+    feedType: String,
+    onPostClick: (Int) -> Unit,
+    onCategoryClick: (Int, String) -> Unit
 ) {
+    val viewModel: HomeViewModel = viewModel(key = feedType, factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return HomeViewModel(feedType = feedType) as T
+        }
+    })
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
         is HomeUiState.Loading -> LoadingView()
         is HomeUiState.Error -> ErrorView(s.message) { viewModel.load() }
-        is HomeUiState.Success -> HomeContent(
-            state = s,
-            onPostClick = onPostClick,
-            onCategoryClick = onCategoryClick
-        )
+        is HomeUiState.Success -> FeedContent(s, onPostClick, onCategoryClick)
     }
 }
 
@@ -59,7 +64,10 @@ private fun LoadingView() {
         modifier = Modifier.fillMaxSize().background(AppdonyBg),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(color = AppdonyGreen)
+        CircularProgressIndicator(
+            color = AppdonyGreen,
+            modifier = Modifier.size(44.dp)
+        )
     }
 }
 
@@ -77,27 +85,26 @@ private fun ErrorView(message: String, onRetry: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
             ) {
                 Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "تلاش دوباره")
+                Text(text = "  تلاش دوباره")
             }
         }
     }
 }
 
 @Composable
-private fun HomeContent(
+private fun FeedContent(
     state: HomeUiState.Success,
     onPostClick: (Int) -> Unit,
-    onCategoryClick: (Int) -> Unit
+    onCategoryClick: (Int, String) -> Unit
 ) {
     val data = state.data
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(AppdonyBg),
         contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp)
     ) {
-        // ۱. بنر بزرگ (اولین پست)
+        // بنر بزرگ
         data.banner?.let { banner ->
-            item {
+            item(key = "banner") {
                 BannerCard(
                     title = banner.cleanTitle(),
                     imageUrl = banner.featuredImageUrl(),
@@ -107,9 +114,9 @@ private fun HomeContent(
             }
         }
 
-        // ۲. کارت ویژه تک‌تایی
+        // کارت ویژه
         data.singleFeature?.let { feature ->
-            item {
+            item(key = "single") {
                 SingleFeatureCard(
                     title = feature.cleanTitle(),
                     description = feature.cleanExcerpt(),
@@ -120,30 +127,15 @@ private fun HomeContent(
             }
         }
 
-        // ۳. سکشن‌های دسته‌بندی — همه افقی
+        // همه‌ی سکشن‌ها افقی
         data.sections.forEach { section ->
-            item(key = "section_${section.categoryId}") {
+            item(key = "sec_${section.categoryId}") {
                 CategoryRow(
                     title = section.title,
                     posts = section.posts,
                     onPostClick = onPostClick,
-                    onMoreClick = { onCategoryClick(section.categoryId) }
+                    onMoreClick = { onCategoryClick(section.categoryId, section.title) }
                 )
-            }
-        }
-
-        // اگه هیچ سکشنی نبود
-        if (data.sections.isEmpty() && data.banner == null) {
-            item {
-                Box(
-                    modifier = Modifier.fillMaxSize().height(300.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "محتوایی برای نمایش نیست",
-                        color = AppdonyTextMuted
-                    )
-                }
             }
         }
     }
