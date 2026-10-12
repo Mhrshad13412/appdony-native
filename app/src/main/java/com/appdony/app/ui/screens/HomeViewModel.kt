@@ -58,8 +58,8 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
                     _sections.value = data.categories.associate { it.id to SectionState.NotLoaded }
                     _initialLoading.value = false
                 }
-                .onFailure {
-                    _error.value = it.message ?: "خطا در دریافت اطلاعات"
+                .onFailure { err ->
+                    _error.value = err.message ?: "خطا در دریافت اطلاعات"
                     _initialLoading.value = false
                 }
         }
@@ -75,9 +75,9 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
                 .onSuccess { posts ->
                     _sections.update { it + (categoryId to SectionState.Loaded(posts)) }
                 }
-                .onFailure {
-                    _sections.update {
-                        it + (categoryId to SectionState.Error(it.message ?: "خطا"))
+                .onFailure { err ->
+                    _sections.update { currentMap ->
+                        currentMap + (categoryId to SectionState.Error(err.message ?: "خطا"))
                     }
                 }
         }
