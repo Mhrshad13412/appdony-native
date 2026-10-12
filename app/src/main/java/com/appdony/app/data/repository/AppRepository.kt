@@ -23,15 +23,28 @@ class AppRepository {
         Result.failure(e)
     }
 
+    suspend fun getPostsByCategoryPaged(
+        categoryId: Int,
+        page: Int,
+        perPage: Int = 24
+    ): Result<List<Post>> = try {
+        Result.success(
+            api.getPostsByCategory(
+                categoryId = categoryId,
+                perPage = perPage,
+                page = page
+            )
+        )
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
         Result.success(api.searchPosts(query = query, perPage = 30))
     } catch (e: Exception) {
         Result.failure(e)
     }
 
-    /**
-     * فقط ۲ درخواست موازی → سریع!
-     */
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
             val postsDeferred = async { api.getPosts(perPage = 15, page = 1) }
@@ -40,7 +53,6 @@ class AppRepository {
             val posts = postsDeferred.await()
             val allCategories = categoriesDeferred.await()
 
-            // پیدا کردن والدهای اصلی با slug/name
             val gamesParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
             }
@@ -58,8 +70,6 @@ class AppRepository {
                 else -> null
             }
 
-            // اگه والد پیدا شد → فرزنداش
-            // اگه نه → همه دسته‌های سطح اول
             val sections = if (relevantParent != null) {
                 val children = allCategories.filter {
                     it.parent == relevantParent.id && it.count > 0
@@ -67,7 +77,6 @@ class AppRepository {
                 if (children.isNotEmpty()) {
                     children.sortedByDescending { it.count }.take(30)
                 } else {
-                    // اگه فرزندی نداره، خودش
                     listOf(relevantParent)
                 }
             } else {
