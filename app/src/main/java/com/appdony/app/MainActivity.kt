@@ -1,56 +1,57 @@
 package com.appdony.app
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.appdony.app.data.api.ApiClient
-import kotlinx.coroutines.launch
+import androidx.navigation.compose.rememberNavController
+import com.appdony.app.ui.components.AppBottomNav
+import com.appdony.app.ui.components.AppTopBar
+import com.appdony.app.ui.navigation.AppNavGraph
+import com.appdony.app.ui.theme.AppdonyBg
+import com.appdony.app.ui.theme.AppdonyTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
-            MaterialTheme {
-                var statusText by remember { mutableStateOf("منتظر تست...") }
-                val scope = rememberCoroutineScope()
-
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = statusText)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = {
-                            statusText = "در حال لود..."
-                            scope.launch {
-                                try {
-                                    val posts = ApiClient.api.getPosts(perPage = 5)
-                                    posts.take(3).forEach {
-                                        Log.d("APPDONY_TEST", "→ ${it.title.rendered}")
-                                    }
-                                    statusText = "✅ ${posts.size} پست لود شد!"
-                                } catch (e: Exception) {
-                                    Log.e("APPDONY_TEST", "خطا", e)
-                                    statusText = "❌ ${e.message}"
-                                }
-                            }
-                        }) {
-                            Text("تست API")
-                        }
-                    }
-                }
+            AppdonyTheme {
+                MainScreen()
             }
+        }
+    }
+}
+
+@Composable
+fun MainScreen() {
+    val navController = rememberNavController()
+
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                onSearchClick = { /* TODO: صفحه جستجو */ },
+                onLoginClick = { /* TODO: لاگین وردپرس */ }
+            )
+        },
+        bottomBar = {
+            AppBottomNav(navController = navController)
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(AppdonyBg)
+        ) {
+            AppNavGraph(navController = navController)
         }
     }
 }
