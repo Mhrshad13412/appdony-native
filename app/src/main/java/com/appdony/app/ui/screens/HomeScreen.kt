@@ -1,142 +1,85 @@
 package com.appdony.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.appdony.app.data.model.cleanExcerpt
-import com.appdony.app.data.model.cleanTitle
-import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.CategoryRow
-import com.appdony.app.ui.components.SingleFeatureCard
-import com.appdony.app.ui.theme.AppdonyBg
-import com.appdony.app.ui.theme.AppdonyGreen
-import com.appdony.app.ui.theme.AppdonyTextMuted
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.appdony.app.data.model.Category
+import com.appdony.app.data.model.Post
+import com.appdony.app.data.repository.AppRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-/**
- * این یه صفحه عمومی‌ست که برای بازی/برنامه/وبلاگ استفاده می‌شه.
- */
-@Composable
-fun FeedScreen(
-    feedType: String,
-    onPostClick: (Int) -> Unit,
-    onCategoryClick: (Int, String) -> Unit
-) {
-    val viewModel: HomeViewModel = viewModel(key = feedType, factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            @Suppress("UNCHECKED_CAST")
-            return HomeViewModel(feedType = feedType) as T
-        }
-    })
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
-    when (val s = state) {
-        is HomeUiState.Loading -> LoadingView()
-        is HomeUiState.Error -> ErrorView(s.message) { viewModel.load() }
-        is HomeUiState.Success -> FeedContent(s, onPostClick, onCategoryClick)
-    }
+sealed class SectionState {
+    object NotLoaded : SectionState()
+    object Loading : SectionState()
+    data class Loaded(val posts: List<Post>) : SectionState()
+    data class Error(val message: String) : SectionState()
 }
 
-@Composable
-private fun LoadingView() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(AppdonyBg),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator(
-            color = AppdonyGreen,
-            modifier = Modifier.size(44.dp)
-        )
-    }
-}
+class HomeViewModel(private val feedType: String = "games") : ViewModel() {
 
-@Composable
-private fun ErrorView(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize().background(AppdonyBg),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = message, color = AppdonyTextMuted, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
-            ) {
-                Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
-                Text(text = "  تلاش دوباره")
-            }
+    private val repo = AppRepository()
+
+    private val _initialLoading = MutableStateFlow(true)
+    val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _banner = MutableStateFlow<Post?>(null)
+    val banner: StateFlow<Post?> = _banner.asStateFlow()
+
+    private val _singleFeature = MutableStateFlow<Post?>(null)
+    val singleFeature: StateFlow<Post?> = _singleFeature.asStateFlow()
+
+    private val _featured = MutableStateFlow<List<Post>>(emptyList())
+    val featured: StateFlow<List<Post>> = _featured.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    val categories: StateFlow<List<Category>> = _categories.asStateFlow()
+
+    private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
+    val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
+
+    init { loadInitial() }
+
+    fun loadInitial() {
+        viewModelScope.launch {
+            _initialLoading.value = true
+            _error.value = null
+            repo.loadInitial(feedType)
+                .onSuccess { data ->
+                    _banner.value = data.banner
+                    _singleFeature.value = data.singleFeature
+                    _featured.value = data.featured
+                    _categories.value = data.categories
+                    _sections.value = data.categories.associate { it.id to SectionState.NotLoaded }
+                    _initialLoading.value = false
+                }
+                .onFailure { err ->
+                    _error.value = err.message ?: "خطا در دریافت اطلاعات"
+                    _initialLoading.value = false
+                }
         }
     }
-}
 
-@Composable
-private fun FeedContent(
-    state: HomeUiState.Success,
-    onPostClick: (Int) -> Unit,
-    onCategoryClick: (Int, String) -> Unit
-) {
-    val data = state.data
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(AppdonyBg),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp)
-    ) {
-        // بنر بزرگ
-        data.banner?.let { banner ->
-            item(key = "banner") {
-                BannerCard(
-                    title = banner.cleanTitle(),
-                    imageUrl = banner.featuredImageUrl(),
-                    onClick = { onPostClick(banner.id) }
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-        }
+    fun loadSection(categoryId: Int) {
+        val current = _sections.value[categoryId]
+        if (current is SectionState.Loading || current is SectionState.Loaded) return
 
-        // کارت ویژه
-        data.singleFeature?.let { feature ->
-            item(key = "single") {
-                SingleFeatureCard(
-                    title = feature.cleanTitle(),
-                    description = feature.cleanExcerpt(),
-                    imageUrl = feature.featuredImageUrl(),
-                    onClick = { onPostClick(feature.id) }
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-        }
-
-        // همه‌ی سکشن‌ها افقی
-        data.sections.forEach { section ->
-            item(key = "sec_${section.categoryId}") {
-                CategoryRow(
-                    title = section.title,
-                    posts = section.posts,
-                    onPostClick = onPostClick,
-                    onMoreClick = { onCategoryClick(section.categoryId, section.title) }
-                )
-            }
+        viewModelScope.launch {
+            _sections.update { it + (categoryId to SectionState.Loading) }
+            repo.getPostsByCategory(categoryId, perPage = 15)
+                .onSuccess { posts ->
+                    _sections.update { it + (categoryId to SectionState.Loaded(posts)) }
+                }
+                .onFailure { err ->
+                    _sections.update { currentMap ->
+                        currentMap + (categoryId to SectionState.Error(err.message ?: "خطا"))
+                    }
+                }
         }
     }
 }
