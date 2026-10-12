@@ -1,15 +1,20 @@
 package com.appdony.app.data.model
 
+import android.text.Html
+
 fun Post.featuredImageUrl(): String? {
     return embedded?.featuredMedia?.firstOrNull()?.sourceUrl
 }
 
 fun Post.cleanTitle(): String {
-    return title.rendered
-        .replace(Regex("<[^>]*>"), "")
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&")
-        .replace("&#8211;", "-")
-        .replace("&#8217;", "'")
+    return Html.fromHtml(title.rendered, Html.FROM_HTML_MODE_LEGACY)
+        .toString()
+        .trim()
+}
+
+fun Post.cleanExcerpt(): String {
+    return Html.fromHtml(excerpt.rendered, Html.FROM_HTML_MODE_LEGACY)
+        .toString()
+        .replace("\n", " ")
         .trim()
 }
