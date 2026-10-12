@@ -1,0 +1,48 @@
+package com.appdony.app.ui.screens
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.appdony.app.data.model.Post
+import com.appdony.app.data.repository.AppRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+sealed class DetailUiState {
+    object Loading : DetailUiState()
+    data class Success(val post: Post, val similar: List<Post>) : DetailUiState()
+    data class Error(val message: String) : DetailUiState()
+}
+
+class DetailViewModel(private val postId: Int) : ViewModel() {
+
+    private val repo = AppRepository()
+
+    private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
+    val state: StateFlow<DetailUiState> = _state.asStateFlow()
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch {
+            _state.value = DetailUiState.Loading
+            val postResult = repo.getPost(postId)
+            postResult.onSuccess { post ->
+                val catId = post.primaryCategoryId()
+                val similar = if (catId != null) {
+                    repo.getPostsByCategory(catId, perPage = 8)
+                        .getOrNull()?.filter { it.id != post.id }?.take(6) ?: emptyList()
+                } else emptyList()
+                _state.value = DetailUiState.Success(post, similar)
+            }.onFailure {
+                _state.value = DetailUiState.Error(it.message ?: "خطا")
+            }
+        }
+    }
+}
+
+// extension
+private fun Post.primaryCategoryId(): Int? {
+    return embedded?.terms?.firstOrNull()?.firstOrNull()?.id
+}
