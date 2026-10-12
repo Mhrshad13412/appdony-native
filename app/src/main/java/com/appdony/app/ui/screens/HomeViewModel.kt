@@ -2,35 +2,83 @@ package com.appdony.app.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.appdony.app.data.model.HomeData
+import com.appdony.app.data.model.Category
+import com.appdony.app.data.model.Post
 import com.appdony.app.data.repository.AppRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-sealed class HomeUiState {
-    object Loading : HomeUiState()
-    data class Success(val data: HomeData) : HomeUiState()
-    data class Error(val message: String) : HomeUiState()
+sealed class SectionState {
+    object NotLoaded : SectionState()
+    object Loading : SectionState()
+    data class Loaded(val posts: List<Post>) : SectionState()
+    data class Error(val message: String) : SectionState()
 }
 
-class HomeViewModel(private val feedType: String = "all") : ViewModel() {
+class HomeViewModel(private val feedType: String = "games") : ViewModel() {
 
     private val repo = AppRepository()
 
-    private val _state = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
-    val state: StateFlow<HomeUiState> = _state.asStateFlow()
+    private val _initialLoading = MutableStateFlow(true)
+    val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
 
-    init { load() }
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
-    fun load() {
+    private val _banner = MutableStateFlow<Post?>(null)
+    val banner: StateFlow<Post?> = _banner.asStateFlow()
+
+    private val _singleFeature = MutableStateFlow<Post?>(null)
+    val singleFeature: StateFlow<Post?> = _singleFeature.asStateFlow()
+
+    private val _featured = MutableStateFlow<List<Post>>(emptyList())
+    val featured: StateFlow<List<Post>> = _featured.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    val categories: StateFlow<List<Category>> = _categories.asStateFlow()
+
+    private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
+    val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
+
+    init { loadInitial() }
+
+    fun loadInitial() {
         viewModelScope.launch {
-            _state.value = HomeUiState.Loading
-            repo.loadHome(type = feedType)
-                .onSuccess { _state.value = HomeUiState.Success(it) }
+            _initialLoading.value = true
+            _error.value = null
+            repo.loadInitial(feedType)
+                .onSuccess { data ->
+                    _banner.value = data.banner
+                    _singleFeature.value = data.singleFeature
+                    _featured.value = data.featured
+                    _categories.value = data.categories
+                    _sections.value = data.categories.associate { it.id to SectionState.NotLoaded }
+                    _initialLoading.value = false
+                }
                 .onFailure {
-                    _state.value = HomeUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
+                    _error.value = it.message ?: "خطا در دریافت اطلاعات"
+                    _initialLoading.value = false
+                }
+        }
+    }
+
+    fun loadSection(categoryId: Int) {
+        val current = _sections.value[categoryId]
+        if (current is SectionState.Loading || current is SectionState.Loaded) return
+
+        viewModelScope.launch {
+            _sections.update { it + (categoryId to SectionState.Loading) }
+            repo.getPostsByCategory(categoryId, perPage = 15)
+                .onSuccess { posts ->
+                    _sections.update { it + (categoryId to SectionState.Loaded(posts)) }
+                }
+                .onFailure {
+                    _sections.update {
+                        it + (categoryId to SectionState.Error(it.message ?: "خطا"))
+                    }
                 }
         }
     }
