@@ -21,11 +21,25 @@ data class Embedded(
 )
 
 data class Media(
-    @SerializedName("source_url") val sourceUrl: String? = null
+    @SerializedName("source_url") val sourceUrl: String? = null,
+    @SerializedName("media_details") val mediaDetails: MediaDetails? = null
+)
+
+data class MediaDetails(
+    val width: Int? = null,
+    val height: Int? = null,
+    val sizes: Map<String, MediaSize>? = null
+)
+
+data class MediaSize(
+    @SerializedName("source_url") val sourceUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null
 )
 
 data class Term(
     val id: Int,
     val name: String,
-    val slug: String
+    val slug: String,
+    val taxonomy: String? = null
 )
