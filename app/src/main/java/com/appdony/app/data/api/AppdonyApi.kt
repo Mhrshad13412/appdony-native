@@ -1,5 +1,6 @@
 package com.appdony.app.data.api
 
+import com.appdony.app.data.model.Category
 import com.appdony.app.data.model.Post
 import retrofit2.http.GET
 import retrofit2.http.Query
@@ -17,6 +18,16 @@ interface AppdonyApi {
     suspend fun getPostsByCategory(
         @Query("categories") categoryId: Int,
         @Query("per_page") perPage: Int = 10,
+        @Query("page") page: Int = 1,
         @Query("_embed") embed: Int = 1
     ): List<Post>
+
+    @GET("wp-json/wp/v2/categories")
+    suspend fun getCategories(
+        @Query("per_page") perPage: Int = 20,
+        @Query("parent") parent: Int = 0,
+        @Query("hide_empty") hideEmpty: Boolean = true,
+        @Query("orderby") orderBy: String = "count",
+        @Query("order") order: String = "desc"
+    ): List<Category>
 }
