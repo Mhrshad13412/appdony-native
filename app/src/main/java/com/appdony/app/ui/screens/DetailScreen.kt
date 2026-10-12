@@ -298,5 +298,3 @@ private fun DetailContent(
         }
     }
 }
-
-private fun Int.dp() = this.dp
