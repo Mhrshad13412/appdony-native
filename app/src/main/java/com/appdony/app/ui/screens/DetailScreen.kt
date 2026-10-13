@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,9 +54,11 @@ import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.primaryCategoryName
+import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.CommentWebView
 import com.appdony.app.ui.components.CommentsSection
+import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyGreen
@@ -63,6 +66,7 @@ import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.AppInfo
 import com.appdony.app.util.DownloadHelper
+import kotlinx.coroutines.launch
 
 @Composable
 fun DetailScreen(
@@ -81,8 +85,28 @@ fun DetailScreen(
     )
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var showCommentWeb by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sessionManager = remember { SessionManager(context) }
+    val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
 
+    var showCommentWeb by remember { mutableStateOf(false) }
+    var showLoginSheet by remember { mutableStateOf(false) }
+
+    // پنجره لاگین
+    if (showLoginSheet) {
+        LoginSheet(
+            onDismiss = { showLoginSheet = false },
+            onLoginSuccess = { user, disp ->
+                scope.launch {
+                    sessionManager.saveSession(user, disp.ifBlank { user })
+                    showLoginSheet = false
+                    showCommentWeb = true
+                }
+            }
+        )
+    }
+
+    // WebView کامنت
     if (showCommentWeb) {
         CommentWebView(
             postId = postId,
@@ -126,11 +150,18 @@ fun DetailScreen(
                         }
                         context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                     },
-                    onAddComment = { showCommentWeb = true }
+                    onAddComment = {
+                        if (isLoggedIn) {
+                            showCommentWeb = true
+                        } else {
+                            showLoginSheet = true
+                        }
+                    }
                 )
             }
         }
 
+        // دکمه بازگشت
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -164,6 +195,7 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // کاور بالا
         item {
             Box(
                 modifier = Modifier
@@ -188,6 +220,7 @@ private fun DetailContent(
             }
         }
 
+        // کارت اصلی
         item {
             Row(
                 modifier = Modifier
@@ -243,6 +276,7 @@ private fun DetailContent(
             }
         }
 
+        // اطلاعات فنی
         item {
             if (info.version != null || info.size != null || info.androidReq != null) {
                 Row(
@@ -275,8 +309,7 @@ private fun DetailContent(
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (index == 0) AppdonyGreen
-                                else AppdonyCardBg
+                                containerColor = if (index == 0) AppdonyGreen else AppdonyCardBg
                             )
                         ) {
                             Icon(
@@ -325,6 +358,7 @@ private fun DetailContent(
             }
         }
 
+        // اسکرین‌شات‌ها
         if (info.screenshots.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -362,6 +396,7 @@ private fun DetailContent(
             }
         }
 
+        // توضیحات
         item {
             Spacer(Modifier.height(20.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -381,6 +416,7 @@ private fun DetailContent(
             }
         }
 
+        // برنامه‌های مشابه
         if (similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -409,6 +445,7 @@ private fun DetailContent(
             }
         }
 
+        // کامنت‌ها
         item {
             Spacer(Modifier.height(24.dp))
             CommentsSection(
