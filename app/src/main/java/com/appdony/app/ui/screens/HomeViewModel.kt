@@ -28,11 +28,8 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    private val _banner = MutableStateFlow<Post?>(null)
-    val banner: StateFlow<Post?> = _banner.asStateFlow()
-
-    private val _singleFeature = MutableStateFlow<Post?>(null)
-    val singleFeature: StateFlow<Post?> = _singleFeature.asStateFlow()
+    private val _plusPosts = MutableStateFlow<List<Post>>(emptyList())
+    val plusPosts: StateFlow<List<Post>> = _plusPosts.asStateFlow()
 
     private val _featured = MutableStateFlow<List<Post>>(emptyList())
     val featured: StateFlow<List<Post>> = _featured.asStateFlow()
@@ -43,7 +40,10 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
     private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
     val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
 
-    init { loadInitial() }
+    init {
+        loadInitial()
+        loadPlus()
+    }
 
     fun loadInitial() {
         viewModelScope.launch {
@@ -51,8 +51,6 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
             _error.value = null
             repo.loadInitial(feedType)
                 .onSuccess { data ->
-                    _banner.value = data.banner
-                    _singleFeature.value = data.singleFeature
                     _featured.value = data.featured
                     _categories.value = data.categories
                     _sections.value = data.categories.associate { it.id to SectionState.NotLoaded }
@@ -62,6 +60,13 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
                     _error.value = err.message ?: "خطا در دریافت اطلاعات"
                     _initialLoading.value = false
                 }
+        }
+    }
+
+    fun loadPlus() {
+        viewModelScope.launch {
+            repo.loadPlusPosts()
+                .onSuccess { _plusPosts.value = it }
         }
     }
 
