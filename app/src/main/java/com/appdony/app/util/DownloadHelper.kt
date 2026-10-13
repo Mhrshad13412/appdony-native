@@ -13,8 +13,7 @@ object DownloadHelper {
     fun startDownload(
         context: Context,
         url: String,
-        fileName: String,
-        userAgent: String? = null
+        fileName: String
     ) {
         try {
             val request = DownloadManager.Request(Uri.parse(url)).apply {
@@ -30,22 +29,6 @@ object DownloadHelper {
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
 
-                // User-Agent برای اینکه سایت قبول کنه
-                setRequestHeader(
-                    "User-Agent",
-                    userAgent ?: "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 " +
-                            "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                )
-                setRequestHeader("Referer", "https://appdony.ir/")
-                setRequestHeader("Accept", "*/*")
-
-                // کوکی‌های WebView (اگه کاربر لاگین کرده)
-                val cookies = CookieManager.getInstance().getCookie(url)
-                if (!cookies.isNullOrBlank()) {
-                    setRequestHeader("Cookie", cookies)
-                }
-
-                // تعیین نوع فایل
                 val ext = MimeTypeMap.getFileExtensionFromUrl(url).lowercase()
                 val mime = when (ext) {
                     "apk" -> "application/vnd.android.package-archive"
@@ -55,10 +38,25 @@ object DownloadHelper {
                     else -> "application/octet-stream"
                 }
                 setMimeType(mime)
+
+                // کوکی از WebView — برای لینک‌های نیازمند لاگین
+                val cookies = CookieManager.getInstance().getCookie(url)
+                if (!cookies.isNullOrBlank()) {
+                    // setRequestHeader از API 30 — اینجا چک می‌کنیم
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        setRequestHeader("Cookie", cookies)
+                        setRequestHeader(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 " +
+                                    "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                        )
+                        setRequestHeader("Referer", "https://appdony.ir/")
+                    }
+                }
             }
 
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val downloadId = manager.enqueue(request)
+            manager.enqueue(request)
 
             Toast.makeText(
                 context,
@@ -81,7 +79,6 @@ object DownloadHelper {
             .take(50)
             .ifBlank { "appdony_file" }
 
-        // اگه url پسوند داره استفاده کن
         val ext = url.substringAfterLast(".", "").substringBefore("?").lowercase()
         val safeExt = if (ext in listOf("apk", "zip", "rar", "pdf") && ext.isNotBlank()) {
             ".$ext"
