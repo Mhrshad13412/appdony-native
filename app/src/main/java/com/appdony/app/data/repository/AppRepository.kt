@@ -30,11 +30,7 @@ class AppRepository {
         perPage: Int = 24
     ): Result<List<Post>> = try {
         Result.success(
-            api.getPostsByCategory(
-                categoryId = categoryId,
-                perPage = perPage,
-                page = page
-            )
+            api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page)
         )
     } catch (e: Exception) {
         Result.failure(e)
@@ -67,7 +63,10 @@ class AppRepository {
                 it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
             }
             val blogParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("blog", "وبلاگ", "article", "مقاله", "news", "خبر"))
+                it.parent == 0 && matchesAny(
+                    it,
+                    listOf("blog", "وبلاگ", "article", "مقاله", "news", "خبر", "اخبار")
+                )
             }
 
             val relevantParent = when (feedType) {
@@ -87,9 +86,16 @@ class AppRepository {
                     listOf(relevantParent)
                 }
             } else {
-                allCategories.filter { it.parent == 0 && it.count > 0 }
-                    .sortedByDescending { it.count }
-                    .take(25)
+                // برای بلاگ: اگه parent پیدا نشد، همه دسته‌ها رو نشون بده
+                if (feedType == "blog") {
+                    allCategories.filter { it.count > 0 }
+                        .sortedByDescending { it.count }
+                        .take(20)
+                } else {
+                    allCategories.filter { it.parent == 0 && it.count > 0 }
+                        .sortedByDescending { it.count }
+                        .take(25)
+                }
             }
 
             Result.success(
