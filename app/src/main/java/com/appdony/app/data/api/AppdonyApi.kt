@@ -1,6 +1,7 @@
 package com.appdony.app.data.api
 
 import com.appdony.app.data.model.Category
+import com.appdony.app.data.model.Comment
 import com.appdony.app.data.model.Post
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -42,4 +43,12 @@ interface AppdonyApi {
         @Query("orderby") orderBy: String = "count",
         @Query("order") order: String = "desc"
     ): List<Category>
+
+    @GET("wp-json/wp/v2/comments")
+    suspend fun getComments(
+        @Query("post") postId: Int,
+        @Query("per_page") perPage: Int = 50,
+        @Query("orderby") orderBy: String = "date",
+        @Query("order") order: String = "desc"
+    ): List<Comment>
 }
