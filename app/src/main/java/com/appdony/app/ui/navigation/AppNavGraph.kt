@@ -13,6 +13,7 @@ import com.appdony.app.ui.screens.CategoryScreen
 import com.appdony.app.ui.screens.DetailScreen
 import com.appdony.app.ui.screens.GamesScreen
 import com.appdony.app.ui.screens.SearchScreen
+import com.appdony.app.ui.screens.SettingsScreen
 import com.appdony.app.ui.screens.UpdatesScreen
 
 @Composable
@@ -52,6 +53,10 @@ fun AppNavGraph(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 onPostClick = { id -> navController.navigate("detail/$id") }
             )
+        }
+
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
