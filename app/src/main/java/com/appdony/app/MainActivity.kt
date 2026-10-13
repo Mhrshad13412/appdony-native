@@ -22,13 +22,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.appdony.app.data.preferences.ThemeManager
+import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.navigation.AppNavGraph
-import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyTheme
 import kotlinx.coroutines.launch
 
@@ -37,10 +38,25 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AppdonyTheme {
-                MainScreen()
-            }
+            AppRoot()
         }
+    }
+}
+
+@Composable
+fun AppRoot() {
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val themeState by themeManager.state.collectAsStateWithLifecycle(
+        initialValue = com.appdony.app.data.preferences.ThemeState()
+    )
+
+    AppdonyTheme(
+        darkTheme = themeState.mode == ThemeMode.DARK,
+        primaryColor = ThemeManager.themeColors[themeState.colorIndex],
+        fontSize = themeState.fontSize
+    ) {
+        MainScreen()
     }
 }
 
@@ -65,7 +81,6 @@ fun MainScreen() {
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
-    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
@@ -82,18 +97,13 @@ fun MainScreen() {
         )
     }
 
-    // پنجره پروفایل (وقتی لاگین هست)
     if (showAccountSheet) {
         AccountSheet(
             displayName = displayName.ifBlank { username },
             username = username,
             onDismiss = { showAccountSheet = false },
-            onDownloads = {
-                navController.navigate("updates")
-            },
-            onSettings = {
-                navController.navigate("settings")
-            },
+            onDownloads = { navController.navigate("updates") },
+            onSettings = { navController.navigate("settings") },
             onFavorites = {
                 scope.launch {
                     snackbarHostState.showSnackbar("علاقه‌مندی‌ها به‌زودی...")
@@ -122,11 +132,8 @@ fun MainScreen() {
                     userInitial = displayName,
                     onSearchClick = { navController.navigate("search") },
                     onLoginClick = {
-                        if (isLoggedIn) {
-                            showAccountSheet = true
-                        } else {
-                            showLoginSheet = true
-                        }
+                        if (isLoggedIn) showAccountSheet = true
+                        else showLoginSheet = true
                     }
                 )
             }
@@ -142,7 +149,7 @@ fun MainScreen() {
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(AppdonyBg)
+                .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
         ) {
             AppNavGraph(navController = navController)
         }
