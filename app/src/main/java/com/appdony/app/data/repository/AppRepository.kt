@@ -2,6 +2,7 @@ package com.appdony.app.data.repository
 
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Category
+import com.appdony.app.data.model.Comment
 import com.appdony.app.data.model.InitialData
 import com.appdony.app.data.model.Post
 import kotlinx.coroutines.async
@@ -41,6 +42,12 @@ class AppRepository {
 
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
         Result.success(api.searchPosts(query = query, perPage = 30))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun getComments(postId: Int): Result<List<Comment>> = try {
+        Result.success(api.getComments(postId = postId, perPage = 50))
     } catch (e: Exception) {
         Result.failure(e)
     }
