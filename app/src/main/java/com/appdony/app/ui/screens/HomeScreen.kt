@@ -30,13 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
 import com.appdony.app.ui.components.SectionHeader
-import com.appdony.app.ui.components.SingleFeatureCard
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
@@ -59,8 +57,6 @@ fun FeedScreen(
 
     val loading by vm.initialLoading.collectAsStateWithLifecycle()
     val errorMsg by vm.error.collectAsStateWithLifecycle()
-    val bannerPost by vm.banner.collectAsStateWithLifecycle()
-    val singlePost by vm.singleFeature.collectAsStateWithLifecycle()
     val featuredList by vm.featured.collectAsStateWithLifecycle()
     val categoriesList by vm.categories.collectAsStateWithLifecycle()
     val sectionStates by vm.sections.collectAsStateWithLifecycle()
@@ -75,40 +71,18 @@ fun FeedScreen(
             contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            bannerPost?.let { b ->
-                item(key = "banner") {
-                    BannerCard(
-                        title = b.cleanTitle(),
-                        imageUrl = b.featuredImageUrl(),
-                        onClick = { onPostClick(b.id) }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-
-            singlePost?.let { f ->
-                item(key = "single") {
-                    SingleFeatureCard(
-                        title = f.cleanTitle(),
-                        description = f.cleanExcerpt(),
-                        imageUrl = f.featuredImageUrl(),
-                        onClick = { onPostClick(f.id) }
-                    )
-                    Spacer(Modifier.height(16.dp))
-                }
-            }
-
+            // ═══ بلاک بالایی — اسکرول افقی چند کارت بزرگ ═══
             if (featuredList.isNotEmpty()) {
-                item(key = "featured_title") {
+                item(key = "top_banner_title") {
                     SectionHeader(title = "ویژه")
                 }
-                item(key = "featured_row") {
+                item(key = "top_banner_row") {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(featuredList, key = { it.id }) { p ->
-                            AppCard(
+                        items(featuredList, key = { "top_${it.id}" }) { p ->
+                            BannerCard(
                                 title = p.cleanTitle(),
                                 imageUrl = p.featuredImageUrl(),
                                 onClick = { onPostClick(p.id) }
@@ -119,10 +93,10 @@ fun FeedScreen(
                 }
             }
 
+            // ═══ سکشن‌های دسته‌بندی — تنبل لود ═══
             items(categoriesList, key = { "cat_${it.id}" }) { cat ->
                 val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
 
-                // فقط اگه NotLoaded بود، لود کن
                 LaunchedEffect(cat.id) {
                     if (sectionState is SectionState.NotLoaded) {
                         vm.loadSection(cat.id)
