@@ -18,6 +18,13 @@ class AppRepository {
         Result.failure(e)
     }
 
+    suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
+        if (ids.isEmpty()) Result.success(emptyList())
+        else Result.success(api.getPostsByIds(ids = ids.joinToString(",")))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 15): Result<List<Post>> = try {
         Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
     } catch (e: Exception) {
@@ -44,6 +51,39 @@ class AppRepository {
 
     suspend fun getComments(postId: Int): Result<List<Comment>> = try {
         Result.success(api.getComments(postId = postId, perPage = 50))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * بارگذاری پست‌های اپدونی پلاس
+     * اول دنبال دسته «پلاس» یا «ویژه» می‌گرده
+     * اگه نبود، پست‌های آخر رو برمی‌گردونه
+     */
+    suspend fun loadPlusPosts(): Result<List<Post>> = try {
+        val allCategories = api.getCategories(perPage = 100)
+
+        // پیدا کردن دسته پلاس
+        val plusParent = allCategories.firstOrNull {
+            it.parent == 0 && (
+                it.name.contains("پلاس") ||
+                it.slug.contains("plus", ignoreCase = true) ||
+                it.name.contains("ویژه") ||
+                it.name.contains("کیفیت بالا") ||
+                it.slug.contains("premium", ignoreCase = true)
+            )
+        }
+
+        val posts = if (plusParent != null) {
+            val childIds = allCategories.filter { it.parent == plusParent.id }.map { it.id }
+            val allIds = (listOf(plusParent.id) + childIds).joinToString(",")
+            api.getPostsByMultipleCategories(categories = allIds, perPage = 12)
+        } else {
+            // fallback: ۶ پست آخر
+            api.getPosts(perPage = 6)
+        }
+
+        Result.success(posts)
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -86,7 +126,6 @@ class AppRepository {
                     listOf(relevantParent)
                 }
             } else {
-                // برای بلاگ: اگه parent پیدا نشد، همه دسته‌ها رو نشون بده
                 if (feedType == "blog") {
                     allCategories.filter { it.count > 0 }
                         .sortedByDescending { it.count }
