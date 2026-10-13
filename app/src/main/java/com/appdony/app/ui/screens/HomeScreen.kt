@@ -122,8 +122,11 @@ fun FeedScreen(
             items(categoriesList, key = { "cat_${it.id}" }) { cat ->
                 val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
 
+                // فقط اگه NotLoaded بود، لود کن
                 LaunchedEffect(cat.id) {
-                    vm.loadSection(cat.id)
+                    if (sectionState is SectionState.NotLoaded) {
+                        vm.loadSection(cat.id)
+                    }
                 }
 
                 SectionBlock(
@@ -213,10 +216,7 @@ private fun LoadingView() {
             .background(AppdonyBg),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(
-            color = AppdonyGreen,
-            modifier = Modifier.size(44.dp)
-        )
+        CircularProgressIndicator(color = AppdonyGreen, modifier = Modifier.size(44.dp))
     }
 }
 
