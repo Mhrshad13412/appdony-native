@@ -83,7 +83,6 @@ fun DetailScreen(
     val context = LocalContext.current
     var showCommentWeb by remember { mutableStateOf(false) }
 
-    // اگه WebView بازه، فقط اون رو نشون بده
     if (showCommentWeb) {
         CommentWebView(
             postId = postId,
@@ -113,11 +112,9 @@ fun DetailScreen(
                     info = s.info,
                     similar = s.similar,
                     onSimilarClick = onSimilarClick,
-                    onDownload = { url ->
-                        val name = s.post.cleanTitle()
-                            .replace(Regex("[^\\w\\u0600-\\u06FF\\s.]"), "")
-                            .take(40) + ".apk"
-                        DownloadHelper.startDownload(context, url, name)
+                    onDownload = { url, title ->
+                        val fileName = DownloadHelper.buildFileName(title, url)
+                        DownloadHelper.startDownload(context, url, fileName)
                     },
                     onShare = {
                         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -127,16 +124,13 @@ fun DetailScreen(
                                 "دانلود ${s.post.cleanTitle()}\nhttps://appdony.ir/?p=${s.post.id}"
                             )
                         }
-                        context.startActivity(
-                            Intent.createChooser(intent, "اشتراک‌گذاری")
-                        )
+                        context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                     },
                     onAddComment = { showCommentWeb = true }
                 )
             }
         }
 
-        // دکمه بازگشت
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -162,7 +156,7 @@ private fun DetailContent(
     info: AppInfo,
     similar: List<Post>,
     onSimilarClick: (Int) -> Unit,
-    onDownload: (String) -> Unit,
+    onDownload: (String, String) -> Unit,
     onShare: () -> Unit,
     onAddComment: () -> Unit
 ) {
@@ -264,44 +258,69 @@ private fun DetailContent(
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val url = info.downloadLinks.firstOrNull()
-                        if (url != null) onDownload(url)
-                    },
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
-                ) {
-                    Icon(Icons.Default.Download, null, tint = Color.White)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "نصب و دانلود",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Box(
+        // دکمه‌های دانلود
+        if (info.downloadLinks.isNotEmpty()) {
+            item {
+                Column(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(AppdonyCardBg)
-                        .clickable { onShare() },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "اشتراک",
-                        tint = AppdonyTextPrimary
-                    )
+                    info.downloadLinks.forEachIndexed { index, link ->
+                        Button(
+                            onClick = { onDownload(link.url, post.cleanTitle()) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (index == 0) AppdonyGreen
+                                else AppdonyCardBg
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                null,
+                                tint = if (index == 0) Color.White else AppdonyTextPrimary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = link.title.ifBlank { "دانلود" },
+                                color = if (index == 0) Color.White else AppdonyTextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { onShare() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppdonyCardBg)
+                    ) {
+                        Icon(Icons.Default.Share, null, tint = AppdonyTextPrimary)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "لینک دانلود در توضیحات",
+                            color = AppdonyTextPrimary,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }
