@@ -31,6 +31,20 @@ interface AppdonyApi {
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts")
+    suspend fun getPostsByMultipleCategories(
+        @Query("categories") categories: String, // "1,2,3"
+        @Query("per_page") perPage: Int = 10,
+        @Query("_embed") embed: Int = 1
+    ): List<Post>
+
+    @GET("wp-json/wp/v2/posts")
+    suspend fun getPostsByIds(
+        @Query("include") ids: String, // "1,2,3"
+        @Query("per_page") perPage: Int = 50,
+        @Query("_embed") embed: Int = 1
+    ): List<Post>
+
+    @GET("wp-json/wp/v2/posts")
     suspend fun searchPosts(
         @Query("search") query: String,
         @Query("per_page") perPage: Int = 20,
