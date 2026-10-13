@@ -37,7 +37,8 @@ fun AppRowItem(
     title: String,
     imageUrl: String?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showRank: Boolean = true
 ) {
     Row(
         modifier = modifier
@@ -46,14 +47,16 @@ fun AppRowItem(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = rank.toString(),
-            color = AppdonyTextMuted,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(24.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+        if (showRank) {
+            Text(
+                text = rank.toString(),
+                color = AppdonyTextMuted,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
         Box(
             modifier = Modifier
                 .size(56.dp)
@@ -88,11 +91,7 @@ fun AppRowItem(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "رایگان",
-                color = AppdonyTextMuted,
-                fontSize = 12.sp
-            )
+            Text(text = "رایگان", color = AppdonyTextMuted, fontSize = 12.sp)
         }
     }
 }
