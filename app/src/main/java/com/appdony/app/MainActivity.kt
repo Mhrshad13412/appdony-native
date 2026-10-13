@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -67,6 +68,7 @@ fun MainScreen() {
     val currentRoute = backStackEntry?.destination?.route ?: ""
     val showChrome = currentRoute != "search" &&
             currentRoute != "settings" &&
+            currentRoute != "favorites" &&
             !currentRoute.startsWith("detail/")
 
     val context = LocalContext.current
@@ -104,11 +106,7 @@ fun MainScreen() {
             onDismiss = { showAccountSheet = false },
             onDownloads = { navController.navigate("updates") },
             onSettings = { navController.navigate("settings") },
-            onFavorites = {
-                scope.launch {
-                    snackbarHostState.showSnackbar("علاقه‌مندی‌ها به‌زودی...")
-                }
-            },
+            onFavorites = { navController.navigate("favorites") },
             onAbout = {
                 scope.launch {
                     snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
@@ -149,7 +147,7 @@ fun MainScreen() {
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             AppNavGraph(navController = navController)
         }
