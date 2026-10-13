@@ -27,3 +27,11 @@ val AppTypography = Typography(
         fontSize = 11.sp
     )
 )
+
+fun Typography.withScale(scale: Float): Typography = Typography(
+    titleLarge = titleLarge.copy(fontSize = (20 * scale).sp),
+    titleMedium = titleMedium.copy(fontSize = (16 * scale).sp),
+    bodyLarge = bodyLarge.copy(fontSize = (15 * scale).sp),
+    bodyMedium = bodyMedium.copy(fontSize = (13 * scale).sp),
+    labelSmall = labelSmall.copy(fontSize = (11 * scale).sp)
+)
