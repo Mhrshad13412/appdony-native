@@ -1,106 +1,86 @@
-package com.appdony.app.data.repository
+package com.appdony.app.ui.navigation
 
-import com.appdony.app.data.api.ApiClient
-import com.appdony.app.data.model.Category
-import com.appdony.app.data.model.InitialData
-import com.appdony.app.data.model.Post
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import android.net.Uri
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.appdony.app.ui.screens.AppsScreen
+import com.appdony.app.ui.screens.BlogScreen
+import com.appdony.app.ui.screens.CategoryScreen
+import com.appdony.app.ui.screens.DetailScreen
+import com.appdony.app.ui.screens.GamesScreen
+import com.appdony.app.ui.screens.SearchScreen
+import com.appdony.app.ui.screens.UpdatesScreen
 
-class AppRepository {
-
-    private val api = ApiClient.api
-
-    suspend fun getPost(id: Int): Result<Post> = try {
-        Result.success(api.getPost(id = id))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 15): Result<List<Post>> = try {
-        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    suspend fun getPostsByCategoryPaged(
-        categoryId: Int,
-        page: Int,
-        perPage: Int = 24
-    ): Result<List<Post>> = try {
-        Result.success(
-            api.getPostsByCategory(
-                categoryId = categoryId,
-                perPage = perPage,
-                page = page
-            )
-        )
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    suspend fun searchPosts(query: String): Result<List<Post>> = try {
-        Result.success(api.searchPosts(query = query, perPage = 30))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    suspend fun loadInitial(feedType: String): Result<InitialData> = try {
-        coroutineScope {
-            val postsDeferred = async { api.getPosts(perPage = 15, page = 1) }
-            val categoriesDeferred = async { api.getCategories(perPage = 100) }
-
-            val posts = postsDeferred.await()
-            val allCategories = categoriesDeferred.await()
-
-            val gamesParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
-            }
-            val appsParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
-            }
-            val blogParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("blog", "وبلاگ", "article", "مقاله", "news", "خبر"))
-            }
-
-            val relevantParent = when (feedType) {
-                "games" -> gamesParent
-                "apps" -> appsParent
-                "blog" -> blogParent
-                else -> null
-            }
-
-            val sections = if (relevantParent != null) {
-                val children = allCategories.filter {
-                    it.parent == relevantParent.id && it.count > 0
+@Composable
+fun AppNavGraph(navController: NavHostController) {
+    NavHost(
+        navController = navController,
+        startDestination = "games"
+    ) {
+        composable("games") {
+            GamesScreen(
+                onPostClick = { id -> navController.navigate("detail/$id") },
+                onCategoryClick = { id, name ->
+                    navController.navigate("category/$id/${Uri.encode(name)}")
                 }
-                if (children.isNotEmpty()) {
-                    children.sortedByDescending { it.count }.take(30)
-                } else {
-                    listOf(relevantParent)
-                }
-            } else {
-                allCategories.filter { it.parent == 0 && it.count > 0 }
-                    .sortedByDescending { it.count }
-                    .take(25)
-            }
-
-            Result.success(
-                InitialData(
-                    banner = posts.getOrNull(0),
-                    singleFeature = posts.getOrNull(1),
-                    featured = posts.take(6),
-                    categories = sections
-                )
             )
         }
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-}
+        composable("apps") {
+            AppsScreen(
+                onPostClick = { id -> navController.navigate("detail/$id") },
+                onCategoryClick = { id, name ->
+                    navController.navigate("category/$id/${Uri.encode(name)}")
+                }
+            )
+        }
+        composable("blog") {
+            BlogScreen(
+                onPostClick = { id -> navController.navigate("detail/$id") },
+                onCategoryClick = { id, name ->
+                    navController.navigate("category/$id/${Uri.encode(name)}")
+                }
+            )
+        }
+        composable("updates") { UpdatesScreen() }
 
-private fun matchesAny(cat: Category, keywords: List<String>): Boolean {
-    val name = cat.name.lowercase()
-    val slug = cat.slug.lowercase()
-    return keywords.any { name.contains(it.lowercase()) || slug.contains(it.lowercase()) }
+        composable("search") {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onPostClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+
+        composable(
+            route = "category/{categoryId}/{categoryName}",
+            arguments = listOf(
+                navArgument("categoryId") { type = NavType.IntType },
+                navArgument("categoryName") { type = NavType.StringType }
+            )
+        ) { backStack ->
+            val catId = backStack.arguments?.getInt("categoryId") ?: return@composable
+            val catName = backStack.arguments?.getString("categoryName") ?: ""
+            CategoryScreen(
+                categoryId = catId,
+                categoryName = Uri.decode(catName),
+                onBack = { navController.popBackStack() },
+                onPostClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+
+        composable(
+            route = "detail/{postId}",
+            arguments = listOf(navArgument("postId") { type = NavType.IntType })
+        ) { backStack ->
+            val postId = backStack.arguments?.getInt("postId") ?: return@composable
+            DetailScreen(
+                postId = postId,
+                onBack = { navController.popBackStack() },
+                onSimilarClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+    }
 }
