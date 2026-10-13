@@ -4,11 +4,18 @@ import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.webkit.CookieManager
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 
 object DownloadHelper {
 
-    fun startDownload(context: Context, url: String, fileName: String) {
+    fun startDownload(
+        context: Context,
+        url: String,
+        fileName: String,
+        userAgent: String? = null
+    ) {
         try {
             val request = DownloadManager.Request(Uri.parse(url)).apply {
                 setTitle(fileName)
@@ -22,15 +29,41 @@ object DownloadHelper {
                 )
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
+
+                // User-Agent برای اینکه سایت قبول کنه
+                setRequestHeader(
+                    "User-Agent",
+                    userAgent ?: "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 " +
+                            "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                )
+                setRequestHeader("Referer", "https://appdony.ir/")
+                setRequestHeader("Accept", "*/*")
+
+                // کوکی‌های WebView (اگه کاربر لاگین کرده)
+                val cookies = CookieManager.getInstance().getCookie(url)
+                if (!cookies.isNullOrBlank()) {
+                    setRequestHeader("Cookie", cookies)
+                }
+
+                // تعیین نوع فایل
+                val ext = MimeTypeMap.getFileExtensionFromUrl(url).lowercase()
+                val mime = when (ext) {
+                    "apk" -> "application/vnd.android.package-archive"
+                    "zip" -> "application/zip"
+                    "rar" -> "application/x-rar-compressed"
+                    "pdf" -> "application/pdf"
+                    else -> "application/octet-stream"
+                }
+                setMimeType(mime)
             }
 
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            manager.enqueue(request)
+            val downloadId = manager.enqueue(request)
 
             Toast.makeText(
                 context,
-                "دانلود شروع شد ✓",
-                Toast.LENGTH_SHORT
+                "دانلود شروع شد ✓\nچک کن: پوشه Downloads",
+                Toast.LENGTH_LONG
             ).show()
         } catch (e: Exception) {
             Toast.makeText(
@@ -39,5 +72,23 @@ object DownloadHelper {
                 Toast.LENGTH_LONG
             ).show()
         }
+    }
+
+    fun buildFileName(title: String, url: String): String {
+        val clean = title
+            .replace(Regex("[^\\w\\u0600-\\u06FF\\s.]"), "")
+            .trim()
+            .take(50)
+            .ifBlank { "appdony_file" }
+
+        // اگه url پسوند داره استفاده کن
+        val ext = url.substringAfterLast(".", "").substringBefore("?").lowercase()
+        val safeExt = if (ext in listOf("apk", "zip", "rar", "pdf") && ext.isNotBlank()) {
+            ".$ext"
+        } else {
+            ".apk"
+        }
+
+        return "$clean$safeExt"
     }
 }
