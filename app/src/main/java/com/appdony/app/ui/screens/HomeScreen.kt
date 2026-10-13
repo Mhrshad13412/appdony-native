@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +58,7 @@ fun FeedScreen(
 
     val loading by vm.initialLoading.collectAsStateWithLifecycle()
     val errorMsg by vm.error.collectAsStateWithLifecycle()
+    val plusPosts by vm.plusPosts.collectAsStateWithLifecycle()
     val featuredList by vm.featured.collectAsStateWithLifecycle()
     val categoriesList by vm.categories.collectAsStateWithLifecycle()
     val sectionStates by vm.sections.collectAsStateWithLifecycle()
@@ -71,17 +73,20 @@ fun FeedScreen(
             contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // ═══ بلاک بالایی — اسکرول افقی چند کارت بزرگ ═══
-            if (featuredList.isNotEmpty()) {
-                item(key = "top_banner_title") {
-                    SectionHeader(title = "ویژه")
+            // ═══ بلاک بالایی: اپدونی پلاس ═══
+            val topPosts = if (plusPosts.isNotEmpty()) plusPosts else featuredList
+            val topTitle = if (plusPosts.isNotEmpty()) "اپدونی پلاس" else "ویژه"
+
+            if (topPosts.isNotEmpty()) {
+                item(key = "top_title") {
+                    SectionHeader(title = topTitle)
                 }
-                item(key = "top_banner_row") {
+                item(key = "top_row") {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(featuredList, key = { "top_${it.id}" }) { p ->
+                        items(topPosts, key = { "top_${it.id}" }) { p ->
                             BannerCard(
                                 title = p.cleanTitle(),
                                 imageUrl = p.featuredImageUrl(),
@@ -93,7 +98,7 @@ fun FeedScreen(
                 }
             }
 
-            // ═══ سکشن‌های دسته‌بندی — تنبل لود ═══
+            // ═══ سکشن‌های دسته‌بندی ═══
             items(categoriesList, key = { "cat_${it.id}" }) { cat ->
                 val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
 
@@ -207,7 +212,9 @@ private fun ErrorView(message: String, onRetry: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Text("  تلاش دوباره")
