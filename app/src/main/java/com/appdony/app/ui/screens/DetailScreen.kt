@@ -24,13 +24,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +58,7 @@ import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.primaryCategoryName
+import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.CommentWebView
@@ -87,12 +92,15 @@ fun DetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager(context) }
+    val favoritesManager = remember { FavoritesManager(context) }
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+    val favorites by favoritesManager.favoriteIds.collectAsStateWithLifecycle(initialValue = emptySet())
+
+    val isFavorite = favorites.contains(postId)
 
     var showCommentWeb by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
 
-    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
@@ -106,7 +114,6 @@ fun DetailScreen(
         )
     }
 
-    // WebView کامنت
     if (showCommentWeb) {
         CommentWebView(
             postId = postId,
@@ -120,7 +127,7 @@ fun DetailScreen(
             is DetailUiState.Loading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
-                        color = AppdonyGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(44.dp)
                     )
                 }
@@ -151,17 +158,14 @@ fun DetailScreen(
                         context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                     },
                     onAddComment = {
-                        if (isLoggedIn) {
-                            showCommentWeb = true
-                        } else {
-                            showLoginSheet = true
-                        }
+                        if (isLoggedIn) showCommentWeb = true
+                        else showLoginSheet = true
                     }
                 )
             }
         }
 
-        // دکمه بازگشت
+        // دکمه بازگشت — سمت چپ بالا
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -175,6 +179,30 @@ fun DetailScreen(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "بازگشت",
                 tint = Color.White,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        // دکمه قلب — سمت راست بالا
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(0xCC000000))
+                .clickable {
+                    scope.launch {
+                        favoritesManager.toggle(postId)
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isFavorite) Icons.Filled.Favorite
+                else Icons.Outlined.FavoriteBorder,
+                contentDescription = "علاقه‌مندی",
+                tint = if (isFavorite) Color(0xFFFF5252) else Color.White,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -195,7 +223,6 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // کاور بالا
         item {
             Box(
                 modifier = Modifier
@@ -220,7 +247,6 @@ private fun DetailContent(
             }
         }
 
-        // کارت اصلی
         item {
             Row(
                 modifier = Modifier
@@ -268,7 +294,7 @@ private fun DetailContent(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = post.primaryCategoryName(),
-                        color = AppdonyGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -276,7 +302,6 @@ private fun DetailContent(
             }
         }
 
-        // اطلاعات فنی
         item {
             if (info.version != null || info.size != null || info.androidReq != null) {
                 Row(
@@ -292,7 +317,6 @@ private fun DetailContent(
             }
         }
 
-        // دکمه‌های دانلود
         if (info.downloadLinks.isNotEmpty()) {
             item {
                 Column(
@@ -309,7 +333,8 @@ private fun DetailContent(
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (index == 0) AppdonyGreen else AppdonyCardBg
+                                containerColor = if (index == 0) MaterialTheme.colorScheme.primary
+                                else AppdonyCardBg
                             )
                         ) {
                             Icon(
@@ -358,7 +383,6 @@ private fun DetailContent(
             }
         }
 
-        // اسکرین‌شات‌ها
         if (info.screenshots.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -396,7 +420,6 @@ private fun DetailContent(
             }
         }
 
-        // توضیحات
         item {
             Spacer(Modifier.height(20.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -416,7 +439,6 @@ private fun DetailContent(
             }
         }
 
-        // برنامه‌های مشابه
         if (similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -445,7 +467,6 @@ private fun DetailContent(
             }
         }
 
-        // کامنت‌ها
         item {
             Spacer(Modifier.height(24.dp))
             CommentsSection(
