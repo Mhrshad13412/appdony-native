@@ -21,32 +21,48 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.ui.theme.AppdonyBg
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.ThemeManager
+import com.appdony.app.data.preferences.ThemeMode
+import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val scope = rememberCoroutineScope()
+    val state by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
+    val primary = MaterialTheme.colorScheme.primary
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppdonyBg)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // نوار بالا
         item {
             Row(
                 modifier = Modifier
@@ -62,7 +78,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "بازگشت",
                         tint = AppdonyTextPrimary
                     )
@@ -77,37 +93,42 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // حالت شب/روز
+        // حالت نمایش
         item {
-            SettingsSection(title = "حالت نمایش", icon = Icons.Default.DarkMode)
-            SettingsOption(icon = Icons.Default.DarkMode, title = "تیره", selected = true, onClick = {})
-            SettingsOption(icon = Icons.Default.LightMode, title = "روشن", selected = false, onClick = {})
+            SettingsSection(title = "حالت نمایش", icon = Icons.Default.DarkMode, tint = primary)
+            SettingsOption(
+                icon = Icons.Default.DarkMode,
+                title = "تیره",
+                selected = state.mode == ThemeMode.DARK,
+                onClick = { scope.launch { themeManager.setMode(ThemeMode.DARK) } },
+                selectedColor = primary
+            )
+            SettingsOption(
+                icon = Icons.Default.LightMode,
+                title = "روشن",
+                selected = state.mode == ThemeMode.LIGHT,
+                onClick = { scope.launch { themeManager.setMode(ThemeMode.LIGHT) } },
+                selectedColor = primary
+            )
             Spacer(Modifier.height(16.dp))
         }
 
         // تم رنگی
         item {
-            SettingsSection(title = "رنگ تم", icon = Icons.Default.Palette)
+            SettingsSection(title = "رنگ تم", icon = Icons.Default.Palette, tint = primary)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val colors = listOf(
-                    0xFF0D7377, // سبز اپدونی
-                    0xFF1976D2, // آبی
-                    0xFF7B1FA2, // بنفش
-                    0xFFC2185B, // صورتی
-                    0xFFD32F2F, // قرمز
-                    0xFF5D4037, // قهوه‌ای
-                    0xFF455A64  // خاکستری
-                )
-                colors.forEachIndexed { index, color ->
+                ThemeManager.themeColors.forEachIndexed { index, colorLong ->
                     ColorCircle(
-                        color = Color(color),
-                        selected = index == 0,
-                        onClick = {}
+                        color = Color(colorLong),
+                        selected = state.colorIndex == index,
+                        onClick = {
+                            scope.launch { themeManager.setColorIndex(index) }
+                        }
                     )
                 }
             }
@@ -116,16 +137,31 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         // سایز فونت
         item {
-            SettingsSection(title = "سایز فونت", icon = Icons.Default.FormatSize)
-            SettingsOption(title = "کوچک", selected = false, onClick = {})
-            SettingsOption(title = "متوسط", selected = true, onClick = {})
-            SettingsOption(title = "بزرگ", selected = false, onClick = {})
+            SettingsSection(title = "سایز فونت", icon = Icons.Default.FormatSize, tint = primary)
+            SettingsOption(
+                title = "کوچک",
+                selected = state.fontSize == FontSize.SMALL,
+                onClick = { scope.launch { themeManager.setFontSize(FontSize.SMALL) } },
+                selectedColor = primary
+            )
+            SettingsOption(
+                title = "متوسط",
+                selected = state.fontSize == FontSize.MEDIUM,
+                onClick = { scope.launch { themeManager.setFontSize(FontSize.MEDIUM) } },
+                selectedColor = primary
+            )
+            SettingsOption(
+                title = "بزرگ",
+                selected = state.fontSize == FontSize.LARGE,
+                onClick = { scope.launch { themeManager.setFontSize(FontSize.LARGE) } },
+                selectedColor = primary
+            )
             Spacer(Modifier.height(16.dp))
         }
 
         // درباره
         item {
-            SettingsSection(title = "درباره", icon = Icons.Default.Check)
+            SettingsSection(title = "درباره", icon = Icons.Default.Info, tint = primary)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -152,20 +188,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                     color = AppdonyTextMuted,
                     fontSize = 12.sp
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "appdony.ir",
-                    color = AppdonyGreen,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun SettingsSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private fun SettingsSection(
+    title: String,
+    icon: ImageVector,
+    tint: Color
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,7 +209,7 @@ private fun SettingsSection(title: String, icon: androidx.compose.ui.graphics.ve
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = AppdonyGreen,
+            tint = tint,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(10.dp))
@@ -193,7 +227,8 @@ private fun SettingsOption(
     title: String,
     selected: Boolean,
     onClick: () -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
+    selectedColor: Color,
+    icon: ImageVector? = null
 ) {
     Row(
         modifier = Modifier
@@ -224,7 +259,7 @@ private fun SettingsOption(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
-                tint = AppdonyGreen,
+                tint = selectedColor,
                 modifier = Modifier.size(20.dp)
             )
         }
