@@ -2,7 +2,6 @@ package com.appdony.app.ui.screens
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,15 +49,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.primaryCategoryName
 import com.appdony.app.ui.components.AppCard
+import com.appdony.app.ui.components.CommentWebView
+import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import com.appdony.app.util.AppInfo
 import com.appdony.app.util.DownloadHelper
 
 @Composable
@@ -75,6 +81,16 @@ fun DetailScreen(
     )
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showCommentWeb by remember { mutableStateOf(false) }
+
+    // اگه WebView بازه، فقط اون رو نشون بده
+    if (showCommentWeb) {
+        CommentWebView(
+            postId = postId,
+            onClose = { showCommentWeb = false }
+        )
+        return
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(AppdonyBg)) {
         when (val s = state) {
@@ -114,12 +130,13 @@ fun DetailScreen(
                         context.startActivity(
                             Intent.createChooser(intent, "اشتراک‌گذاری")
                         )
-                    }
+                    },
+                    onAddComment = { showCommentWeb = true }
                 )
             }
         }
 
-        // دکمه بازگشت شناور
+        // دکمه بازگشت
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -141,18 +158,18 @@ fun DetailScreen(
 
 @Composable
 private fun DetailContent(
-    post: com.appdony.app.data.model.Post,
-    info: com.appdony.app.util.AppInfo,
-    similar: List<com.appdony.app.data.model.Post>,
+    post: Post,
+    info: AppInfo,
+    similar: List<Post>,
     onSimilarClick: (Int) -> Unit,
     onDownload: (String) -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onAddComment: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // کاور بالا
         item {
             Box(
                 modifier = Modifier
@@ -170,17 +187,13 @@ private fun DetailContent(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    AppdonyBg.copy(alpha = 0.95f)
-                                )
+                                listOf(Color.Transparent, AppdonyBg.copy(alpha = 0.95f))
                             )
                         )
                 )
             }
         }
 
-        // کارت اصلی (آیکون + نام + دسته)
         item {
             Row(
                 modifier = Modifier
@@ -208,7 +221,7 @@ private fun DetailContent(
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Default.Android,
+                            Icons.Default.Android,
                             contentDescription = null,
                             tint = AppdonyTextMuted,
                             modifier = Modifier.size(36.dp)
@@ -236,7 +249,6 @@ private fun DetailContent(
             }
         }
 
-        // اطلاعات فنی
         item {
             if (info.version != null || info.size != null || info.androidReq != null) {
                 Row(
@@ -245,20 +257,13 @@ private fun DetailContent(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    if (info.version != null) {
-                        InfoChip(label = "نسخه", value = info.version)
-                    }
-                    if (info.size != null) {
-                        InfoChip(label = "حجم", value = info.size)
-                    }
-                    if (info.androidReq != null) {
-                        InfoChip(label = "اندروید", value = info.androidReq.take(15))
-                    }
+                    info.version?.let { InfoChip(label = "نسخه", value = it) }
+                    info.size?.let { InfoChip(label = "حجم", value = it) }
+                    info.androidReq?.let { InfoChip(label = "اندروید", value = it.take(15)) }
                 }
             }
         }
 
-        // دکمه‌های دانلود + اشتراک
         item {
             Row(
                 modifier = Modifier
@@ -271,9 +276,7 @@ private fun DetailContent(
                         val url = info.downloadLinks.firstOrNull()
                         if (url != null) onDownload(url)
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
+                    modifier = Modifier.weight(1f).height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
                 ) {
@@ -303,7 +306,6 @@ private fun DetailContent(
             }
         }
 
-        // اسکرین‌شات‌ها
         if (info.screenshots.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -341,7 +343,6 @@ private fun DetailContent(
             }
         }
 
-        // توضیحات
         item {
             Spacer(Modifier.height(20.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -361,7 +362,6 @@ private fun DetailContent(
             }
         }
 
-        // برنامه‌های مشابه
         if (similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
@@ -390,33 +390,12 @@ private fun DetailContent(
             }
         }
 
-        // کامنت‌ها (فعلاً placeholder)
         item {
             Spacer(Modifier.height(24.dp))
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = "نظرات کاربران",
-                    color = AppdonyTextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(AppdonyCardBg)
-                        .border(1.dp, AppdonyGreen.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "💬 بخش نظرات — به‌زودی\n(متصل به سایت اپدونی)",
-                        color = AppdonyTextMuted,
-                        fontSize = 13.sp
-                    )
-                }
-            }
+            CommentsSection(
+                postId = post.id,
+                onAddComment = onAddComment
+            )
         }
     }
 }
@@ -430,11 +409,7 @@ private fun InfoChip(label: String, value: String) {
             .background(AppdonyCardBg)
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = label,
-            color = AppdonyTextMuted,
-            fontSize = 11.sp
-        )
+        Text(text = label, color = AppdonyTextMuted, fontSize = 11.sp)
         Spacer(Modifier.height(4.dp))
         Text(
             text = value,
