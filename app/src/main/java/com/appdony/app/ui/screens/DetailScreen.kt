@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,12 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,8 +47,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.appdony.app.data.model.Post
-import com.appdony.app.data.model.cleanContent
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.primaryCategoryName
@@ -56,6 +56,7 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import com.appdony.app.util.DownloadHelper
 
 @Composable
 fun DetailScreen(
@@ -73,12 +74,16 @@ fun DetailScreen(
         }
     )
     val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize().background(AppdonyBg)) {
         when (val s = state) {
             is DetailUiState.Loading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AppdonyGreen, modifier = Modifier.size(44.dp))
+                    CircularProgressIndicator(
+                        color = AppdonyGreen,
+                        modifier = Modifier.size(44.dp)
+                    )
                 }
             }
             is DetailUiState.Error -> {
@@ -89,8 +94,27 @@ fun DetailScreen(
             is DetailUiState.Success -> {
                 DetailContent(
                     post = s.post,
+                    info = s.info,
                     similar = s.similar,
-                    onSimilarClick = onSimilarClick
+                    onSimilarClick = onSimilarClick,
+                    onDownload = { url ->
+                        val name = s.post.cleanTitle()
+                            .replace(Regex("[^\\w\\u0600-\\u06FF\\s.]"), "")
+                            .take(40) + ".apk"
+                        DownloadHelper.startDownload(context, url, name)
+                    },
+                    onShare = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                "دانلود ${s.post.cleanTitle()}\nhttps://appdony.ir/?p=${s.post.id}"
+                            )
+                        }
+                        context.startActivity(
+                            Intent.createChooser(intent, "اشتراک‌گذاری")
+                        )
+                    }
                 )
             }
         }
@@ -117,20 +141,23 @@ fun DetailScreen(
 
 @Composable
 private fun DetailContent(
-    post: Post,
-    similar: List<Post>,
-    onSimilarClick: (Int) -> Unit
+    post: com.appdony.app.data.model.Post,
+    info: com.appdony.app.util.AppInfo,
+    similar: List<com.appdony.app.data.model.Post>,
+    onSimilarClick: (Int) -> Unit,
+    onDownload: (String) -> Unit,
+    onShare: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // کاور بزرگ با گرادیان
+        // کاور بالا
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .height(260.dp)
             ) {
                 AsyncImage(
                     model = post.featuredImageUrl(),
@@ -145,7 +172,7 @@ private fun DetailContent(
                             Brush.verticalGradient(
                                 listOf(
                                     Color.Transparent,
-                                    AppdonyBg.copy(alpha = 0.9f)
+                                    AppdonyBg.copy(alpha = 0.95f)
                                 )
                             )
                         )
@@ -153,76 +180,170 @@ private fun DetailContent(
             }
         }
 
-        // کارت اطلاعات اصلی
+        // کارت اصلی (آیکون + نام + دسته)
         item {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(AppdonyCardBg)
-                    .padding(16.dp)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // آیکون
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(AppdonyBg),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Box(
+                    modifier = Modifier
+                        .size(78.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(AppdonyBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val img = post.featuredImageUrl()
+                    if (!img.isNullOrBlank()) {
                         AsyncImage(
-                            model = post.featuredImageUrl(),
+                            model = img,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Android,
+                            contentDescription = null,
+                            tint = AppdonyTextMuted,
+                            modifier = Modifier.size(36.dp)
+                        )
                     }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = post.cleanTitle(),
-                            color = AppdonyTextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = post.primaryCategoryName(),
-                            color = AppdonyGreen,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = post.cleanTitle(),
+                        color = AppdonyTextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = post.primaryCategoryName(),
+                        color = AppdonyGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // اطلاعات فنی
+        item {
+            if (info.version != null || info.size != null || info.androidReq != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    if (info.version != null) {
+                        InfoChip(label = "نسخه", value = info.version)
+                    }
+                    if (info.size != null) {
+                        InfoChip(label = "حجم", value = info.size)
+                    }
+                    if (info.androidReq != null) {
+                        InfoChip(label = "اندروید", value = info.androidReq.take(15))
                     }
                 }
             }
         }
 
-        // دکمه نصب بزرگ
+        // دکمه‌های دانلود + اشتراک
         item {
-            Button(
-                onClick = { /* TODO: دانلود */ },
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Button(
+                    onClick = {
+                        val url = info.downloadLinks.firstOrNull()
+                        if (url != null) onDownload(url)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppdonyGreen)
+                ) {
+                    Icon(Icons.Default.Download, null, tint = Color.White)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "نصب و دانلود",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AppdonyCardBg)
+                        .clickable { onShare() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = "اشتراک",
+                        tint = AppdonyTextPrimary
+                    )
+                }
+            }
+        }
+
+        // اسکرین‌شات‌ها
+        if (info.screenshots.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(20.dp))
                 Text(
-                    text = "نصب و دانلود",
-                    color = Color.White,
+                    text = "تصاویر",
+                    color = AppdonyTextPrimary,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
+                Spacer(Modifier.height(10.dp))
+            }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(info.screenshots) { url ->
+                        Box(
+                            modifier = Modifier
+                                .width(180.dp)
+                                .height(280.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(AppdonyCardBg)
+                        ) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
             }
         }
 
         // توضیحات
         item {
+            Spacer(Modifier.height(20.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "توضیحات",
@@ -232,7 +353,7 @@ private fun DetailContent(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = post.cleanContent().take(2000),
+                    text = info.cleanDescription.take(3000),
                     color = AppdonyTextMuted,
                     fontSize = 13.sp,
                     lineHeight = 22.sp
@@ -251,10 +372,11 @@ private fun DetailContent(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+                Spacer(Modifier.height(10.dp))
             }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(similar, key = { it.id }) { p ->
@@ -268,9 +390,9 @@ private fun DetailContent(
             }
         }
 
-        // کامنت‌ها
+        // کامنت‌ها (فعلاً placeholder)
         item {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "نظرات کاربران",
@@ -278,23 +400,49 @@ private fun DetailContent(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(AppdonyCardBg)
                         .border(1.dp, AppdonyGreen.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .padding(20.dp),
+                        .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "بخش نظرات به‌زودی...\n(متصل به سایت اپدونی)",
+                        text = "💬 بخش نظرات — به‌زودی\n(متصل به سایت اپدونی)",
                         color = AppdonyTextMuted,
                         fontSize = 13.sp
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun InfoChip(label: String, value: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppdonyCardBg)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            color = AppdonyTextMuted,
+            fontSize = 11.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = value,
+            color = AppdonyTextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
