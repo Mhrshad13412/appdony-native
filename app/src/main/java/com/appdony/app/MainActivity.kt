@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.appdony.app.data.session.SessionManager
+import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.LoginSheet
@@ -48,7 +49,9 @@ fun MainScreen() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: ""
-    val showChrome = currentRoute != "search" && !currentRoute.startsWith("detail/")
+    val showChrome = currentRoute != "search" &&
+            currentRoute != "settings" &&
+            !currentRoute.startsWith("detail/")
 
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
@@ -57,20 +60,55 @@ fun MainScreen() {
 
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
 
     var showLoginSheet by remember { mutableStateOf(false) }
+    var showAccountSheet by remember { mutableStateOf(false) }
 
+    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
-            onLoginSuccess = { username, disp ->
+            onLoginSuccess = { user, disp ->
                 scope.launch {
                     sessionManager.saveSession(
-                        username = username,
-                        displayName = disp.ifBlank { username }
+                        username = user,
+                        displayName = disp.ifBlank { user }
                     )
                     showLoginSheet = false
                     snackbarHostState.showSnackbar("خوش آمدید $disp")
+                }
+            }
+        )
+    }
+
+    // پنجره پروفایل (وقتی لاگین هست)
+    if (showAccountSheet) {
+        AccountSheet(
+            displayName = displayName.ifBlank { username },
+            username = username,
+            onDismiss = { showAccountSheet = false },
+            onDownloads = {
+                navController.navigate("updates")
+            },
+            onSettings = {
+                navController.navigate("settings")
+            },
+            onFavorites = {
+                scope.launch {
+                    snackbarHostState.showSnackbar("علاقه‌مندی‌ها به‌زودی...")
+                }
+            },
+            onAbout = {
+                scope.launch {
+                    snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
+                }
+            },
+            onLogout = {
+                scope.launch {
+                    sessionManager.clearSession()
+                    showAccountSheet = false
+                    snackbarHostState.showSnackbar("از حساب خارج شدی")
                 }
             }
         )
@@ -85,9 +123,7 @@ fun MainScreen() {
                     onSearchClick = { navController.navigate("search") },
                     onLoginClick = {
                         if (isLoggedIn) {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("قبلاً وارد شدی: $displayName")
-                            }
+                            showAccountSheet = true
                         } else {
                             showLoginSheet = true
                         }
