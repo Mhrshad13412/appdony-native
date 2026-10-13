@@ -39,19 +39,19 @@ object DownloadHelper {
                 }
                 setMimeType(mime)
 
-                // کوکی از WebView — برای لینک‌های نیازمند لاگین
+                // هدرها
+                addRequestHeader(
+                    "User-Agent",
+                    "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 " +
+                            "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                )
+                addRequestHeader("Referer", "https://appdony.ir/")
+                addRequestHeader("Accept", "*/*")
+
+                // کوکی از WebView
                 val cookies = CookieManager.getInstance().getCookie(url)
                 if (!cookies.isNullOrBlank()) {
-                    // setRequestHeader از API 30 — اینجا چک می‌کنیم
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        setRequestHeader("Cookie", cookies)
-                        setRequestHeader(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 " +
-                                    "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                        )
-                        setRequestHeader("Referer", "https://appdony.ir/")
-                    }
+                    addRequestHeader("Cookie", cookies)
                 }
             }
 
