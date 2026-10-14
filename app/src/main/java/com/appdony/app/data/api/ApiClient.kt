@@ -1,44 +1,50 @@
 package com.appdony.app.data.api
 
-import okhttp3.Cache
+import android.content.Context
+import com.franmontiel.persistentcookiejar.PersistentCookieJar
+import com.franmontiel.persistentcookiejar.cache.SetCookieCache
+import com.franmontiel.persistentcookiejar.persistence.SharedPrefsCookiePersistor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    private const val BASE_URL = "https://appdony.ir/"
+    const val BASE_URL = "https://appdony.ir/"
+    const val WP_LOGIN_URL = "https://appdony.ir/wp-login.php"
+    const val WP_ADMIN_URL = "https://appdony.ir/wp-admin/"
 
-    private var cache: Cache? = null
+    private var cookieJar: PersistentCookieJar? = null
 
-    private fun getCache(context: android.content.Context): Cache {
-        return cache ?: Cache(
-            File(context.cacheDir, "http_cache"),
-            50L * 1024 * 1024 // ۵۰ مگ
-        ).also { cache = it }
+    fun init(context: Context) {
+        if (cookieJar == null) {
+            cookieJar = PersistentCookieJar(
+                SetCookieCache(),
+                SharedPrefsCookiePersistor(context.applicationContext)
+            )
+        }
     }
 
-    fun init(context: android.content.Context) {
-        getCache(context)
+    fun clearCookies() {
+        cookieJar?.clear()
     }
+
+    val cookieJarInstance: PersistentCookieJar?
+        get() = cookieJar
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .cache(cache)
-            .addNetworkInterceptor { chain ->
-                val response = chain.proceed(chain.request())
-                response.newBuilder()
-                    .header("Cache-Control", "public, max-age=300")
-                    .build()
-            }
+            .cookieJar(cookieJar ?: throw IllegalStateException("ApiClient.init() رو صدا بزن!"))
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.NONE
             })
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .retryOnConnectionFailure(true)
             .build()
     }
