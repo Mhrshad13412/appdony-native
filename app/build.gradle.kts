@@ -65,14 +65,12 @@ android {
         }
     }
 
-    // بهینه‌سازی برای debug سریع‌تر
     androidResources {
         generateLocaleConfig = true
     }
 }
 
 dependencies {
-    // Core library desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 
     // Compose
@@ -96,6 +94,9 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    // Cookie Jar پایدار (برای لاگین وردپرس)
+    implementation("com.github.franmontiel:PersistentCookieJar:v1.0.1")
+
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
@@ -107,6 +108,9 @@ dependencies {
 
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
+
+    // Security (برای ذخیره امن)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
