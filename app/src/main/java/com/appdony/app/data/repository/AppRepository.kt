@@ -25,7 +25,7 @@ class AppRepository {
         Result.failure(e)
     }
 
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 15): Result<List<Post>> = try {
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 10): Result<List<Post>> = try {
         Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
     } catch (e: Exception) {
         Result.failure(e)
@@ -55,15 +55,9 @@ class AppRepository {
         Result.failure(e)
     }
 
-    /**
-     * بارگذاری پست‌های اپدونی پلاس
-     * اول دنبال دسته «پلاس» یا «ویژه» می‌گرده
-     * اگه نبود، پست‌های آخر رو برمی‌گردونه
-     */
     suspend fun loadPlusPosts(): Result<List<Post>> = try {
         val allCategories = api.getCategories(perPage = 100)
 
-        // پیدا کردن دسته پلاس
         val plusParent = allCategories.firstOrNull {
             it.parent == 0 && (
                 it.name.contains("پلاس") ||
@@ -79,7 +73,6 @@ class AppRepository {
             val allIds = (listOf(plusParent.id) + childIds).joinToString(",")
             api.getPostsByMultipleCategories(categories = allIds, perPage = 12)
         } else {
-            // fallback: ۶ پست آخر
             api.getPosts(perPage = 6)
         }
 
@@ -88,9 +81,13 @@ class AppRepository {
         Result.failure(e)
     }
 
+    /**
+     * بهینه‌شده: فقط ۲ درخواست موازی، با تعداد کم
+     * فقط ۱۰ پست آخر + دسته‌ها
+     */
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
-            val postsDeferred = async { api.getPosts(perPage = 15, page = 1) }
+            val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
             val categoriesDeferred = async { api.getCategories(perPage = 100) }
 
             val posts = postsDeferred.await()
