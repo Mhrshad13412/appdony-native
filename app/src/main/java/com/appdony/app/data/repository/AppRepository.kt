@@ -1,16 +1,50 @@
 package com.appdony.app.data.repository
 
 import com.appdony.app.data.api.ApiClient
+import com.appdony.app.data.api.CommentRequest
 import com.appdony.app.data.model.Category
 import com.appdony.app.data.model.Comment
 import com.appdony.app.data.model.InitialData
 import com.appdony.app.data.model.Post
+import com.appdony.app.data.model.UserData
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
 class AppRepository {
 
     private val api = ApiClient.api
+
+    // ══════════════════ لاگین ══════════════════
+
+    suspend fun login(username: String, password: String): Result<UserData> = try {
+        // ۱. ارسال درخواست لاگین به wp-login.php
+        val response = api.login(username = username, password = password)
+
+        // ۲. کد 302 یعنی ریدایرکت به پنل = موفق
+        // کد 200 یعنی فرم دوباره نمایش داده شده = خطا
+        if (response.code() == 302 || response.code() == 200 && response.isSuccessful) {
+            // ۳. حالا با کوکی، اطلاعات کاربر رو بگیر
+            val user = api.getCurrentUser()
+            if (user.id > 0 && user.username.isNotBlank()) {
+                Result.success(user)
+            } else {
+                Result.failure(Exception("لاگین ناموفق — اطلاعات کاربر دریافت نشد"))
+            }
+        } else {
+            Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun checkAuth(): Boolean = try {
+        val response = api.checkAuth()
+        response.isSuccessful
+    } catch (e: Exception) {
+        false
+    }
+
+    // ══════════════════ پست‌ها ══════════════════
 
     suspend fun getPost(id: Int): Result<Post> = try {
         Result.success(api.getPost(id = id))
@@ -49,11 +83,29 @@ class AppRepository {
         Result.failure(e)
     }
 
+    // ══════════════════ کامنت‌ها ══════════════════
+
     suspend fun getComments(postId: Int): Result<List<Comment>> = try {
         Result.success(api.getComments(postId = postId, perPage = 50))
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    suspend fun postComment(
+        postId: Int,
+        content: String,
+        nonce: String
+    ): Result<Comment> = try {
+        val comment = api.postComment(
+            nonce = nonce,
+            body = CommentRequest(post = postId, content = content)
+        )
+        Result.success(comment)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    // ══════════════════ اپدونی پلاس ══════════════════
 
     suspend fun loadPlusPosts(): Result<List<Post>> = try {
         val allCategories = api.getCategories(perPage = 100)
@@ -81,10 +133,8 @@ class AppRepository {
         Result.failure(e)
     }
 
-    /**
-     * بهینه‌شده: فقط ۲ درخواست موازی، با تعداد کم
-     * فقط ۱۰ پست آخر + دسته‌ها
-     */
+    // ══════════════════ لود اولیه ══════════════════
+
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
             val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
