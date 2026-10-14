@@ -34,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,12 +60,10 @@ import com.appdony.app.data.model.primaryCategoryName
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
-import com.appdony.app.ui.components.CommentWebView
 import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.AppInfo
@@ -93,36 +90,36 @@ fun DetailScreen(
     val scope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager(context) }
     val favoritesManager = remember { FavoritesManager(context) }
+
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+    val nonce by sessionManager.nonce.collectAsStateWithLifecycle(initialValue = "")
     val favorites by favoritesManager.favoriteIds.collectAsStateWithLifecycle(initialValue = emptySet())
 
     val isFavorite = favorites.contains(postId)
 
-    var showCommentWeb by remember { mutableStateOf(false) }
     var showLoginSheet by remember { mutableStateOf(false) }
 
+    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
-            onLoginSuccess = { user, disp ->
+            onLoginSuccess = { user ->
                 scope.launch {
-                    sessionManager.saveSession(user, disp.ifBlank { user })
+                    sessionManager.saveSession(
+                        userId = user.id,
+                        username = user.username,
+                        displayName = user.displayName(),
+                        email = user.email,
+                        avatarUrl = user.avatarUrl() ?: "",
+                        nonce = user.nonce
+                    )
                     showLoginSheet = false
-                    showCommentWeb = true
                 }
             }
         )
     }
 
-    if (showCommentWeb) {
-        CommentWebView(
-            postId = postId,
-            onClose = { showCommentWeb = false }
-        )
-        return
-    }
-
-    Box(modifier = Modifier.fillMaxSize().background(AppdonyBg)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
             is DetailUiState.Loading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -142,6 +139,8 @@ fun DetailScreen(
                     post = s.post,
                     info = s.info,
                     similar = s.similar,
+                    isLoggedIn = isLoggedIn,
+                    nonce = nonce,
                     onSimilarClick = onSimilarClick,
                     onDownload = { url, title ->
                         val fileName = DownloadHelper.buildFileName(title, url)
@@ -157,15 +156,12 @@ fun DetailScreen(
                         }
                         context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                     },
-                    onAddComment = {
-                        if (isLoggedIn) showCommentWeb = true
-                        else showLoginSheet = true
-                    }
+                    onNeedLogin = { showLoginSheet = true }
                 )
             }
         }
 
-        // دکمه بازگشت — سمت چپ بالا
+        // دکمه بازگشت
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -183,7 +179,7 @@ fun DetailScreen(
             )
         }
 
-        // دکمه قلب — سمت راست بالا
+        // دکمه قلب
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -192,9 +188,7 @@ fun DetailScreen(
                 .clip(CircleShape)
                 .background(Color(0xCC000000))
                 .clickable {
-                    scope.launch {
-                        favoritesManager.toggle(postId)
-                    }
+                    scope.launch { favoritesManager.toggle(postId) }
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -214,10 +208,12 @@ private fun DetailContent(
     post: Post,
     info: AppInfo,
     similar: List<Post>,
+    isLoggedIn: Boolean,
+    nonce: String,
     onSimilarClick: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
     onShare: () -> Unit,
-    onAddComment: () -> Unit
+    onNeedLogin: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -240,7 +236,7 @@ private fun DetailContent(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, AppdonyBg.copy(alpha = 0.95f))
+                                listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
                             )
                         )
                 )
@@ -261,7 +257,7 @@ private fun DetailContent(
                     modifier = Modifier
                         .size(78.dp)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(AppdonyBg),
+                        .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     val img = post.featuredImageUrl()
@@ -360,13 +356,12 @@ private fun DetailContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
                     Button(
                         onClick = { onShare() },
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppdonyCardBg)
@@ -471,7 +466,9 @@ private fun DetailContent(
             Spacer(Modifier.height(24.dp))
             CommentsSection(
                 postId = post.id,
-                onAddComment = onAddComment
+                isLoggedIn = isLoggedIn,
+                nonce = nonce,
+                onNeedLogin = onNeedLogin
             )
         }
     }
