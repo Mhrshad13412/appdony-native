@@ -19,14 +19,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,14 +47,15 @@ import com.appdony.app.data.model.Comment
 import com.appdony.app.ui.screens.CommentsUiState
 import com.appdony.app.ui.screens.CommentsViewModel
 import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun CommentsSection(
     postId: Int,
-    onAddComment: () -> Unit
+    isLoggedIn: Boolean,
+    nonce: String,
+    onNeedLogin: () -> Unit
 ) {
     val vm: CommentsViewModel = viewModel(
         key = "comments_$postId",
@@ -57,9 +67,23 @@ fun CommentsSection(
         }
     )
     val state by vm.state.collectAsStateWithLifecycle()
+    val sending by vm.sending.collectAsStateWithLifecycle()
+    val sendResult by vm.sendResult.collectAsStateWithLifecycle()
+
+    var showComposer by remember { mutableStateOf(false) }
+    var commentText by remember { mutableStateOf("") }
+
+    // اگه لاگین نباشه و بخواد بنویسه، onNeedLogin صدا زده میشه
+    LaunchedEffect(showComposer) {
+        if (showComposer && !isLoggedIn) {
+            showComposer = false
+            onNeedLogin()
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        // هدر + دکمه افزودن
+
+        // هدر + دکمه نظر جدید
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -74,21 +98,24 @@ fun CommentsSection(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AppdonyGreen)
-                    .clickable { onAddComment() }
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable {
+                        if (isLoggedIn) showComposer = !showComposer
+                        else onNeedLogin()
+                    }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = null,
-                        tint = AppdonyTextPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = "نظر جدید",
-                        color = AppdonyTextPrimary,
+                        color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -98,6 +125,104 @@ fun CommentsSection(
 
         Spacer(Modifier.height(12.dp))
 
+        // فرم نوشتن نظر
+        if (showComposer && isLoggedIn) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppdonyCardBg)
+                    .padding(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text("نظرت رو بنویس...", color = AppdonyTextMuted)
+                    },
+                    minLines = 3,
+                    maxLines = 6,
+                    enabled = !sending,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.background,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                        focusedTextColor = AppdonyTextPrimary,
+                        unfocusedTextColor = AppdonyTextPrimary
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable(enabled = !sending && commentText.isNotBlank()) {
+                                vm.sendComment(commentText, nonce)
+                                commentText = ""
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (sending) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            } else {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = "ارسال",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // نمایش نتیجه ارسال
+        if (sendResult != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (sendResult!!.contains("✓")) Color(0x330D7377)
+                        else Color(0x33FF5252)
+                    )
+                    .clickable { vm.clearSendResult() }
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = sendResult!!,
+                    color = if (sendResult!!.contains("✓")) Color(0xFF14A0A6)
+                    else Color(0xFFFF8A80),
+                    fontSize = 13.sp
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // لیست کامنت‌ها
         when (val s = state) {
             is CommentsUiState.Loading -> {
                 Box(
@@ -105,7 +230,7 @@ fun CommentsSection(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = AppdonyGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -131,7 +256,7 @@ fun CommentsSection(
                             .background(AppdonyCardBg)
                             .border(
                                 1.dp,
-                                AppdonyGreen.copy(alpha = 0.3f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                                 RoundedCornerShape(14.dp)
                             )
                             .padding(24.dp),
@@ -146,7 +271,7 @@ fun CommentsSection(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 text = "اولین نفر باش!",
-                                color = AppdonyGreen,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 12.sp
                             )
                         }
@@ -176,7 +301,7 @@ private fun CommentItem(comment: Comment) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(AppdonyGreen.copy(alpha = 0.3f)),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
             val avatar = comment.avatarUrl()
