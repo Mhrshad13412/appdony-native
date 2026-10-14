@@ -64,10 +64,6 @@ android {
             excludes += "/META-INF/NOTICE.txt"
         }
     }
-
-    androidResources {
-        generateLocaleConfig = true
-    }
 }
 
 dependencies {
@@ -94,7 +90,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Cookie Jar پایدار (برای لاگین وردپرس)
+    // Cookie Jar پایدار
     implementation("com.github.franmontiel:PersistentCookieJar:v1.0.1")
 
     // Image Loading
@@ -109,7 +105,7 @@ dependencies {
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
 
-    // Security (برای ذخیره امن)
+    // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Debug
