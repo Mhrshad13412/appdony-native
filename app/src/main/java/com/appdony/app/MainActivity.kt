@@ -83,22 +83,28 @@ fun MainScreen() {
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
+    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
-            onLoginSuccess = { user, disp ->
+            onLoginSuccess = { user ->
                 scope.launch {
                     sessionManager.saveSession(
-                        username = user,
-                        displayName = disp.ifBlank { user }
+                        userId = user.id,
+                        username = user.username,
+                        displayName = user.displayName(),
+                        email = user.email,
+                        avatarUrl = user.avatarUrl() ?: "",
+                        nonce = user.nonce
                     )
                     showLoginSheet = false
-                    snackbarHostState.showSnackbar("خوش آمدید $disp")
+                    snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
                 }
             }
         )
     }
 
+    // پنجره پروفایل
     if (showAccountSheet) {
         AccountSheet(
             displayName = displayName.ifBlank { username },
