@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,14 +78,12 @@ fun BlogScreen(
             }
         }
         else -> {
-            // همه پست‌های وبلاگ از همه دسته‌ها
             val allPosts = sectionStates.values
                 .filterIsInstance<SectionState.Loaded>()
                 .flatMap { it.posts }
                 .distinctBy { it.id }
 
             if (allPosts.isEmpty()) {
-                // اگه هنوز چیزی لود نشده، همه سکشن‌ها رو لود کن
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -94,9 +92,8 @@ fun BlogScreen(
                 ) {
                     items(3) { BlogCardSkeleton() }
                 }
-                // Trigger load for all
                 categoriesList.forEach { cat ->
-                    androidx.compose.runtime.LaunchedEffect(cat.id) {
+                    LaunchedEffect(cat.id) {
                         vm.loadSection(cat.id)
                     }
                 }
@@ -143,7 +140,6 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
             .clickable { onClick() }
             .padding(bottom = 14.dp)
     ) {
-        // تصویر
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,7 +158,6 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
         }
 
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            // دسته
             val catName = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
             if (!catName.isNullOrBlank()) {
                 Text(
@@ -174,7 +169,6 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
             }
 
-            // عنوان
             Text(
                 text = post.cleanTitle(),
                 color = AppdonyTextPrimary,
@@ -187,7 +181,6 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
 
             Spacer(Modifier.height(6.dp))
 
-            // خلاصه
             val excerpt = post.cleanExcerpt()
             if (excerpt.isNotBlank()) {
                 Text(
@@ -201,7 +194,6 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
             }
 
-            // تاریخ
             Text(
                 text = post.date.take(10),
                 color = AppdonyTextMuted,
