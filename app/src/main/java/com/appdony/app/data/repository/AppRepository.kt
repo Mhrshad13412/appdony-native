@@ -17,13 +17,18 @@ class AppRepository {
     // ══════════════════ لاگین ══════════════════
 
     suspend fun login(username: String, password: String): Result<UserData> = try {
-        // ۱. ارسال درخواست لاگین به wp-login.php
+        // مرحله ۱: اول صفحه لاگین رو باز کن تا کوکی‌های اولیه ست بشن
+        try {
+            api.getLoginPage()
+        } catch (_: Exception) { }
+
+        // مرحله ۲: حالا یوزرنیم و پسورد رو بفرست
         val response = api.login(username = username, password = password)
 
-        // ۲. کد 302 یعنی ریدایرکت به پنل = موفق
-        // کد 200 یعنی فرم دوباره نمایش داده شده = خطا
-        if (response.code() == 302 || response.code() == 200 && response.isSuccessful) {
-            // ۳. حالا با کوکی، اطلاعات کاربر رو بگیر
+        // ۳۰۲ = موفق (ریدایرکت به پنل)
+        // ۲۰۰ = خطا (فرم دوباره نمایش داده شده)
+        if (response.code() == 302) {
+            // حالا با کوکی، اطلاعات کاربر رو بگیر
             val user = api.getCurrentUser()
             if (user.id > 0 && user.username.isNotBlank()) {
                 Result.success(user)
@@ -59,7 +64,7 @@ class AppRepository {
         Result.failure(e)
     }
 
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 10): Result<List<Post>> = try {
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
         Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
     } catch (e: Exception) {
         Result.failure(e)
@@ -133,7 +138,7 @@ class AppRepository {
         Result.failure(e)
     }
 
-    // ══════════════════ لود اولیه ══════════════════
+    // ══════════════════ لود اولیه (بهینه‌شده) ══════════════════
 
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
@@ -149,6 +154,7 @@ class AppRepository {
             val appsParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
             }
+            // ⬇️ بهتر: دسته وبلاگ رو دقیق‌تر پیدا کن
             val blogParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(
                     it,
