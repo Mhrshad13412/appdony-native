@@ -27,8 +27,14 @@ interface AppdonyApi {
     // ══════════════════ لاگین ══════════════════
 
     /**
-     * لاگین با یوزرنیم و پسورد معمولی وردپرس
-     * کوکی‌ها به صورت خودکار توسط CookieJar ذخیره می‌شن
+     * مرحله ۱ لاگین: گرفتن کوکی‌های اولیه از صفحه لاگین
+     * این درخواست باعث می‌شه کوکی‌های wordpress_test_cookie ست بشن
+     */
+    @GET("wp-login.php")
+    suspend fun getLoginPage(): Response<ResponseBody>
+
+    /**
+     * مرحله ۲ لاگین: ارسال یوزرنیم و پسورد
      */
     @FormUrlEncoded
     @POST("wp-login.php")
@@ -70,7 +76,7 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByCategory(
         @Query("categories") categoryId: Int,
-        @Query("per_page") perPage: Int = 10,
+        @Query("per_page") perPage: Int = 6, // ⬅️ کاهش از ۱۰ به ۶ برای سرعت
         @Query("page") page: Int = 1,
         @Query("_embed") embed: Int = 1
     ): List<Post>
@@ -78,7 +84,7 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByMultipleCategories(
         @Query("categories") categories: String,
-        @Query("per_page") perPage: Int = 10,
+        @Query("per_page") perPage: Int = 6,
         @Query("_embed") embed: Int = 1
     ): List<Post>
 
@@ -115,9 +121,6 @@ interface AppdonyApi {
         @Query("order") order: String = "desc"
     ): List<Comment>
 
-    /**
-     * ثبت کامنت — با کوکی لاگین (خودکار) + nonce
-     */
     @POST("wp-json/wp/v2/comments")
     suspend fun postComment(
         @Header("X-WP-Nonce") nonce: String,
