@@ -19,6 +19,14 @@ data class AppInfo(
 
 object HtmlParser {
 
+    // دامنه‌های تبلیغاتی که نباید نمایش داده بشن
+    private val blockedDomains = listOf(
+        "google.com/ads", "doubleclick", "googlesyndication",
+        "facebook.com/tr", "google-analytics",
+        "t.me/", "telegram.me/", "instagram.com/appdony",
+        "twitter.com/intent", "pinterest.com/pin"
+    )
+
     fun parsePostContent(html: String): AppInfo {
         val version = extractVersion(html)
         val size = extractSize(html)
@@ -46,8 +54,7 @@ object HtmlParser {
     private fun extractVersion(html: String): String? {
         val patterns = listOf(
             Regex("""نسخه\s*[:：]?\s*([0-9][0-9\.a-zA-Z\-]*)"""),
-            Regex("""[Vv]ersion\s*[:：]?\s*([0-9][0-9\.a-zA-Z\-]*)"""),
-            Regex("""v([0-9]+\.[0-9]+(\.[0-9]+)?)""")
+            Regex("""[Vv]ersion\s*[:：]?\s*([0-9][0-9\.a-zA-Z\-]*)""")
         )
         for (p in patterns) {
             val m = p.find(html)
@@ -77,8 +84,7 @@ object HtmlParser {
     private fun extractAndroidReq(html: String): String? {
         val patterns = listOf(
             Regex("""اندروید\s*([0-9]+(\.[0-9]+)?)\s*و\s*بالاتر"""),
-            Regex("""[Aa]ndroid\s*([0-9]+(\.[0-9]+)?)\s*(\+|و بالاتر)?"""),
-            Regex("""نیازمند\s*اندروید\s*([0-9]+(\.[0-9]+)?)""")
+            Regex("""[Aa]ndroid\s*([0-9]+(\.[0-9]+)?)\s*(\+|و بالاتر)?""")
         )
         for (p in patterns) {
             val m = p.find(html)
@@ -100,12 +106,13 @@ object HtmlParser {
     }
 
     /**
-     * استخراج همه لینک‌های دانلود با عنوانشون
+     * استخراج همه لینک‌های دانلود از HTML
+     * هر لینکی که تو تگ <a> باشه و متنش شامل «دانلود» یا تو دکمه‌های دانلود باشه
      */
     private fun extractDownloadLinks(html: String): List<DownloadLink> {
         val result = mutableListOf<DownloadLink>()
 
-        // ۱. لینک‌های با کلمه «دانلود» در متن
+        // ۱. لینک‌های با متن «دانلود»
         val anchorRegex = Regex(
             """<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)</a>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
@@ -113,30 +120,38 @@ object HtmlParser {
         anchorRegex.findAll(html).forEach { m ->
             val url = m.groupValues[1].trim()
             val rawText = Html.fromHtml(m.groupValues[2], Html.FROM_HTML_MODE_LEGACY).toString().trim()
-            if (url.startsWith("http") && !url.contains("appdony.ir") &&
-                !url.contains("wordpress.org") && !url.contains("wp.com")
+
+            // فیلتر: فقط لینک‌های http معتبر، بدون دامنه‌های تبلیغاتی
+            if (url.startsWith("http") &&
+                blockedDomains.none { url.contains(it, ignoreCase = true) }
             ) {
                 val title = rawText.ifBlank { "دانلود" }
-                // فیلتر تکرار
+                    .replace(Regex("\\s+"), " ")
+                    .take(60)
+
+                // اگه لینک تکراری نباشه
                 if (result.none { it.url == url }) {
-                    result.add(DownloadLink(title = title.take(50), url = url))
+                    result.add(DownloadLink(title = title, url = url))
                 }
             }
         }
 
-        // ۲. لینک‌های دکمه‌ای (کلاس download)
+        // ۲. لینک‌های با کلاس download یا button
         val btnRegex = Regex(
-            """<a[^>]*class=["'][^"']*download[^"']*["'][^>]*href=["']([^"']+)["']""",
+            """<a[^>]*class=["'][^"']*(?:download|btn)[^"']*["'][^>]*href=["']([^"']+)["']""",
             RegexOption.IGNORE_CASE
         )
         btnRegex.findAll(html).forEach { m ->
             val url = m.groupValues[1].trim()
-            if (url.startsWith("http") && result.none { it.url == url }) {
+            if (url.startsWith("http") &&
+                blockedDomains.none { url.contains(it, ignoreCase = true) } &&
+                result.none { it.url == url }
+            ) {
                 result.add(DownloadLink(title = "دانلود مستقیم", url = url))
             }
         }
 
-        return result.take(6)
+        return result.take(8)
     }
 
     private fun extractScreenshots(html: String): List<String> {
