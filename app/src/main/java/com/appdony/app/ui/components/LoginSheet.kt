@@ -1,5 +1,10 @@
 package com.appdony.app.ui.components
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.webkit.CookieManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,34 +56,127 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.viewinterop.AndroidView
 import com.appdony.app.data.model.UserData
-import com.appdony.app.ui.screens.LoginState
-import com.appdony.app.ui.screens.LoginViewModel
+import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginSheet(
     onDismiss: () -> Unit,
     onLoginSuccess: (user: UserData) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val viewModel: LoginViewModel = viewModel()
-    val state by viewModel.state.collectAsStateWithLifecycle()
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(state) {
-        val s = state
-        if (s is LoginState.Success) {
-            onLoginSuccess(s.user)
-            viewModel.resetState()
+    // WebView مخفی برای لاگین
+    var hiddenWebView by remember { mutableStateOf<WebView?>(null) }
+    var webViewReady by remember { mutableStateOf(false) }
+
+    // راه‌اندازی WebView مخفی
+    if (hiddenWebView == null) {
+        Box(modifier = Modifier.size(1.dp)) {
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+                        CookieManager.getInstance().setAcceptCookie(true)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                webViewReady = true
+                            }
+                        }
+
+                        loadUrl("https://appdony.ir/wp-login.php")
+                        hiddenWebView = this
+                    }
+                },
+                modifier = Modifier.size(1.dp)
+            )
+        }
+    }
+
+    // اجرای لاگین از طریق WebView
+    fun performLogin() {
+        val wv = hiddenWebView ?: return
+        loading = true
+        errorMsg = null
+
+        // JS برای پر کردن فرم و submit
+        val js = """
+            javascript:(function() {
+                var userField = document.getElementById('user_login');
+                var passField = document.getElementById('user_pass');
+                var submitBtn = document.getElementById('wp-submit');
+                if (userField && passField && submitBtn) {
+                    userField.value = '${username.replace("'", "\\'")}';
+                    passField.value = '${password.replace("'", "\\'")}';
+                    var event = new Event('input', { bubbles: true });
+                    userField.dispatchEvent(event);
+                    passField.dispatchEvent(event);
+                    submitBtn.click();
+                    return 'ok';
+                }
+                return 'error';
+            })();
+        """.trimIndent()
+
+        wv.evaluateJavascript(js) { result ->
+            // الان صبر کن تا صفحه مقصد بارگذاری بشه
+            CoroutineScope(Dispatchers.Main).launch {
+                kotlinx.coroutines.delay(2500)
+                checkLoginStatus()
+            }
+        }
+    }
+
+    suspend fun checkLoginStatus() {
+        // چک کردن کوکی لاگین
+        val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+        val hasLoginCookie = cookies.contains("wordpress_logged_in")
+
+        if (hasLoginCookie) {
+            // دریافت اطلاعات کاربر
+            val repo = AppRepository()
+            val result = withContext(Dispatchers.IO) { repo.getCurrentUser() }
+            result.onSuccess { user ->
+                if (user.id > 0) {
+                    loading = false
+                    onLoginSuccess(user)
+                } else {
+                    loading = false
+                    errorMsg = "خطا در دریافت اطلاعات کاربر"
+                }
+            }.onFailure {
+                loading = false
+                errorMsg = "خطا در دریافت اطلاعات: ${it.message}"
+            }
+        } else {
+            loading = false
+            errorMsg = "نام کاربری یا رمز عبور اشتباه است"
         }
     }
 
@@ -141,7 +239,7 @@ fun LoginSheet(
                     Icon(Icons.Default.Person, null, tint = AppdonyTextMuted)
                 },
                 singleLine = true,
-                enabled = state !is LoginState.Loading,
+                enabled = !loading,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -180,7 +278,7 @@ fun LoginSheet(
                 visualTransformation = if (passwordVisible) VisualTransformation.None
                 else PasswordVisualTransformation(),
                 singleLine = true,
-                enabled = state !is LoginState.Loading,
+                enabled = !loading,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -194,13 +292,12 @@ fun LoginSheet(
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
-                    onDone = { viewModel.login(username, password) }
+                    onDone = { if (webViewReady) performLogin() }
                 )
             )
 
             // نمایش خطا
-            val err = state as? LoginState.Error
-            if (err != null) {
+            if (errorMsg != null) {
                 Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier
@@ -210,7 +307,7 @@ fun LoginSheet(
                         .padding(12.dp)
                 ) {
                     Text(
-                        text = err.message,
+                        text = errorMsg!!,
                         color = Color(0xFFFF8A80),
                         fontSize = 13.sp
                     )
@@ -221,19 +318,24 @@ fun LoginSheet(
 
             // دکمه ورود
             Button(
-                onClick = { viewModel.login(username, password) },
+                onClick = {
+                    if (!webViewReady) {
+                        errorMsg = "لطفاً چند لحظه صبر کن..."
+                        return@Button
+                    }
+                    performLogin()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                enabled = state !is LoginState.Loading &&
-                        username.isNotBlank() && password.isNotBlank(),
+                enabled = !loading && username.isNotBlank() && password.isNotBlank(),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     disabledContainerColor = AppdonyCardBg
                 )
             ) {
-                if (state is LoginState.Loading) {
+                if (loading) {
                     CircularProgressIndicator(
                         color = Color.White,
                         strokeWidth = 2.dp,
@@ -251,7 +353,6 @@ fun LoginSheet(
 
             Spacer(Modifier.height(12.dp))
 
-            // لینک ثبت‌نام
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -268,7 +369,7 @@ fun LoginSheet(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable {
-                        // TODO: باز کردن صفحه ثبت‌نام
+                        // TODO
                     }
                 )
             }
