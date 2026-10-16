@@ -14,27 +14,10 @@ class AppRepository {
 
     private val api = ApiClient.api
 
-    // ══════════════════ لاگین ══════════════════
+    // ══════════════════ کاربر ══════════════════
 
-    suspend fun login(username: String, password: String): Result<UserData> = try {
-        // مرحله ۱: اول صفحه لاگین رو باز کن تا کوکی‌های اولیه ست بشن
-        try { api.getLoginPage() } catch (_: Exception) { }
-
-        // مرحله ۲: حالا یوزرنیم و پسورد رو بفرست
-        val response = api.login(username = username, password = password)
-
-        if (response.code() == 302) {
-            // ۳۰۲ = موفق (ریدایرکت به پنل)
-            val user = api.getCurrentUser()
-            if (user.id > 0 && user.username.isNotBlank()) {
-                Result.success(user)
-            } else {
-                Result.failure(Exception("لاگین ناموفق — اطلاعات کاربر دریافت نشد"))
-            }
-        } else {
-            // ۲۰۰ = فرم دوباره نمایش داده شده = خطا
-            Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
-        }
+    suspend fun getCurrentUser(): Result<UserData> = try {
+        Result.success(api.getCurrentUser())
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -84,9 +67,33 @@ class AppRepository {
         Result.failure(e)
     }
 
-    /** گرفتن پست‌های وبلاگ از دسته‌بندی وبلاگ */
-    suspend fun getBlogPosts(blogCategoryId: Int, perPage: Int = 10): Result<List<Post>> = try {
-        Result.success(api.getBlogPosts(categoryId = blogCategoryId, perPage = perPage))
+    // ══════════════════ بلاگ ══════════════════
+
+    /**
+     * گرفتن پست‌های بلاگ
+     * 1. اول دنبال دسته slug=blog می‌گرده
+     * 2. اگه نبود، دنبال slug=news یا name=وبلاگ
+     * 3. اگه هیچی نبود، همه پست‌ها رو با ترتیب آخر برمی‌گردونه
+     */
+    suspend fun getBlogPosts(): Result<List<Post>> = try {
+        // ۱. تلاش برای پیدا کردن دسته بلاگ
+        val blogCategory = try {
+            api.getCategoryBySlug("blog").firstOrNull()
+                ?: api.getCategoryBySlug("news").firstOrNull()
+                ?: api.getCategoryBySlug("blog-news").firstOrNull()
+        } catch (e: Exception) {
+            null
+        }
+
+        val posts = if (blogCategory != null) {
+            // اگه دسته بلاگ رو پیدا کردیم، پست‌هاش رو بگیر
+            api.getBlogPosts(categoryId = blogCategory.id, perPage = 20)
+        } else {
+            // وگرنه همه پست‌ها
+            api.getPosts(perPage = 20)
+        }
+
+        Result.success(posts)
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -118,6 +125,7 @@ class AppRepository {
     suspend fun loadPlusPosts(): Result<List<Post>> = try {
         val allCategories = api.getCategories(perPage = 100)
 
+        // دنبال دسته‌بندی پلاس می‌گردیم
         val plusParent = allCategories.firstOrNull {
             it.parent == 0 && (
                 it.name.contains("پلاس") ||
@@ -133,6 +141,7 @@ class AppRepository {
             val allIds = (listOf(plusParent.id) + childIds).joinToString(",")
             api.getPostsByMultipleCategories(categories = allIds, perPage = 12)
         } else {
+            // فالبک: ۶ پست آخر
             api.getPosts(perPage = 6)
         }
 
@@ -151,22 +160,17 @@ class AppRepository {
             val posts = postsDeferred.await()
             val allCategories = categoriesDeferred.await()
 
-            // پیدا کردن دسته‌بندی‌های اصلی
             val gamesParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
             }
             val appsParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
             }
-            // ⬇️ وبلاگ: اگه دسته‌بندی با slug "blog" پیدا شد، ازش استفاده کن
-            val blogParent = allCategories.firstOrNull {
-                it.slug == "blog" || it.name == "وبلاگ"
-            }
 
             val relevantParent = when (feedType) {
                 "games" -> gamesParent
                 "apps" -> appsParent
-                "blog" -> blogParent
+                "blog" -> null // بلاگ جدا مدیریت می‌شه
                 else -> null
             }
 
@@ -180,16 +184,9 @@ class AppRepository {
                     listOf(relevantParent)
                 }
             } else {
-                // برای بلاگ: اگه parent پیدا نشد، همه رو نشون بده
-                if (feedType == "blog") {
-                    allCategories.filter { it.count > 0 }
-                        .sortedByDescending { it.count }
-                        .take(20)
-                } else {
-                    allCategories.filter { it.parent == 0 && it.count > 0 }
-                        .sortedByDescending { it.count }
-                        .take(25)
-                }
+                allCategories.filter { it.parent == 0 && it.count > 0 }
+                    .sortedByDescending { it.count }
+                    .take(25)
             }
 
             Result.success(
