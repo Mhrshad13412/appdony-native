@@ -26,16 +26,11 @@ interface AppdonyApi {
 
     // ══════════════════ لاگین ══════════════════
 
-    /**
-     * مرحله ۱ لاگین: گرفتن کوکی‌های اولیه از صفحه لاگین
-     * این درخواست باعث می‌شه کوکی‌های wordpress_test_cookie ست بشن
-     */
+    /** مرحله ۱: گرفتن کوکی‌های اولیه */
     @GET("wp-login.php")
     suspend fun getLoginPage(): Response<ResponseBody>
 
-    /**
-     * مرحله ۲ لاگین: ارسال یوزرنیم و پسورد
-     */
+    /** مرحله ۲: ارسال یوزرنیم و پسورد */
     @FormUrlEncoded
     @POST("wp-login.php")
     suspend fun login(
@@ -46,15 +41,11 @@ interface AppdonyApi {
         @Field("testcookie") testCookie: String = "1"
     ): Response<ResponseBody>
 
-    /**
-     * گرفتن اطلاعات کاربر لاگین‌شده (شامل nonce)
-     */
+    /** گرفتن اطلاعات کاربر لاگین‌شده (شامل nonce) */
     @GET("wp-json/wp/v2/users/me?context=edit")
     suspend fun getCurrentUser(): UserData
 
-    /**
-     * چک کردن معتبر بودن کوکی لاگین
-     */
+    /** چک کردن معتبر بودن کوکی لاگین */
     @GET("wp-json/wp/v2/users/me")
     suspend fun checkAuth(): Response<ResponseBody>
 
@@ -67,6 +58,14 @@ interface AppdonyApi {
         @Query("_embed") embed: Int = 1
     ): List<Post>
 
+    /** گرفتن پست‌های وبلاگ با فیلتر دسته‌بندی */
+    @GET("wp-json/wp/v2/posts")
+    suspend fun getBlogPosts(
+        @Query("categories") categoryId: Int,
+        @Query("per_page") perPage: Int = 10,
+        @Query("_embed") embed: Int = 1
+    ): List<Post>
+
     @GET("wp-json/wp/v2/posts/{id}")
     suspend fun getPost(
         @Path("id") id: Int,
@@ -76,7 +75,7 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByCategory(
         @Query("categories") categoryId: Int,
-        @Query("per_page") perPage: Int = 6, // ⬅️ کاهش از ۱۰ به ۶ برای سرعت
+        @Query("per_page") perPage: Int = 6,
         @Query("page") page: Int = 1,
         @Query("_embed") embed: Int = 1
     ): List<Post>
