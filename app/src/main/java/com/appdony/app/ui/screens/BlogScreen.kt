@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,13 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
+import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
@@ -43,20 +45,23 @@ fun BlogScreen(
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit
 ) {
-    val vm: HomeViewModel = viewModel(
-        key = "feed_blog",
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(feedType = "blog") as T
-            }
-        }
-    )
+    val repo = remember { AppRepository() }
+    var loading by remember { mutableStateOf(true) }
+    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
 
-    val loading by vm.initialLoading.collectAsStateWithLifecycle()
-    val errorMsg by vm.error.collectAsStateWithLifecycle()
-    val categoriesList by vm.categories.collectAsStateWithLifecycle()
-    val sectionStates by vm.sections.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        loading = true
+        repo.getBlogPosts()
+            .onSuccess {
+                posts = it
+                loading = false
+            }
+            .onFailure {
+                errorMsg = it.message ?: "خطا در دریافت اطلاعات"
+                loading = false
+            }
+    }
 
     when {
         loading -> {
@@ -78,51 +83,30 @@ fun BlogScreen(
             }
         }
         else -> {
-            val allPosts = sectionStates.values
-                .filterIsInstance<SectionState.Loaded>()
-                .flatMap { it.posts }
-                .distinctBy { it.id }
-
-            if (allPosts.isEmpty()) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    items(3) { BlogCardSkeleton() }
-                }
-                categoriesList.forEach { cat ->
-                    LaunchedEffect(cat.id) {
-                        vm.loadSection(cat.id)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(
+                            text = "وبلاگ",
+                            color = AppdonyTextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "آخرین مطالب و اخبار",
+                            color = AppdonyTextMuted,
+                            fontSize = 13.sp
+                        )
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Text(
-                                text = "وبلاگ",
-                                color = AppdonyTextPrimary,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "آخرین مطالب و اخبار",
-                                color = AppdonyTextMuted,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                    items(allPosts, key = { it.id }) { post ->
-                        BlogPostCard(post = post, onClick = { onPostClick(post.id) })
-                    }
+                items(posts, key = { it.id }) { post ->
+                    BlogPostCard(post = post, onClick = { onPostClick(post.id) })
                 }
             }
         }
