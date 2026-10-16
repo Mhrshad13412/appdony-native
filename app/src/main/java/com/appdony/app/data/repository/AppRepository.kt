@@ -18,17 +18,13 @@ class AppRepository {
 
     suspend fun login(username: String, password: String): Result<UserData> = try {
         // مرحله ۱: اول صفحه لاگین رو باز کن تا کوکی‌های اولیه ست بشن
-        try {
-            api.getLoginPage()
-        } catch (_: Exception) { }
+        try { api.getLoginPage() } catch (_: Exception) { }
 
         // مرحله ۲: حالا یوزرنیم و پسورد رو بفرست
         val response = api.login(username = username, password = password)
 
-        // ۳۰۲ = موفق (ریدایرکت به پنل)
-        // ۲۰۰ = خطا (فرم دوباره نمایش داده شده)
         if (response.code() == 302) {
-            // حالا با کوکی، اطلاعات کاربر رو بگیر
+            // ۳۰۲ = موفق (ریدایرکت به پنل)
             val user = api.getCurrentUser()
             if (user.id > 0 && user.username.isNotBlank()) {
                 Result.success(user)
@@ -36,6 +32,7 @@ class AppRepository {
                 Result.failure(Exception("لاگین ناموفق — اطلاعات کاربر دریافت نشد"))
             }
         } else {
+            // ۲۰۰ = فرم دوباره نمایش داده شده = خطا
             Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
         }
     } catch (e: Exception) {
@@ -43,8 +40,7 @@ class AppRepository {
     }
 
     suspend fun checkAuth(): Boolean = try {
-        val response = api.checkAuth()
-        response.isSuccessful
+        api.checkAuth().isSuccessful
     } catch (e: Exception) {
         false
     }
@@ -84,6 +80,13 @@ class AppRepository {
 
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
         Result.success(api.searchPosts(query = query, perPage = 30))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /** گرفتن پست‌های وبلاگ از دسته‌بندی وبلاگ */
+    suspend fun getBlogPosts(blogCategoryId: Int, perPage: Int = 10): Result<List<Post>> = try {
+        Result.success(api.getBlogPosts(categoryId = blogCategoryId, perPage = perPage))
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -138,7 +141,7 @@ class AppRepository {
         Result.failure(e)
     }
 
-    // ══════════════════ لود اولیه (بهینه‌شده) ══════════════════
+    // ══════════════════ لود اولیه ══════════════════
 
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
@@ -148,18 +151,16 @@ class AppRepository {
             val posts = postsDeferred.await()
             val allCategories = categoriesDeferred.await()
 
+            // پیدا کردن دسته‌بندی‌های اصلی
             val gamesParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
             }
             val appsParent = allCategories.firstOrNull {
                 it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
             }
-            // ⬇️ بهتر: دسته وبلاگ رو دقیق‌تر پیدا کن
+            // ⬇️ وبلاگ: اگه دسته‌بندی با slug "blog" پیدا شد، ازش استفاده کن
             val blogParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(
-                    it,
-                    listOf("blog", "وبلاگ", "article", "مقاله", "news", "خبر", "اخبار")
-                )
+                it.slug == "blog" || it.name == "وبلاگ"
             }
 
             val relevantParent = when (feedType) {
@@ -179,6 +180,7 @@ class AppRepository {
                     listOf(relevantParent)
                 }
             } else {
+                // برای بلاگ: اگه parent پیدا نشد، همه رو نشون بده
                 if (feedType == "blog") {
                     allCategories.filter { it.count > 0 }
                         .sortedByDescending { it.count }
