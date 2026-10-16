@@ -8,8 +8,6 @@ import com.google.gson.annotations.SerializedName
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
-import retrofit2.http.Field
-import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -24,28 +22,11 @@ data class CommentRequest(
 
 interface AppdonyApi {
 
-    // ══════════════════ لاگین ══════════════════
+    // ══════════════════ کاربر ══════════════════
 
-    /** مرحله ۱: گرفتن کوکی‌های اولیه */
-    @GET("wp-login.php")
-    suspend fun getLoginPage(): Response<ResponseBody>
-
-    /** مرحله ۲: ارسال یوزرنیم و پسورد */
-    @FormUrlEncoded
-    @POST("wp-login.php")
-    suspend fun login(
-        @Field("log") username: String,
-        @Field("pwd") password: String,
-        @Field("rememberme") remember: String = "forever",
-        @Field("redirect_to") redirect: String = "https://appdony.ir/wp-admin/",
-        @Field("testcookie") testCookie: String = "1"
-    ): Response<ResponseBody>
-
-    /** گرفتن اطلاعات کاربر لاگین‌شده (شامل nonce) */
     @GET("wp-json/wp/v2/users/me?context=edit")
     suspend fun getCurrentUser(): UserData
 
-    /** چک کردن معتبر بودن کوکی لاگین */
     @GET("wp-json/wp/v2/users/me")
     suspend fun checkAuth(): Response<ResponseBody>
 
@@ -58,7 +39,6 @@ interface AppdonyApi {
         @Query("_embed") embed: Int = 1
     ): List<Post>
 
-    /** گرفتن پست‌های وبلاگ با فیلتر دسته‌بندی */
     @GET("wp-json/wp/v2/posts")
     suspend fun getBlogPosts(
         @Query("categories") categoryId: Int,
@@ -108,6 +88,11 @@ interface AppdonyApi {
         @Query("per_page") perPage: Int = 100,
         @Query("orderby") orderBy: String = "count",
         @Query("order") order: String = "desc"
+    ): List<Category>
+
+    @GET("wp-json/wp/v2/categories")
+    suspend fun getCategoryBySlug(
+        @Query("slug") slug: String
     ): List<Category>
 
     // ══════════════════ کامنت‌ها ══════════════════
