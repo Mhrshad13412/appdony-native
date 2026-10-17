@@ -278,7 +278,7 @@ fun LoginSheet(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable {
-                        // TODO: باز کردن لینک ثبت‌نام
+                        // TODO
                     }
                 )
             }
