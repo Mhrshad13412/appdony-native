@@ -69,7 +69,6 @@ fun AppTopBar(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // دکمه پروفایل
         Box(
             modifier = Modifier
                 .size(44.dp)
