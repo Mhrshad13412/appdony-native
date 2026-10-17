@@ -73,9 +73,7 @@ fun AppTopBar(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(
-                    if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                )
+                .background(if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { onLoginClick() },
             contentAlignment = Alignment.Center
         ) {
