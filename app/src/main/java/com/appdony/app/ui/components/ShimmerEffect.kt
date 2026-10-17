@@ -28,7 +28,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
-import com.appdony.app.ui.theme.AppdonyCardBg
 
 @Composable
 fun ShimmerBrush(): Brush {
@@ -43,11 +42,12 @@ fun ShimmerBrush(): Brush {
         label = "shimmer_translate"
     )
 
+    val bg = MaterialTheme.colorScheme.surfaceVariant
     return Brush.linearGradient(
         colors = listOf(
-            AppdonyCardBg,
-            AppdonyCardBg.copy(alpha = 0.4f),
-            AppdonyCardBg
+            bg,
+            bg.copy(alpha = 0.4f),
+            bg
         ),
         start = Offset(translateAnim, translateAnim),
         end = Offset(translateAnim + 400f, translateAnim + 400f)
