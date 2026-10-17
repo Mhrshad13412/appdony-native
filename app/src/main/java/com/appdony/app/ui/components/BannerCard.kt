@@ -37,9 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun BannerCard(
@@ -71,7 +68,7 @@ fun BannerCard(
                 .fillMaxWidth()
                 .height(170.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(AppdonyCardBg)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             if (!imageUrl.isNullOrBlank()) {
                 AsyncImage(
@@ -81,21 +78,16 @@ fun BannerCard(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            // گرادیان پایین
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color(0xDD000000)
-                            )
+                            colors = listOf(Color.Transparent, Color(0xDD000000))
                         )
                     )
             )
 
-            // آیکون + عنوان پایین راست
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -107,7 +99,7 @@ fun BannerCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(AppdonyCardBg),
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     if (!imageUrl.isNullOrBlank()) {
@@ -121,7 +113,7 @@ fun BannerCard(
                         Icon(
                             Icons.Default.Android,
                             contentDescription = null,
-                            tint = AppdonyTextMuted,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
