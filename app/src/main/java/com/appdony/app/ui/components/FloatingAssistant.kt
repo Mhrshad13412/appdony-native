@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,8 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -50,7 +51,6 @@ fun FloatingAssistant(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.Bottom
     ) {
-        // منوی باز شونده
         AnimatedVisibility(
             visible = isExpanded,
             enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.5f),
@@ -79,7 +79,6 @@ fun FloatingAssistant(
             }
         }
 
-        // خود شخصیت (دکمه اصلی)
         Box(
             modifier = Modifier
                 .size(80.dp)
@@ -88,7 +87,6 @@ fun FloatingAssistant(
         ) {
             PlagueDoctorAvatar(sizeDp = 75)
             
-            // یه افکت کلیک (وقتی منو بازه یه ذره بزرگتر نشونش بده)
             if (isExpanded) {
                 Box(
                     modifier = Modifier
@@ -122,7 +120,7 @@ private fun AssistantMenuItem(
                 text = label,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.size(10.dp))
             Icon(
