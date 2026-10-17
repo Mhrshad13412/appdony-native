@@ -108,111 +108,114 @@ fun MainScreen() {
     var showAccountSheet by remember { mutableStateOf(false) }
     var showTutorial by remember { mutableStateOf(false) }
 
-    // نمایش اتوماتیک در اولین اجرا
     LaunchedEffect(hasSeenOnboarding) {
         if (!hasSeenOnboarding) {
             showTutorial = true
         }
     }
 
-    // لایه راهنمای تمام صفحه
-    if (showTutorial) {
-        SpotlightTutorial(
-            onFinish = {
-                scope.launch { onboardingManager.setSeen() }
-                showTutorial = false
-            }
-        )
-    }
-
-    if (showLoginSheet) {
-        LoginSheet(
-            onDismiss = { showLoginSheet = false },
-            onLoginSuccess = { user ->
-                scope.launch {
-                    sessionManager.saveSession(
-                        userId = user.id,
-                        username = user.username,
-                        displayName = user.displayName(),
-                        email = user.email,
-                        avatarUrl = user.avatarUrl() ?: "",
-                        nonce = user.nonce
+    // ⚠️ نکته مهم: همه چیز داخل یک Box با fillMaxSize قرار می‌گیرد
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                if (showChrome) {
+                    AppTopBar(
+                        isLoggedIn = isLoggedIn,
+                        userInitial = displayName,
+                        onSearchClick = { navController.navigate("search") },
+                        onHelpClick = { showTutorial = true },
+                        onLoginClick = {
+                            if (isLoggedIn) showAccountSheet = true
+                            else showLoginSheet = true
+                        }
                     )
-                    showLoginSheet = false
-                    snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
-                }
-            }
-        )
-    }
-
-    if (showAccountSheet) {
-        AccountSheet(
-            displayName = displayName.ifBlank { username },
-            username = username,
-            onDismiss = { showAccountSheet = false },
-            onDownloads = { navController.navigate("updates") },
-            onSettings = { navController.navigate("settings") },
-            onFavorites = { navController.navigate("favorites") },
-            onHelp = { showTutorial = true },
-            onAbout = {
-                scope.launch {
-                    snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
                 }
             },
-            onLogout = {
-                scope.launch {
-                    sessionManager.clearSession()
-                    showAccountSheet = false
-                    snackbarHostState.showSnackbar("از حساب خارج شدی")
+            bottomBar = {
+                if (showChrome) {
+                    AppBottomNav(navController = navController)
                 }
-            }
-        )
-    }
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                AppNavGraph(navController = navController)
 
-    Scaffold(
-        topBar = {
-            if (showChrome) {
-                AppTopBar(
-                    isLoggedIn = isLoggedIn,
-                    userInitial = displayName,
-                    onSearchClick = { navController.navigate("search") },
-                    onHelpClick = { showTutorial = true }, // دکمه علامت سوال
-                    onLoginClick = {
-                        if (isLoggedIn) showAccountSheet = true
-                        else showLoginSheet = true
+                // شخصیت شناور (با padding کمتر)
+                if (showChrome && !showTutorial) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 80.dp, end = 16.dp) // 👈 فاصله کمتر
+                    ) {
+                        FloatingAssistant(
+                            onSearchClick = { navController.navigate("search") },
+                            onDownloadsClick = { navController.navigate("updates") },
+                            onHelpClick = { showTutorial = true }
+                        )
                     }
-                )
-            }
-        },
-        bottomBar = {
-            if (showChrome) {
-                AppBottomNav(navController = navController)
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            AppNavGraph(navController = navController)
-
-            // شخصیت شناور دکتر طاعون
-            if (showChrome && !showTutorial) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 100.dp, end = 16.dp)
-                ) {
-                    FloatingAssistant(
-                        onSearchClick = { navController.navigate("search") },
-                        onDownloadsClick = { navController.navigate("updates") },
-                        onHelpClick = { showTutorial = true }
-                    )
                 }
             }
+        }
+
+        // 👇 لایه راهنما دقیقاً روی Scaffold قرار می‌گیرد
+        if (showTutorial) {
+            SpotlightTutorial(
+                onFinish = {
+                    scope.launch { onboardingManager.setSeen() }
+                    showTutorial = false
+                }
+            )
+        }
+
+        // شیت‌های لاگین و پروفایل هم باید داخل همین Box باشن
+        if (showLoginSheet) {
+            LoginSheet(
+                onDismiss = { showLoginSheet = false },
+                onLoginSuccess = { user ->
+                    scope.launch {
+                        sessionManager.saveSession(
+                            userId = user.id,
+                            username = user.username,
+                            displayName = user.displayName(),
+                            email = user.email,
+                            avatarUrl = user.avatarUrl() ?: "",
+                            nonce = user.nonce
+                        )
+                        showLoginSheet = false
+                        snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
+                    }
+                }
+            )
+        }
+
+        if (showAccountSheet) {
+            AccountSheet(
+                displayName = displayName.ifBlank { username },
+                username = username,
+                onDismiss = { showAccountSheet = false },
+                onDownloads = { navController.navigate("updates") },
+                onSettings = { navController.navigate("settings") },
+                onFavorites = { navController.navigate("favorites") },
+                onHelp = { showTutorial = true },
+                onAbout = {
+                    scope.launch {
+                        snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
+                    }
+                },
+                onLogout = {
+                    scope.launch {
+                        sessionManager.clearSession()
+                        showAccountSheet = false
+                        snackbarHostState.showSnackbar("از حساب خارج شدی")
+                    }
+                }
+            )
         }
     }
 }
