@@ -46,9 +46,6 @@ import coil.compose.AsyncImage
 import com.appdony.app.data.model.Comment
 import com.appdony.app.ui.screens.CommentsUiState
 import com.appdony.app.ui.screens.CommentsViewModel
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun CommentsSection(
@@ -73,7 +70,6 @@ fun CommentsSection(
     var showComposer by remember { mutableStateOf(false) }
     var commentText by remember { mutableStateOf("") }
 
-    // اگه لاگین نباشه و بخواد بنویسه، onNeedLogin صدا زده میشه
     LaunchedEffect(showComposer) {
         if (showComposer && !isLoggedIn) {
             showComposer = false
@@ -82,18 +78,8 @@ fun CommentsSection(
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-
-        // هدر + دکمه نظر جدید
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "نظرات کاربران",
-                color = AppdonyTextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("نظرات کاربران", color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Box(
                 modifier = Modifier
@@ -106,41 +92,28 @@ fun CommentsSection(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "نظر جدید",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("نظر جدید", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // فرم نوشتن نظر
         if (showComposer && isLoggedIn) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(AppdonyCardBg)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(12.dp)
             ) {
                 OutlinedTextField(
                     value = commentText,
                     onValueChange = { commentText = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text("نظرت رو بنویس...", color = AppdonyTextMuted)
-                    },
+                    placeholder = { Text("نظرت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     minLines = 3,
                     maxLines = 6,
                     enabled = !sending,
@@ -150,15 +123,12 @@ fun CommentsSection(
                         unfocusedBorderColor = Color.Transparent,
                         focusedContainerColor = MaterialTheme.colorScheme.background,
                         unfocusedContainerColor = MaterialTheme.colorScheme.background,
-                        focusedTextColor = AppdonyTextPrimary,
-                        unfocusedTextColor = AppdonyTextPrimary
+                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                     )
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
@@ -171,27 +141,13 @@ fun CommentsSection(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (sending) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(6.dp))
                             } else {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
                             }
-                            Text(
-                                text = "ارسال",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Text("ارسال", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -199,14 +155,13 @@ fun CommentsSection(
             Spacer(Modifier.height(12.dp))
         }
 
-        // نمایش نتیجه ارسال
         if (sendResult != null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(
-                        if (sendResult!!.contains("✓")) Color(0x330D7377)
+                        if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         else Color(0x33FF5252)
                     )
                     .clickable { vm.clearSendResult() }
@@ -214,37 +169,25 @@ fun CommentsSection(
             ) {
                 Text(
                     text = sendResult!!,
-                    color = if (sendResult!!.contains("✓")) Color(0xFF14A0A6)
-                    else Color(0xFFFF8A80),
+                    color = if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary else Color(0xFFFF8A80),
                     fontSize = 13.sp
                 )
             }
             Spacer(Modifier.height(12.dp))
         }
 
-        // لیست کامنت‌ها
         when (val s = state) {
             is CommentsUiState.Loading -> {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
+                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                 }
             }
             is CommentsUiState.Error -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(AppdonyCardBg)
-                        .padding(20.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(s.message, color = AppdonyTextMuted, fontSize = 13.sp)
+                    Text(s.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
             }
             is CommentsUiState.Success -> {
@@ -253,27 +196,15 @@ fun CommentsSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(AppdonyCardBg)
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                RoundedCornerShape(14.dp)
-                            )
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "هنوز نظری ثبت نشده",
-                                color = AppdonyTextMuted,
-                                fontSize = 13.sp
-                            )
+                            Text("هنوز نظری ثبت نشده", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = "اولین نفر باش!",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 12.sp
-                            )
+                            Text("اولین نفر باش!", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                         }
                     }
                 } else {
@@ -294,7 +225,7 @@ private fun CommentItem(comment: Comment) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(AppdonyCardBg)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(12.dp)
     ) {
         Box(
@@ -306,42 +237,18 @@ private fun CommentItem(comment: Comment) {
         ) {
             val avatar = comment.avatarUrl()
             if (!avatar.isNullOrBlank()) {
-                AsyncImage(
-                    model = avatar,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                AsyncImage(model = avatar, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = AppdonyTextPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
             }
         }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = comment.author_name,
-                color = AppdonyTextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text(comment.author_name, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
-            Text(
-                text = comment.date.take(10),
-                color = AppdonyTextMuted,
-                fontSize = 10.sp
-            )
+            Text(comment.date.take(10), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = comment.cleanContent(),
-                color = AppdonyTextPrimary,
-                fontSize = 13.sp,
-                lineHeight = 20.sp
-            )
+            Text(comment.cleanContent(), color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, lineHeight = 20.sp)
         }
     }
 }
