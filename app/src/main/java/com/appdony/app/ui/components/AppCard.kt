@@ -32,9 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun AppCard(
@@ -56,7 +53,7 @@ fun AppCard(
             modifier = Modifier
                 .size(100.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(AppdonyCardBg),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             if (!imageUrl.isNullOrBlank()) {
@@ -70,12 +67,11 @@ fun AppCard(
                 Icon(
                     imageVector = Icons.Default.Android,
                     contentDescription = null,
-                    tint = AppdonyTextMuted,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(36.dp)
                 )
             }
 
-            // دکمه قلب کوچیک گوشه کارت
             if (showFavorite && onFavoriteClick != null) {
                 Box(
                     modifier = Modifier
@@ -88,8 +84,7 @@ fun AppCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite
-                        else Icons.Outlined.FavoriteBorder,
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = "علاقه‌مندی",
                         tint = if (isFavorite) Color(0xFFFF5252) else Color.White,
                         modifier = Modifier.size(16.dp)
@@ -100,7 +95,7 @@ fun AppCard(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = title,
-            color = AppdonyTextPrimary,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
