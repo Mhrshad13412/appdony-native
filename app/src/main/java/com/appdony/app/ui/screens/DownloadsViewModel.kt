@@ -38,7 +38,6 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
             DownloadManager.STATUS_RUNNING or
             DownloadManager.STATUS_PENDING or
             DownloadManager.STATUS_PAUSED or
-            DownloadManager.STATUS_SUCCESSFUL or
             DownloadManager.STATUS_FAILED
         )
 
@@ -71,12 +70,9 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
         cursor.close()
 
-        val sorted = list.sortedByDescending { it.id }
-
-        _downloads.value = sorted.filter {
-            it.title.contains("اپدونی", ignoreCase = true) ||
-            (it.fileName?.endsWith(".apk") == true)
-        }
+        _downloads.value = list
+            .sortedByDescending { it.id }
+            .filter { it.status != DownloadManager.STATUS_SUCCESSFUL }
     }
 
     fun removeDownload(id: Long) {
