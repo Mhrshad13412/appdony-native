@@ -4,6 +4,7 @@ import com.appdony.app.data.model.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -63,8 +64,8 @@ object WordPressLogin {
                         .build()
                 ).execute().use { it.body?.close() }
 
-                // ۳. بررسی وجود کوکی لاگین
-                val cookies = jar.loadForRequest(okhttp3.HttpUrl.get(LOGIN_URL))
+                // ۳. بررسی وجود کوکی لاگین (اصلاح شد)
+                val cookies = jar.loadForRequest(LOGIN_URL.toHttpUrl())
                 val loggedIn = cookies.any { it.name.startsWith("wordpress_logged_in") }
 
                 if (!loggedIn) {
