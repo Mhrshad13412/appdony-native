@@ -19,12 +19,10 @@ data class AppInfo(
 
 object HtmlParser {
 
-    // دامنه‌های تبلیغاتی که نباید نمایش داده بشن
     private val blockedDomains = listOf(
-        "google.com/ads", "doubleclick", "googlesyndication",
-        "facebook.com/tr", "google-analytics",
-        "t.me/", "telegram.me/", "instagram.com/appdony",
-        "twitter.com/intent", "pinterest.com/pin"
+        "google.com", "doubleclick", "googlesyndication",
+        "facebook.com", "google-analytics", "t.me/", 
+        "telegram.me/", "twitter.com", "pinterest.com"
     )
 
     fun parsePostContent(html: String): AppInfo {
@@ -71,11 +69,7 @@ object HtmlParser {
         for (p in patterns) {
             val m = p.find(html)
             if (m != null) {
-                return m.groupValues[0].trim()
-                    .replace("حجم", "")
-                    .replace(":", "")
-                    .replace("：", "")
-                    .trim()
+                return m.groupValues[0].trim().replace("حجم", "").replace(":", "").replace("：", "").trim()
             }
         }
         return null
@@ -105,14 +99,9 @@ object HtmlParser {
         return null
     }
 
-    /**
-     * استخراج همه لینک‌های دانلود از HTML
-     * هر لینکی که تو تگ <a> باشه و متنش شامل «دانلود» یا تو دکمه‌های دانلود باشه
-     */
     private fun extractDownloadLinks(html: String): List<DownloadLink> {
         val result = mutableListOf<DownloadLink>()
 
-        // ۱. لینک‌های با متن «دانلود»
         val anchorRegex = Regex(
             """<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)</a>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
@@ -121,36 +110,20 @@ object HtmlParser {
             val url = m.groupValues[1].trim()
             val rawText = Html.fromHtml(m.groupValues[2], Html.FROM_HTML_MODE_LEGACY).toString().trim()
 
-            // فیلتر: فقط لینک‌های http معتبر، بدون دامنه‌های تبلیغاتی
-            if (url.startsWith("http") &&
-                blockedDomains.none { url.contains(it, ignoreCase = true) }
-            ) {
-                val title = rawText.ifBlank { "دانلود" }
-                    .replace(Regex("\\s+"), " ")
-                    .take(60)
+            val isBroken = rawText.contains("خطا در بارگذاری") || 
+                           rawText.contains("Error") ||
+                           url == "#" || 
+                           url.startsWith("javascript")
+            
+            val isBlocked = blockedDomains.any { url.contains(it, ignoreCase = true) }
 
-                // اگه لینک تکراری نباشه
+            if (url.startsWith("http") && !isBroken && !isBlocked) {
+                val title = rawText.ifBlank { "دانلود" }.replace(Regex("\\s+"), " ").take(60)
                 if (result.none { it.url == url }) {
                     result.add(DownloadLink(title = title, url = url))
                 }
             }
         }
-
-        // ۲. لینک‌های با کلاس download یا button
-        val btnRegex = Regex(
-            """<a[^>]*class=["'][^"']*(?:download|btn)[^"']*["'][^>]*href=["']([^"']+)["']""",
-            RegexOption.IGNORE_CASE
-        )
-        btnRegex.findAll(html).forEach { m ->
-            val url = m.groupValues[1].trim()
-            if (url.startsWith("http") &&
-                blockedDomains.none { url.contains(it, ignoreCase = true) } &&
-                result.none { it.url == url }
-            ) {
-                result.add(DownloadLink(title = "دانلود مستقیم", url = url))
-            }
-        }
-
         return result.take(8)
     }
 
@@ -159,9 +132,7 @@ object HtmlParser {
         val result = mutableListOf<String>()
         regex.findAll(html).forEach { m ->
             val url = m.groupValues[1]
-            if (url.startsWith("http") &&
-                (url.endsWith(".jpg") || url.endsWith(".jpeg") ||
-                 url.endsWith(".png") || url.endsWith(".webp"))) {
+            if (url.startsWith("http") && (url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".png") || url.endsWith(".webp"))) {
                 if (!result.contains(url)) result.add(url)
             }
         }
