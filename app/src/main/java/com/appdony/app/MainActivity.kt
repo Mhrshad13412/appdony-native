@@ -20,10 +20,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -36,8 +38,9 @@ import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
+import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.LoginSheet
-import com.appdony.app.ui.components.OnboardingSheet
+import com.appdony.app.ui.components.SpotlightTutorial
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import kotlinx.coroutines.launch
@@ -103,20 +106,20 @@ fun MainScreen() {
 
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
-    var showOnboarding by remember { mutableStateOf(false) }
+    var showTutorial by remember { mutableStateOf(false) }
 
-    // نمایش بار اول
     LaunchedEffect(hasSeenOnboarding) {
         if (!hasSeenOnboarding) {
-            showOnboarding = true
+            showTutorial = true
         }
     }
 
-    if (showOnboarding) {
-        OnboardingSheet(
-            onDismiss = {
+    // راهنمای تعاملی (Spotlight)
+    if (showTutorial) {
+        SpotlightTutorial(
+            onFinish = {
                 scope.launch { onboardingManager.setSeen() }
-                showOnboarding = false
+                showTutorial = false
             }
         )
     }
@@ -149,7 +152,7 @@ fun MainScreen() {
             onDownloads = { navController.navigate("updates") },
             onSettings = { navController.navigate("settings") },
             onFavorites = { navController.navigate("favorites") },
-            onHelp = { showOnboarding = true }, // دکمه راهنما
+            onHelp = { showTutorial = true },
             onAbout = {
                 scope.launch {
                     snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
@@ -193,6 +196,21 @@ fun MainScreen() {
                 .background(MaterialTheme.colorScheme.background)
         ) {
             AppNavGraph(navController = navController)
+
+            // دستیار شناور (فقط وقتی راهنما باز نیست)
+            if (showChrome && !showTutorial) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 90.dp, end = 16.dp)
+                ) {
+                    FloatingAssistant(
+                        onSearchClick = { navController.navigate("search") },
+                        onDownloadsClick = { navController.navigate("updates") },
+                        onHelpClick = { showTutorial = true }
+                    )
+                }
+            }
         }
     }
 }
