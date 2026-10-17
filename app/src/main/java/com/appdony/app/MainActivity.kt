@@ -122,7 +122,6 @@ fun MainScreen() {
                         isLoggedIn = isLoggedIn,
                         userInitial = displayName,
                         onSearchClick = { navController.navigate("search") },
-                        // 👇 onHelpClick حذف شد
                         onLoginClick = {
                             if (isLoggedIn) showAccountSheet = true
                             else showLoginSheet = true
