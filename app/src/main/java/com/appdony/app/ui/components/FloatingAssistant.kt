@@ -37,18 +37,6 @@ fun FloatingAssistant(
     onHelpClick: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    
-    // انیمیشن برای حباب گفتگو
-    val infiniteTransition = rememberInfiniteTransition(label = "bubble")
-    val bubbleAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bubbleAlpha"
-    )
 
     Column(
         horizontalAlignment = Alignment.End,
