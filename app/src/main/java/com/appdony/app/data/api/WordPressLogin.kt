@@ -8,63 +8,43 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/**
- * لاگین مستقیم به وردپرس با OkHttp
- * بدون Retrofit — کنترل کامل روی کوکی‌ها و ریدایرکت‌ها
- */
 object WordPressLogin {
 
     private const val LOGIN_URL = "https://appdony.ir/wp-login.php"
     private const val ADMIN_URL = "https://appdony.ir/wp-admin/"
+    private const val API_USER_URL = "https://appdony.ir/wp-json/wp/v2/users/me?context=edit"
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-    /**
-     * ساخت یه OkHttpClient اختصاصی برای لاگین
-     * (بدون redirect خودکار، خودمون مدیریت می‌کنیم)
-     */
-    private fun buildLoginClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .cookieJar(ApiClient.cookieJarInstance
-                ?: throw IllegalStateException("ApiClient.init() رو صدا بزن!"))
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            // ❌ followRedirects(false) → خودمون مدیریت می‌کنیم
-            .followRedirects(false)
-            .followSslRedirects(false)
-            .retryOnConnectionFailure(true)
-            .build()
-    }
-
-    /**
-     * لاگین به وردپرس
-     * 1. GET صفحه لاگین → ست شدن wordpress_test_cookie
-     * 2. POST با log, pwd, wp-submit, redirect_to, testcookie
-     * 3. اگه پاسخ 302 بود → کوکی چک کن → موفق
-     * 4. اگه 200 بود → خطا
-     */
     suspend fun login(username: String, password: String): Result<UserData> =
         withContext(Dispatchers.IO) {
             try {
-                val client = buildLoginClient()
+                val jar = ApiClient.cookieJarInstance
+                    ?: return@withContext Result.failure(Exception("ApiClient.init() صدا زده نشده!"))
 
-                // ═══ مرحله ۱: GET صفحه لاگین برای ست کردن کوکی اولیه ═══
-                val getRequest = Request.Builder()
-                    .url(LOGIN_URL)
-                    .header("User-Agent", USER_AGENT)
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .header("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.8")
-                    .get()
+                jar.clear()
+
+                val client = OkHttpClient.Builder()
+                    .cookieJar(jar)
+                    .connectTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .retryOnConnectionFailure(true)
                     .build()
 
-                client.newCall(getRequest).execute().use { response ->
-                    response.body?.close()
-                }
+                // ۱. دریافت کوکی اولیه
+                client.newCall(
+                    Request.Builder()
+                        .url(LOGIN_URL)
+                        .header("User-Agent", USER_AGENT)
+                        .get()
+                        .build()
+                ).execute().use { it.body?.close() }
 
-                // ═══ مرحله ۲: POST با اطلاعات کاربر ═══
-                val formBody = FormBody.Builder()
+                // ۲. ارسال اطلاعات ورود
+                val form = FormBody.Builder()
                     .add("log", username)
                     .add("pwd", password)
                     .add("wp-submit", "ورود")
@@ -72,99 +52,69 @@ object WordPressLogin {
                     .add("testcookie", "1")
                     .build()
 
-                val postRequest = Request.Builder()
-                    .url(LOGIN_URL)
-                    .header("User-Agent", USER_AGENT)
-                    .header("Referer", LOGIN_URL)
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .header("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.8")
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .header("Origin", "https://appdony.ir")
-                    .post(formBody)
-                    .build()
+                client.newCall(
+                    Request.Builder()
+                        .url(LOGIN_URL)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", LOGIN_URL)
+                        .header("Origin", "https://appdony.ir")
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .post(form)
+                        .build()
+                ).execute().use { it.body?.close() }
 
-                val postResponse = client.newCall(postRequest).execute()
+                // ۳. بررسی وجود کوکی لاگین
+                val cookies = jar.loadForRequest(okhttp3.HttpUrl.get(LOGIN_URL))
+                val loggedIn = cookies.any { it.name.startsWith("wordpress_logged_in") }
 
-                val responseCode = postResponse.code
-                val locationHeader = postResponse.header("Location")
-                postResponse.body?.close()
-
-                // ═══ مرحله ۳: بررسی نتیجه ═══
-
-                // اگه 302 بود و Location داشت = موفق
-                val isSuccess = responseCode == 302 ||
-                        (responseCode in 300..399 && locationHeader != null)
-
-                if (isSuccess) {
-                    // ═══ مرحله ۴: دریافت اطلاعات کاربر ═══
-                    val userData = fetchUserData(client)
-                    if (userData != null) {
-                        Result.success(userData)
-                    } else {
-                        Result.failure(Exception("لاگین موفق بود ولی اطلاعات کاربر دریافت نشد"))
-                    }
-                } else {
-                    Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
+                if (!loggedIn) {
+                    return@withContext Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
                 }
+
+                // ۴. دریافت اطلاعات کاربر
+                val userJson = try {
+                    client.newCall(
+                        Request.Builder()
+                            .url(API_USER_URL)
+                            .header("User-Agent", USER_AGENT)
+                            .header("Accept", "application/json")
+                            .get()
+                            .build()
+                    ).execute().use { resp ->
+                        if (resp.isSuccessful) resp.body?.string() else null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (userJson.isNullOrBlank()) {
+                    val fallback = UserData(username = username, name = username)
+                    return@withContext Result.success(fallback)
+                }
+
+                val user = parseUser(userJson)
+                if (user != null) Result.success(user)
+                else Result.success(UserData(username = username, name = username))
 
             } catch (e: Exception) {
                 Result.failure(Exception("خطا در اتصال: ${e.message}"))
             }
         }
 
-    /**
-     * گرفتن اطلاعات کاربر از REST API (بعد از لاگین)
-     */
-    private fun fetchUserData(client: OkHttpClient): UserData? {
-        return try {
-            val request = Request.Builder()
-                .url("https://appdony.ir/wp-json/wp/v2/users/me?context=edit")
-                .header("User-Agent", USER_AGENT)
-                .header("Accept", "application/json")
-                .get()
-                .build()
+    private fun parseUser(json: String): UserData? {
+        val id = Regex(""""id"\s*:\s*(\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val username = Regex(""""username"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+        val name = Regex(""""name"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+        val email = Regex(""""email"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+        val nonce = Regex(""""nonce"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+        val avatar = Regex(""""96"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
 
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: return null
-                    parseUserFromJson(body)
-                } else null
-            }
-        } catch (e: Exception) {
-            null
-        }
+        return if (id > 0 && username.isNotBlank())
+            UserData(
+                id = id, username = username, name = name, email = email,
+                nonce = nonce,
+                avatarUrls = if (avatar.isNotBlank()) mapOf("96" to avatar) else null
+            )
+        else null
     }
-
-    /**
-     * پارس ساده JSON بدون Gson (چون می‌خوایم مستقل باشه)
-     */
-    private fun parseUserFromJson(json: String): UserData? {
-        return try {
-            val id = Regex(""""id"\s*:\s*(\d+)""")
-                .find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            val username = Regex(""""username"\s*:\s*"([^"]*)"""")
-                .find(json)?.groupValues?.get(1) ?: ""
-            val name = Regex(""""name"\s*:\s*"([^"]*)"""")
-                .find(json)?.groupValues?.get(1) ?: ""
-            val email = Regex(""""email"\s*:\s*"([^"]*)"""")
-                .find(json)?.groupValues?.get(1) ?: ""
-            val nonce = Regex(""""nonce"\s*:\s*"([^"]*)"""")
-                .find(json)?.groupValues?.get(1) ?: ""
-            val avatar = Regex(""""96"\s*:\s*"([^"]*)"""")
-                .find(json)?.groupValues?.get(1) ?: ""
-
-            if (id > 0 && username.isNotBlank()) {
-                UserData(
-                    id = id,
-                    username = username,
-                    name = name,
-                    email = email,
-                    nonce = nonce,
-                    avatarUrls = if (avatar.isNotBlank()) mapOf("96" to avatar) else null
-                )
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-                               }
+                           }
