@@ -49,9 +49,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            AppRoot()
-        }
+        setContent { AppRoot() }
     }
 }
 
@@ -59,24 +57,12 @@ class MainActivity : ComponentActivity() {
 fun AppRoot() {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
-    val themeState by themeManager.state.collectAsStateWithLifecycle(
-        initialValue = ThemeState()
-    )
-
-    val fontScale = when (themeState.fontSize) {
-        FontSize.SMALL -> 0.85f
-        FontSize.MEDIUM -> 1.0f
-        FontSize.LARGE -> 1.2f
-    }
+    val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
+    val fontScale = when (themeState.fontSize) { FontSize.SMALL -> 0.85f; FontSize.MEDIUM -> 1.0f; FontSize.LARGE -> 1.2f }
     val density = LocalDensity.current
 
-    CompositionLocalProvider(
-        LocalDensity provides Density(density.density, fontScale)
-    ) {
-        AppdonyTheme(
-            darkTheme = themeState.mode == ThemeMode.DARK,
-            primaryColor = ThemeManager.themeColors[themeState.colorIndex]
-        ) {
+    CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+        AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK, primaryColor = ThemeManager.themeColors[themeState.colorIndex]) {
             MainScreen()
         }
     }
@@ -87,10 +73,7 @@ fun MainScreen() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: ""
-    val showChrome = currentRoute != "search" &&
-            currentRoute != "settings" &&
-            currentRoute != "favorites" &&
-            !currentRoute.startsWith("detail/")
+    val showChrome = currentRoute != "search" && currentRoute != "settings" && currentRoute != "favorites" && currentRoute != "chat" && !currentRoute.startsWith("detail/")
 
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
@@ -101,116 +84,55 @@ fun MainScreen() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
-    
     val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = false)
 
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
     var showTutorial by remember { mutableStateOf(false) }
 
-    LaunchedEffect(hasSeenOnboarding) {
-        if (!hasSeenOnboarding) {
-            showTutorial = true
-        }
-    }
+    LaunchedEffect(hasSeenOnboarding) { if (!hasSeenOnboarding) showTutorial = true }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            topBar = {
-                if (showChrome) {
-                    AppTopBar(
-                        isLoggedIn = isLoggedIn,
-                        userInitial = displayName,
-                        onSearchClick = { navController.navigate("search") },
-                        onLoginClick = {
-                            if (isLoggedIn) showAccountSheet = true
-                            else showLoginSheet = true
-                        }
-                    )
-                }
-            },
-            bottomBar = {
-                if (showChrome) {
-                    AppBottomNav(navController = navController)
-                }
-            },
+            topBar = { if (showChrome) AppTopBar(isLoggedIn, displayName, { navController.navigate("search") }, { if (isLoggedIn) showAccountSheet = true else showLoginSheet = true }) },
+            bottomBar = { if (showChrome) AppBottomNav(navController) },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
-            Box(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-            ) {
-                AppNavGraph(navController = navController)
-
+            Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                AppNavGraph(navController)
                 if (showChrome && !showTutorial) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = 80.dp, end = 16.dp)
-                    ) {
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
                         FloatingAssistant(
                             onSearchClick = { navController.navigate("search") },
                             onDownloadsClick = { navController.navigate("updates") },
-                            onHelpClick = { showTutorial = true }
+                            onHelpClick = { showTutorial = true },
+                            onChatClick = { navController.navigate("chat") }
                         )
                     }
                 }
             }
         }
 
-        if (showTutorial) {
-            SpotlightTutorial(
-                onFinish = {
-                    scope.launch { onboardingManager.setSeen() }
-                    showTutorial = false
-                }
-            )
-        }
+        if (showTutorial) SpotlightTutorial { scope.launch { onboardingManager.setSeen() }; showTutorial = false }
 
         if (showLoginSheet) {
-            LoginSheet(
-                onDismiss = { showLoginSheet = false },
-                onLoginSuccess = { user ->
-                    scope.launch {
-                        sessionManager.saveSession(
-                            userId = user.id,
-                            username = user.username,
-                            displayName = user.displayName(),
-                            email = user.email,
-                            avatarUrl = user.avatarUrl() ?: "",
-                            nonce = user.nonce
-                        )
-                        showLoginSheet = false
-                        snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
-                    }
+            LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
+                scope.launch {
+                    sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
+                    showLoginSheet = false
+                    snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
                 }
-            )
+            })
         }
 
         if (showAccountSheet) {
-            AccountSheet(
-                displayName = displayName.ifBlank { username },
-                username = username,
-                onDismiss = { showAccountSheet = false },
-                onDownloads = { navController.navigate("updates") },
-                onSettings = { navController.navigate("settings") },
-                onFavorites = { navController.navigate("favorites") },
-                onHelp = { showTutorial = true },
-                onAbout = {
-                    scope.launch {
-                        snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
-                    }
-                },
-                onLogout = {
-                    scope.launch {
-                        sessionManager.clearSession()
-                        showAccountSheet = false
-                        snackbarHostState.showSnackbar("از حساب خارج شدی")
-                    }
+            AccountSheet(displayName.ifBlank { username }, username, { showAccountSheet = false }, { navController.navigate("updates") }, { navController.navigate("settings") }, { navController.navigate("favorites") }, { showTutorial = true }, { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33") } }, {
+                scope.launch {
+                    sessionManager.clearSession()
+                    showAccountSheet = false
+                    snackbarHostState.showSnackbar("از حساب خارج شدی")
                 }
-            )
+            })
         }
     }
 }
