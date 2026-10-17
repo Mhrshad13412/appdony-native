@@ -108,12 +108,14 @@ fun MainScreen() {
     var showAccountSheet by remember { mutableStateOf(false) }
     var showTutorial by remember { mutableStateOf(false) }
 
+    // نمایش اتوماتیک در اولین اجرا
     LaunchedEffect(hasSeenOnboarding) {
         if (!hasSeenOnboarding) {
             showTutorial = true
         }
     }
 
+    // لایه راهنمای تمام صفحه
     if (showTutorial) {
         SpotlightTutorial(
             onFinish = {
@@ -174,7 +176,7 @@ fun MainScreen() {
                     isLoggedIn = isLoggedIn,
                     userInitial = displayName,
                     onSearchClick = { navController.navigate("search") },
-                    onHelpClick = { showTutorial = true }, // 👈 اتصال دکمه راهنما به تاپ بار
+                    onHelpClick = { showTutorial = true }, // دکمه علامت سوال
                     onLoginClick = {
                         if (isLoggedIn) showAccountSheet = true
                         else showLoginSheet = true
@@ -197,12 +199,12 @@ fun MainScreen() {
         ) {
             AppNavGraph(navController = navController)
 
-            // دستیار شناور (فقط وقتی راهنما باز نیست)
+            // شخصیت شناور دکتر طاعون
             if (showChrome && !showTutorial) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(bottom = 90.dp, end = 16.dp)
+                        .padding(bottom = 100.dp, end = 16.dp)
                 ) {
                     FloatingAssistant(
                         onSearchClick = { navController.navigate("search") },
