@@ -60,17 +60,10 @@ fun BlogScreen(
                 val categories = api.getCategories(perPage = 100)
 
                 val gamesParent = categories.firstOrNull {
-                    it.parent == 0 && (
-                        it.slug.contains("game", true) ||
-                        it.name.contains("بازی")
-                    )
+                    it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی"))
                 }
                 val appsParent = categories.firstOrNull {
-                    it.parent == 0 && (
-                        it.slug.contains("app", true) ||
-                        it.name.contains("برنامه") ||
-                        it.name.contains("اپلیکیشن")
-                    )
+                    it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه") || it.name.contains("اپلیکیشن"))
                 }
 
                 val allPosts = api.getPosts(perPage = 40)
@@ -87,9 +80,9 @@ fun BlogScreen(
                 }
             }
             posts = result
-            loading = false
         } catch (e: Exception) {
             errorMsg = e.message ?: "خطا در دریافت اطلاعات"
+        } finally {
             loading = false
         }
     }
@@ -97,55 +90,33 @@ fun BlogScreen(
     when {
         loading -> {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 items(4) { BlogCardSkeleton() }
             }
         }
         errorMsg != null -> {
-            Box(
-                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
                 Text(errorMsg!!, color = AppdonyTextMuted)
             }
         }
         else -> {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        Text(
-                            text = "وبلاگ",
-                            color = AppdonyTextPrimary,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "آخرین مطالب و اخبار",
-                            color = AppdonyTextMuted,
-                            fontSize = 13.sp
-                        )
+                        Text("وبلاگ", color = AppdonyTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("آخرین مطالب و اخبار", color = AppdonyTextMuted, fontSize = 13.sp)
                     }
                 }
                 if (posts.isEmpty()) {
                     item {
-                        Box(
-                            Modifier.fillMaxWidth().height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "محتوایی برای نمایش نیست",
-                                color = AppdonyTextMuted
-                            )
+                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted)
                         }
                     }
                 } else {
@@ -177,25 +148,15 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
         ) {
             val img = post.featuredImageUrl()
             if (!img.isNullOrBlank()) {
-                AsyncImage(
-                    model = img,
-                    contentDescription = post.cleanTitle(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                AsyncImage(model = img, contentDescription = post.cleanTitle(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
         }
 
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             val catName = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
             if (!catName.isNullOrBlank()) {
-                Text(
-                    text = catName,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(4.dp))
+                Text(text = catName, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
             Text(
@@ -208,7 +169,7 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
                 lineHeight = 22.sp
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             val excerpt = post.cleanExcerpt()
             if (excerpt.isNotBlank()) {
@@ -220,14 +181,10 @@ private fun BlogPostCard(post: Post, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 18.sp
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
-            Text(
-                text = post.date.take(10),
-                color = AppdonyTextMuted,
-                fontSize = 11.sp
-            )
+            Text(text = post.date.take(10), color = AppdonyTextMuted, fontSize = 11.sp)
         }
     }
 }
