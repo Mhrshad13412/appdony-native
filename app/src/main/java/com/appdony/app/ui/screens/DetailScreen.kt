@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,6 +60,7 @@ import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.CommentsSection
+import com.appdony.app.ui.components.DetailSkeleton
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
@@ -99,7 +99,6 @@ fun DetailScreen(
 
     var showLoginSheet by remember { mutableStateOf(false) }
 
-    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
@@ -122,12 +121,7 @@ fun DetailScreen(
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
             is DetailUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(44.dp)
-                    )
-                }
+                DetailSkeleton()
             }
             is DetailUiState.Error -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -149,10 +143,7 @@ fun DetailScreen(
                     onShare = {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(
-                                Intent.EXTRA_TEXT,
-                                "دانلود ${s.post.cleanTitle()}\nhttps://appdony.ir/?p=${s.post.id}"
-                            )
+                            putExtra(Intent.EXTRA_TEXT, "دانلود ${s.post.cleanTitle()}\nhttps://appdony.ir/?p=${s.post.id}")
                         }
                         context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                     },
@@ -161,7 +152,6 @@ fun DetailScreen(
             }
         }
 
-        // دکمه بازگشت
         Box(
             modifier = Modifier
                 .padding(12.dp)
@@ -179,7 +169,6 @@ fun DetailScreen(
             )
         }
 
-        // دکمه قلب
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -193,8 +182,7 @@ fun DetailScreen(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (isFavorite) Icons.Filled.Favorite
-                else Icons.Outlined.FavoriteBorder,
+                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = "علاقه‌مندی",
                 tint = if (isFavorite) Color(0xFFFF5252) else Color.White,
                 modifier = Modifier.size(22.dp)
@@ -224,6 +212,7 @@ private fun DetailContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp)
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
             ) {
                 AsyncImage(
                     model = post.featuredImageUrl(),
@@ -236,7 +225,7 @@ private fun DetailContent(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
+                                listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
                             )
                         )
                 )
@@ -248,6 +237,7 @@ private fun DetailContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(AppdonyCardBg)
                     .padding(16.dp),
@@ -269,12 +259,7 @@ private fun DetailContent(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        Icon(
-                            Icons.Default.Android,
-                            contentDescription = null,
-                            tint = AppdonyTextMuted,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        Icon(Icons.Default.Android, null, tint = AppdonyTextMuted, modifier = Modifier.size(36.dp))
                     }
                 }
                 Spacer(Modifier.width(14.dp))
@@ -329,15 +314,10 @@ private fun DetailContent(
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (index == 0) MaterialTheme.colorScheme.primary
-                                else AppdonyCardBg
+                                containerColor = if (index == 0) MaterialTheme.colorScheme.primary else AppdonyCardBg
                             )
                         ) {
-                            Icon(
-                                Icons.Default.Download,
-                                null,
-                                tint = if (index == 0) Color.White else AppdonyTextPrimary
-                            )
+                            Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else AppdonyTextPrimary)
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = link.title.ifBlank { "دانلود" },
@@ -353,27 +333,20 @@ private fun DetailContent(
             }
         } else {
             item {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppdonyCardBg)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Button(
-                        onClick = { onShare() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppdonyCardBg)
-                    ) {
-                        Icon(Icons.Default.Share, null, tint = AppdonyTextPrimary)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "لینک دانلود در توضیحات",
-                            color = AppdonyTextPrimary,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Text(
+                        text = "لینک دانلود سالمی در این صفحه پیدا نشد",
+                        color = AppdonyTextMuted,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
@@ -381,13 +354,7 @@ private fun DetailContent(
         if (info.screenshots.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "تصاویر",
-                    color = AppdonyTextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
+                Text("تصاویر", color = AppdonyTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(Modifier.height(10.dp))
             }
             item {
@@ -403,12 +370,7 @@ private fun DetailContent(
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(AppdonyCardBg)
                         ) {
-                            AsyncImage(
-                                model = url,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         }
                     }
                 }
@@ -418,32 +380,16 @@ private fun DetailContent(
         item {
             Spacer(Modifier.height(20.dp))
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = "توضیحات",
-                    color = AppdonyTextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("توضیحات", color = AppdonyTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = info.cleanDescription.take(3000),
-                    color = AppdonyTextMuted,
-                    fontSize = 13.sp,
-                    lineHeight = 22.sp
-                )
+                Text(text = info.cleanDescription.take(3000), color = AppdonyTextMuted, fontSize = 13.sp, lineHeight = 22.sp)
             }
         }
 
         if (similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "برنامه‌های مشابه",
-                    color = AppdonyTextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
+                Text("برنامه‌های مشابه", color = AppdonyTextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(Modifier.height(10.dp))
             }
             item {
@@ -452,11 +398,7 @@ private fun DetailContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(similar, key = { it.id }) { p ->
-                        AppCard(
-                            title = p.cleanTitle(),
-                            imageUrl = p.featuredImageUrl(),
-                            onClick = { onSimilarClick(p.id) }
-                        )
+                        AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onSimilarClick(p.id) })
                     }
                 }
             }
@@ -485,13 +427,6 @@ private fun InfoChip(label: String, value: String) {
     ) {
         Text(text = label, color = AppdonyTextMuted, fontSize = 11.sp)
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = value,
-            color = AppdonyTextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Text(text = value, color = AppdonyTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
