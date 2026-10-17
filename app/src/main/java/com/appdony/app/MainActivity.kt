@@ -14,6 +14,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
@@ -35,6 +37,7 @@ import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.LoginSheet
+import com.appdony.app.ui.components.OnboardingSheet
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import kotlinx.coroutines.launch
@@ -64,7 +67,6 @@ fun AppRoot() {
     }
     val density = LocalDensity.current
 
-    // اعمال سایز فونت به کل برنامه
     CompositionLocalProvider(
         LocalDensity provides Density(density.density, fontScale)
     ) {
@@ -89,15 +91,35 @@ fun MainScreen() {
 
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    val onboardingManager = remember { OnboardingManager(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
+    
+    val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = false)
 
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
+    var showOnboarding by remember { mutableStateOf(false) }
+
+    // نمایش بار اول
+    LaunchedEffect(hasSeenOnboarding) {
+        if (!hasSeenOnboarding) {
+            showOnboarding = true
+        }
+    }
+
+    if (showOnboarding) {
+        OnboardingSheet(
+            onDismiss = {
+                scope.launch { onboardingManager.setSeen() }
+                showOnboarding = false
+            }
+        )
+    }
 
     if (showLoginSheet) {
         LoginSheet(
@@ -127,6 +149,7 @@ fun MainScreen() {
             onDownloads = { navController.navigate("updates") },
             onSettings = { navController.navigate("settings") },
             onFavorites = { navController.navigate("favorites") },
+            onHelp = { showOnboarding = true }, // دکمه راهنما
             onAbout = {
                 scope.launch {
                     snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33")
