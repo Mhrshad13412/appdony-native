@@ -32,39 +32,48 @@ fun SpotlightTutorial(
         TutorialStep(
             title = "جستجو",
             desc = "از این نوار می‌تونی هر بازی یا برنامه‌ای رو سریع پیدا کنی!",
-            highlightY = 100f, // ارتفاع نوار جستجو
+            highlightY = 100f,
             highlightHeight = 150f
         ),
         TutorialStep(
+            title = "اپدونی پلاس",
+            desc = "بازی‌های خاص و نسخه‌های ویژه (مثل مود یا اورجینال) همیشه بالای صفحه هستن.",
+            highlightY = 300f,
+            highlightHeight = 350f
+        ),
+        TutorialStep(
             title = "دسته‌بندی‌ها",
-            desc = "تب‌های پایین برای جابه‌جایی بین بازی‌ها، برنامه‌ها و وبلاگ هستن.",
-            highlightY = 1700f, // ارتفاع منوی پایین
+            desc = "اینجا بازی‌ها و برنامه‌ها به دسته‌های مختلفی مثل اکشن، پازل و... تقسیم شدن.",
+            highlightY = 800f,
+            highlightHeight = 450f
+        ),
+        TutorialStep(
+            title = "دستیار شما (دکتر طاعون)",
+            desc = "هر وقت سوالی داشتی یا خواستی سریع به دانلودها یا جستجو بری، روی من بزن!",
+            highlightY = 1400f,
             highlightHeight = 300f
         ),
         TutorialStep(
-            title = "دستیار اپدونی",
-            desc = "دستیار ما (دکتر طاعون) همیشه پایین صفحه کنارت هست تا سریع بهت کمک کنه!",
-            highlightY = 1500f,
-            highlightHeight = 200f
+            title = "منوی پایین",
+            desc = "از این تب‌ها برای جابه‌جایی بین بازی‌ها، برنامه‌ها، وبلاگ و دانلودها استفاده کن.",
+            highlightY = 1750f,
+            highlightHeight = 300f
         )
     )
 
     val current = steps[step]
 
-    // لایه اصلی که کل صفحه رو می‌پوشونه
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f)) // ماسک تیره
+            .background(Color.Black.copy(alpha = 0.7f))
             .clickable { if (step < steps.size - 1) step++ else onFinish() },
         contentAlignment = Alignment.Center
     ) {
-        // رسم مربع شفاف (نورافکن) روی بخش مورد نظر
         Canvas(modifier = Modifier.fillMaxSize()) {
             val holeTopLeft = Offset(0f, current.highlightY)
             val holeSize = Size(size.width, current.highlightHeight)
             
-            // رسم مستطیل شفاف با گوشه گرد
             drawRoundRect(
                 color = Color.Transparent,
                 topLeft = holeTopLeft,
@@ -73,7 +82,6 @@ fun SpotlightTutorial(
                 blendMode = androidx.compose.ui.graphics.BlendMode.Clear
             )
             
-            // کشیدن حاشیه دور نورافکن (اختیاری برای زیبایی)
             drawRoundRect(
                 color = Color.White,
                 topLeft = holeTopLeft,
@@ -83,11 +91,11 @@ fun SpotlightTutorial(
             )
         }
 
-        // کارت توضیحات که همیشه پایین صفحه ثابت می‌مونه
+        // کارت توضیحات
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = 50.dp, start = 24.dp, end = 24.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surface)
