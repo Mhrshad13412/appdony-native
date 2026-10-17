@@ -45,9 +45,6 @@ import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 import kotlinx.coroutines.launch
 
 @Composable
@@ -80,20 +77,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "بازگشت",
-                        tint = AppdonyTextPrimary
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "تنظیمات",
-                    color = AppdonyTextPrimary,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // حالت نمایش
         item {
             SettingsSection(title = "حالت نمایش", icon = Icons.Default.DarkMode, tint = primary)
             SettingsOption(
@@ -110,10 +106,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onClick = { scope.launch { themeManager.setMode(ThemeMode.LIGHT) } },
                 selectedColor = primary
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // تم رنگی
         item {
             SettingsSection(title = "رنگ تم", icon = Icons.Default.Palette, tint = primary)
             Row(
@@ -126,16 +121,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     ColorCircle(
                         color = Color(colorLong),
                         selected = state.colorIndex == index,
-                        onClick = {
-                            scope.launch { themeManager.setColorIndex(index) }
-                        }
+                        onClick = { scope.launch { themeManager.setColorIndex(index) } }
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // سایز فونت
         item {
             SettingsSection(title = "سایز فونت", icon = Icons.Default.FormatSize, tint = primary)
             SettingsOption(
@@ -156,10 +148,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onClick = { scope.launch { themeManager.setFontSize(FontSize.LARGE) } },
                 selectedColor = primary
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // درباره
         item {
             SettingsSection(title = "درباره", icon = Icons.Default.Info, tint = primary)
             Column(
@@ -167,58 +158,44 @@ fun SettingsScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(AppdonyCardBg)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp)
             ) {
                 Text(
                     text = "اپدونی",
-                    color = AppdonyTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "نسخه 2.5.33",
-                    color = AppdonyTextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "مرجع دانلود اپلیکیشن و بازی اندروید",
-                    color = AppdonyTextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun SettingsSection(
-    title: String,
-    icon: ImageVector,
-    tint: Color
-) {
+private fun SettingsSection(title: String, icon: ImageVector, tint: Color) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = title,
-            color = AppdonyTextPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(text = title, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -235,33 +212,23 @@ private fun SettingsOption(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(AppdonyCardBg)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = AppdonyTextMuted,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(12.dp))
+            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(12.dp))
         }
         Text(
             text = title,
-            color = AppdonyTextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             modifier = Modifier.weight(1f)
         )
         if (selected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = selectedColor,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = selectedColor, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -277,12 +244,7 @@ private fun ColorCircle(color: Color, selected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         if (selected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(22.dp)
-            )
+            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
         }
     }
 }
