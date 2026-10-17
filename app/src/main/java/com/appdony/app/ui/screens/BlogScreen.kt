@@ -30,37 +30,68 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun BlogScreen(
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit
 ) {
-    val repo = remember { AppRepository() }
     var loading by remember { mutableStateOf(true) }
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
-        repo.getBlogPosts()
-            .onSuccess {
-                posts = it
-                loading = false
+        errorMsg = null
+        try {
+            val result = withContext(Dispatchers.IO) {
+                val api = ApiClient.api
+                val categories = api.getCategories(perPage = 100)
+
+                val gamesParent = categories.firstOrNull {
+                    it.parent == 0 && (
+                        it.slug.contains("game", true) ||
+                        it.name.contains("بازی")
+                    )
+                }
+                val appsParent = categories.firstOrNull {
+                    it.parent == 0 && (
+                        it.slug.contains("app", true) ||
+                        it.name.contains("برنامه") ||
+                        it.name.contains("اپلیکیشن")
+                    )
+                }
+
+                val allPosts = api.getPosts(perPage = 40)
+
+                val gamesIds = if (gamesParent != null) {
+                    (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet()
+                } else emptySet()
+                val appsIds = if (appsParent != null) {
+                    (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet()
+                } else emptySet()
+
+                allPosts.filter { post ->
+                    post.categories.none { it in gamesIds || it in appsIds }
+                }
             }
-            .onFailure {
-                errorMsg = it.message ?: "خطا در دریافت اطلاعات"
-                loading = false
-            }
+            posts = result
+            loading = false
+        } catch (e: Exception) {
+            errorMsg = e.message ?: "خطا در دریافت اطلاعات"
+            loading = false
+        }
     }
 
     when {
@@ -105,8 +136,22 @@ fun BlogScreen(
                         )
                     }
                 }
-                items(posts, key = { it.id }) { post ->
-                    BlogPostCard(post = post, onClick = { onPostClick(post.id) })
+                if (posts.isEmpty()) {
+                    item {
+                        Box(
+                            Modifier.fillMaxWidth().height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "محتوایی برای نمایش نیست",
+                                color = AppdonyTextMuted
+                            )
+                        }
+                    }
+                } else {
+                    items(posts, key = { it.id }) { post ->
+                        BlogPostCard(post = post, onClick = { onPostClick(post.id) })
+                    }
                 }
             }
         }
