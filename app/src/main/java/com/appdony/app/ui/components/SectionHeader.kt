@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun SectionHeader(
@@ -42,7 +41,7 @@ fun SectionHeader(
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title,
-            color = AppdonyTextPrimary,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
