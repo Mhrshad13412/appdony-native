@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -34,8 +33,7 @@ fun AppTopBar(
     isLoggedIn: Boolean = false,
     userInitial: String = "",
     onSearchClick: () -> Unit = {},
-    onLoginClick: () -> Unit = {},
-    onHelpClick: () -> Unit = {} // 👈 دکمه جدید
+    onLoginClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -66,25 +64,6 @@ fun AppTopBar(
                 text = "جستجو در اپدونی...",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // دکمه راهنما
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { onHelpClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Help,
-                contentDescription = "راهنما",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
             )
         }
 
