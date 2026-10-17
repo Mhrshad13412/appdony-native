@@ -30,11 +30,9 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.CardSkeleton
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
 import com.appdony.app.ui.components.SectionTitleSkeleton
-import com.appdony.app.ui.theme.AppdonyTextMuted
 
 @Composable
 fun FeedScreen(
@@ -69,7 +67,6 @@ fun FeedScreen(
             contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // ═══ بلاک بالایی: اپدونی پلاس ═══
             val topPosts = if (plusPosts.isNotEmpty()) plusPosts else featuredList
             val topTitle = if (plusPosts.isNotEmpty()) "اپدونی پلاس" else "ویژه"
 
@@ -94,7 +91,6 @@ fun FeedScreen(
                 }
             }
 
-            // ═══ سکشن‌های دسته‌بندی (تنبل) ═══
             items(categoriesList, key = { "cat_${it.id}" }) { cat ->
                 val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
 
@@ -130,9 +126,7 @@ private fun HomeSkeleton() {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(3) {
-                    com.appdony.app.ui.components.BannerSkeleton()
-                }
+                items(3) { com.appdony.app.ui.components.BannerSkeleton() }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -168,23 +162,19 @@ private fun SectionBlock(
             }
             is SectionState.Error -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp),
+                    modifier = Modifier.fillMaxWidth().height(80.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(state.message, color = AppdonyTextMuted, fontSize = 12.sp)
+                    Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             }
             is SectionState.Loaded -> {
                 if (state.posts.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp),
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("محتوایی نیست", color = AppdonyTextMuted, fontSize = 12.sp)
+                        Text("محتوایی نیست", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 } else {
                     LazyRow(
@@ -209,19 +199,15 @@ private fun SectionBlock(
 @Composable
 private fun ErrorView(message: String, onRetry: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = AppdonyTextMuted, fontSize = 14.sp)
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("تلاش دوباره")
             }
