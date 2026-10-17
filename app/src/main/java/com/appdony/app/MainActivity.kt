@@ -114,7 +114,6 @@ fun MainScreen() {
         }
     }
 
-    // ⚠️ نکته مهم: همه چیز داخل یک Box با fillMaxSize قرار می‌گیرد
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -123,7 +122,7 @@ fun MainScreen() {
                         isLoggedIn = isLoggedIn,
                         userInitial = displayName,
                         onSearchClick = { navController.navigate("search") },
-                        onHelpClick = { showTutorial = true },
+                        // 👇 onHelpClick حذف شد
                         onLoginClick = {
                             if (isLoggedIn) showAccountSheet = true
                             else showLoginSheet = true
@@ -146,12 +145,11 @@ fun MainScreen() {
             ) {
                 AppNavGraph(navController = navController)
 
-                // شخصیت شناور (با padding کمتر)
                 if (showChrome && !showTutorial) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(bottom = 80.dp, end = 16.dp) // 👈 فاصله کمتر
+                            .padding(bottom = 80.dp, end = 16.dp)
                     ) {
                         FloatingAssistant(
                             onSearchClick = { navController.navigate("search") },
@@ -163,7 +161,6 @@ fun MainScreen() {
             }
         }
 
-        // 👇 لایه راهنما دقیقاً روی Scaffold قرار می‌گیرد
         if (showTutorial) {
             SpotlightTutorial(
                 onFinish = {
@@ -173,7 +170,6 @@ fun MainScreen() {
             )
         }
 
-        // شیت‌های لاگین و پروفایل هم باید داخل همین Box باشن
         if (showLoginSheet) {
             LoginSheet(
                 onDismiss = { showLoginSheet = false },
