@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyGreen
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
@@ -78,7 +78,7 @@ fun AppTopBar(
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isLoggedIn) AppdonyGreen else AppdonyCardBg
+                    if (isLoggedIn) MaterialTheme.colorScheme.primary else AppdonyCardBg
                 )
                 .clickable { onLoginClick() },
             contentAlignment = Alignment.Center
