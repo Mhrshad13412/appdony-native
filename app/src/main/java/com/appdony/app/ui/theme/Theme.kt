@@ -8,13 +8,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
-import com.appdony.app.data.preferences.FontSize
 
 @Composable
 fun AppdonyTheme(
     darkTheme: Boolean = true,
     primaryColor: Long = 0xFF0D7377,
-    fontSize: FontSize = FontSize.MEDIUM,
     content: @Composable () -> Unit
 ) {
     val primary = Color(primaryColor)
@@ -25,7 +23,9 @@ fun AppdonyTheme(
         background = Color(0xFF121517),
         surface = Color(0xFF1E2225),
         onBackground = Color(0xFFE6E1E5),
-        onSurface = Color(0xFFE6E1E5)
+        onSurface = Color(0xFFE6E1E5),
+        surfaceVariant = Color(0xFF23262A),
+        onSurfaceVariant = Color(0xFF939396)
     )
 
     val lightColors = lightColorScheme(
@@ -34,7 +34,9 @@ fun AppdonyTheme(
         background = Color(0xFFFAFAFA),
         surface = Color(0xFFFFFFFF),
         onBackground = Color(0xFF1A1A1A),
-        onSurface = Color(0xFF1A1A1A)
+        onSurface = Color(0xFF1A1A1A),
+        surfaceVariant = Color(0xFFEEEEEE),
+        onSurfaceVariant = Color(0xFF666666)
     )
 
     val colors = if (darkTheme) darkColors else lightColors
@@ -42,7 +44,6 @@ fun AppdonyTheme(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         MaterialTheme(
             colorScheme = colors,
-            typography = AppTypography.withScale(fontSize.scale),
             content = content
         )
     }
