@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,11 +21,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
+import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
@@ -49,15 +54,26 @@ fun AppRoot() {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val themeState by themeManager.state.collectAsStateWithLifecycle(
-        initialValue = com.appdony.app.data.preferences.ThemeState()
+        initialValue = ThemeState()
     )
 
-    AppdonyTheme(
-        darkTheme = themeState.mode == ThemeMode.DARK,
-        primaryColor = ThemeManager.themeColors[themeState.colorIndex],
-        fontSize = themeState.fontSize
+    val fontScale = when (themeState.fontSize) {
+        FontSize.SMALL -> 0.85f
+        FontSize.MEDIUM -> 1.0f
+        FontSize.LARGE -> 1.2f
+    }
+    val density = LocalDensity.current
+
+    // اعمال سایز فونت به کل برنامه
+    CompositionLocalProvider(
+        LocalDensity provides Density(density.density, fontScale)
     ) {
-        MainScreen()
+        AppdonyTheme(
+            darkTheme = themeState.mode == ThemeMode.DARK,
+            primaryColor = ThemeManager.themeColors[themeState.colorIndex]
+        ) {
+            MainScreen()
+        }
     }
 }
 
@@ -83,7 +99,6 @@ fun MainScreen() {
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
-    // پنجره لاگین
     if (showLoginSheet) {
         LoginSheet(
             onDismiss = { showLoginSheet = false },
@@ -104,7 +119,6 @@ fun MainScreen() {
         )
     }
 
-    // پنجره پروفایل
     if (showAccountSheet) {
         AccountSheet(
             displayName = displayName.ifBlank { username },
