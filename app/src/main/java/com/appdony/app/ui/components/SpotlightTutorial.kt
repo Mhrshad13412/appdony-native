@@ -1,5 +1,6 @@
 package com.appdony.app.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,8 +12,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -23,36 +29,71 @@ fun SpotlightTutorial(
     var step by remember { mutableStateOf(0) }
 
     val steps = listOf(
-        TutorialStep("جستجو", "از این نوار می‌تونی هر بازی یا برنامه‌ای رو سریع پیدا کنی!"),
-        TutorialStep("دسته‌بندی‌ها", "تب‌های پایین برای جابه‌جایی بین بازی‌ها، برنامه‌ها و وبلاگ هستن."),
-        TutorialStep("دستیار اپدونی", "دستیار ما (دکتر طاعون) همیشه پایین صفحه کنارت هست تا سریع بهت کمک کنه!")
+        TutorialStep(
+            title = "جستجو",
+            desc = "از این نوار می‌تونی هر بازی یا برنامه‌ای رو سریع پیدا کنی!",
+            highlightY = 100f, // ارتفاع نوار جستجو
+            highlightHeight = 150f
+        ),
+        TutorialStep(
+            title = "دسته‌بندی‌ها",
+            desc = "تب‌های پایین برای جابه‌جایی بین بازی‌ها، برنامه‌ها و وبلاگ هستن.",
+            highlightY = 1700f, // ارتفاع منوی پایین
+            highlightHeight = 300f
+        ),
+        TutorialStep(
+            title = "دستیار اپدونی",
+            desc = "دستیار ما (دکتر طاعون) همیشه پایین صفحه کنارت هست تا سریع بهت کمک کنه!",
+            highlightY = 1500f,
+            highlightHeight = 200f
+        )
     )
 
     val current = steps[step]
 
-    // پس‌زمینه تیره که کل صفحه رو می‌پوشونه
+    // لایه اصلی که کل صفحه رو می‌پوشونه
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f))
+            .background(Color.Black.copy(alpha = 0.7f)) // ماسک تیره
             .clickable { if (step < steps.size - 1) step++ else onFinish() },
         contentAlignment = Alignment.Center
     ) {
-        // کارت توضیحات
+        // رسم مربع شفاف (نورافکن) روی بخش مورد نظر
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val holeTopLeft = Offset(0f, current.highlightY)
+            val holeSize = Size(size.width, current.highlightHeight)
+            
+            // رسم مستطیل شفاف با گوشه گرد
+            drawRoundRect(
+                color = Color.Transparent,
+                topLeft = holeTopLeft,
+                size = holeSize,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20f, 20f),
+                blendMode = androidx.compose.ui.graphics.BlendMode.Clear
+            )
+            
+            // کشیدن حاشیه دور نورافکن (اختیاری برای زیبایی)
+            drawRoundRect(
+                color = Color.White,
+                topLeft = holeTopLeft,
+                size = holeSize,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20f, 20f),
+                style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            )
+        }
+
+        // کارت توضیحات که همیشه پایین صفحه ثابت می‌مونه
         Column(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp, start = 24.dp, end = 24.dp)
                 .fillMaxWidth()
-                .padding(24.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // شخصیت دکتر طاعون
-            PlagueDoctorAvatar(sizeDp = 120)
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 text = "مرحله ${step + 1} از ${steps.size}",
                 color = MaterialTheme.colorScheme.primary,
@@ -73,7 +114,7 @@ fun SpotlightTutorial(
                 text = current.desc,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 lineHeight = 22.sp
             )
             
@@ -100,5 +141,7 @@ fun SpotlightTutorial(
 
 data class TutorialStep(
     val title: String,
-    val desc: String
+    val desc: String,
+    val highlightY: Float,
+    val highlightHeight: Float
 )
