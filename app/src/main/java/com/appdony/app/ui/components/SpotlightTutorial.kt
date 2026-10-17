@@ -91,7 +91,6 @@ fun SpotlightTutorial(
             )
         }
 
-        // کارت توضیحات
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
