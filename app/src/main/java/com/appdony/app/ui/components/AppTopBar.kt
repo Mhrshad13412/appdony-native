@@ -27,10 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.ui.theme.AppdonyBg
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun AppTopBar(
@@ -42,7 +38,7 @@ fun AppTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppdonyBg)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -52,7 +48,7 @@ fun AppTopBar(
                 .weight(1f)
                 .height(44.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(AppdonyCardBg)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { onSearchClick() }
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -60,13 +56,13 @@ fun AppTopBar(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "جستجو",
-                tint = AppdonyTextMuted,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = "جستجو در اپدونی...",
-                color = AppdonyTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
         }
@@ -78,7 +74,7 @@ fun AppTopBar(
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isLoggedIn) MaterialTheme.colorScheme.primary else AppdonyCardBg
+                    if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                 )
                 .clickable { onLoginClick() },
             contentAlignment = Alignment.Center
@@ -94,7 +90,7 @@ fun AppTopBar(
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "ورود",
-                    tint = AppdonyTextPrimary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
             }
