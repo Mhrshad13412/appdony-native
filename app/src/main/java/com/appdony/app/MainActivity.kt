@@ -114,7 +114,6 @@ fun MainScreen() {
         }
     }
 
-    // راهنمای تعاملی (Spotlight)
     if (showTutorial) {
         SpotlightTutorial(
             onFinish = {
@@ -175,6 +174,7 @@ fun MainScreen() {
                     isLoggedIn = isLoggedIn,
                     userInitial = displayName,
                     onSearchClick = { navController.navigate("search") },
+                    onHelpClick = { showTutorial = true }, // 👈 اتصال دکمه راهنما به تاپ بار
                     onLoginClick = {
                         if (isLoggedIn) showAccountSheet = true
                         else showLoginSheet = true
