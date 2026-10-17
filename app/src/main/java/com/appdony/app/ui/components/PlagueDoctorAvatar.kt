@@ -46,7 +46,7 @@ fun PlagueDoctorAvatar(
             .size(sizeDp.dp)
             .offset(y = floatY.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary) // 👈 رنگ اصلی اپ رو گذاشتم پشتش
+            .background(MaterialTheme.colorScheme.primary)
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
             val w = size.width
@@ -54,7 +54,7 @@ fun PlagueDoctorAvatar(
             val cx = w / 2f
             val cy = h / 2f
 
-            // کلاه (آبی نفتی روشن)
+            // کلاه
             val hatPath = Path().apply {
                 moveTo(cx - w * 0.28f, cy - h * 0.05f)
                 lineTo(cx - w * 0.2f, cy - h * 0.45f)
@@ -69,7 +69,7 @@ fun PlagueDoctorAvatar(
                 size = Size(w * 0.7f, h * 0.08f)
             )
 
-            // ماسک (سفید)
+            // ماسک
             val maskPath = Path().apply {
                 moveTo(cx - w * 0.22f, cy - h * 0.02f)
                 quadraticTo(cx - w * 0.1f, cy + h * 0.35f, cx + w * 0.05f, cy + h * 0.4f)
