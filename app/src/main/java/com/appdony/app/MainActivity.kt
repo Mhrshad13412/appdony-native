@@ -12,14 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,18 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.appdony.app.data.preferences.FontSize
-import com.appdony.app.data.preferences.OnboardingManager
-import com.appdony.app.data.preferences.ThemeManager
-import com.appdony.app.data.preferences.ThemeMode
-import com.appdony.app.data.preferences.ThemeState
+import com.appdony.app.data.preferences.*
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.ui.components.AccountSheet
-import com.appdony.app.ui.components.AppBottomNav
-import com.appdony.app.ui.components.AppTopBar
-import com.appdony.app.ui.components.FloatingAssistant
-import com.appdony.app.ui.components.LoginSheet
-import com.appdony.app.ui.components.SpotlightTutorial
+import com.appdony.app.ui.components.*
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import kotlinx.coroutines.launch
@@ -90,7 +74,9 @@ fun MainScreen() {
     var showAccountSheet by remember { mutableStateOf(false) }
     var showTutorial by remember { mutableStateOf(false) }
 
-    LaunchedEffect(hasSeenOnboarding) { if (!hasSeenOnboarding) showTutorial = true }
+    LaunchedEffect(hasSeenOnboarding) {
+        if (!hasSeenOnboarding) { showTutorial = true }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -100,8 +86,9 @@ fun MainScreen() {
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 AppNavGraph(navController)
+
                 if (showChrome && !showTutorial) {
-                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
                         FloatingAssistant(
                             onSearchClick = { navController.navigate("search") },
                             onDownloadsClick = { navController.navigate("updates") },
@@ -113,7 +100,9 @@ fun MainScreen() {
             }
         }
 
-        if (showTutorial) SpotlightTutorial { scope.launch { onboardingManager.setSeen() }; showTutorial = false }
+        if (showTutorial) {
+            SpotlightTutorial(onFinish = { scope.launch { onboardingManager.setSeen() }; showTutorial = false })
+        }
 
         if (showLoginSheet) {
             LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
@@ -126,13 +115,16 @@ fun MainScreen() {
         }
 
         if (showAccountSheet) {
-            AccountSheet(displayName.ifBlank { username }, username, { showAccountSheet = false }, { navController.navigate("updates") }, { navController.navigate("settings") }, { navController.navigate("favorites") }, { showTutorial = true }, { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33") } }, {
-                scope.launch {
-                    sessionManager.clearSession()
-                    showAccountSheet = false
-                    snackbarHostState.showSnackbar("از حساب خارج شدی")
-                }
-            })
+            AccountSheet(
+                displayName = displayName.ifBlank { username }, username = username,
+                onDismiss = { showAccountSheet = false },
+                onDownloads = { navController.navigate("updates") },
+                onSettings = { navController.navigate("settings") },
+                onFavorites = { navController.navigate("favorites") },
+                onHelp = { showTutorial = true },
+                onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.5.33") } },
+                onLogout = { scope.launch { sessionManager.clearSession(); showAccountSheet = false; snackbarHostState.showSnackbar("از حساب خارج شدی") } }
+            )
         }
     }
 }
