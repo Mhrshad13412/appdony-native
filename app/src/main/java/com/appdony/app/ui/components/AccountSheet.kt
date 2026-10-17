@@ -2,6 +2,7 @@ package com.appdony.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,14 +17,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -36,11 +37,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.ui.theme.AppdonyBg
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyGreen
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +47,7 @@ fun AccountSheet(
     onDownloads: () -> Unit,
     onSettings: () -> Unit,
     onFavorites: () -> Unit,
+    onHelp: () -> Unit,
     onAbout: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -59,7 +56,7 @@ fun AccountSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = AppdonyBg,
+        containerColor = MaterialTheme.colorScheme.background,
         dragHandle = null
     ) {
         Column(
@@ -67,10 +64,9 @@ fun AccountSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
-            // دکمه بستن
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                horizontalArrangement = Arrangement.End
             ) {
                 Box(
                     modifier = Modifier
@@ -82,19 +78,18 @@ fun AccountSheet(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "بستن",
-                        tint = AppdonyTextPrimary
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // کارت پروفایل
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(AppdonyCardBg)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -102,7 +97,7 @@ fun AccountSheet(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(AppdonyGreen),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -116,7 +111,7 @@ fun AccountSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = displayName.ifBlank { "کاربر اپدونی" },
-                        color = AppdonyTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
@@ -124,7 +119,7 @@ fun AccountSheet(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "@$username",
-                        color = AppdonyTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
@@ -132,48 +127,39 @@ fun AccountSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            // آیتم‌های منو
             AccountMenuItem(
                 icon = Icons.Default.Download,
                 title = "دانلودهای من",
-                onClick = {
-                    onDownloads()
-                    onDismiss()
-                }
+                onClick = { onDownloads(); onDismiss() }
             )
             AccountMenuItem(
                 icon = Icons.Default.Star,
                 title = "علاقه‌مندی‌ها",
-                onClick = {
-                    onFavorites()
-                    onDismiss()
-                }
+                onClick = { onFavorites(); onDismiss() }
             )
             AccountMenuItem(
                 icon = Icons.Default.Settings,
                 title = "تنظیمات",
-                onClick = {
-                    onSettings()
-                    onDismiss()
-                }
+                onClick = { onSettings(); onDismiss() }
+            )
+            AccountMenuItem(
+                icon = Icons.Default.Help,
+                title = "راهنمای اپلیکیشن",
+                onClick = { onHelp(); onDismiss() }
             )
             AccountMenuItem(
                 icon = Icons.Default.Info,
                 title = "درباره اپدونی",
-                onClick = {
-                    onAbout()
-                    onDismiss()
-                }
+                onClick = { onAbout(); onDismiss() }
             )
 
             Spacer(Modifier.height(8.dp))
 
-            // دکمه خروج
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(AppdonyCardBg)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { onLogout() }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -184,7 +170,7 @@ fun AccountSheet(
                     tint = Color(0xFFFF5252),
                     modifier = Modifier.size(22.dp)
                 )
-                Spacer(Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(14.dp))
                 Text(
                     text = "خروج از حساب",
                     color = Color(0xFFFF5252),
@@ -214,13 +200,13 @@ private fun AccountMenuItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = AppdonyTextPrimary,
+            tint = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.size(22.dp)
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = title,
-            color = AppdonyTextPrimary,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
