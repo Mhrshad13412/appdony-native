@@ -15,7 +15,7 @@ android {
         versionCode = 35
         versionName = "2.5.33"
 
-        // 👇 این خط برای کاهش سایز عالیه و به کدها کاری نداره (فقط پردازنده‌های اضافی رو حذف می‌کنه)
+        // 👇 برای کاهش حجم (فقط پردازنده‌های واقعی گوشی)
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
@@ -32,13 +32,16 @@ android {
 
     buildTypes {
         release {
-            // 👇 این دو خط کدهای حذف‌کننده رو خاموش می‌کنن (هیچ کدی پاک نمیشه)
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // 👇 اینا باید روشن باشن تا اپ سبک بشه، ولی با ProGuard که پایین دادم کرش نمی‌کنه
+            isMinifyEnabled = true
+            isShrinkResources = true
             
             signingConfig = signingConfigs.getByName("release")
             
-            // proguardFiles نیازی نیست چون Minify خاموشه
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         debug {
             isMinifyEnabled = false
@@ -60,7 +63,6 @@ android {
         buildConfig = true
     }
 
-    // 👇 حذف فایل‌های اضافیِ متنی (به کدها کاری نداره و فقط حجم رو کم می‌کنه)
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
