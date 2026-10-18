@@ -22,9 +22,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.appdony.app.data.preferences.*
+import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.OnboardingManager
+import com.appdony.app.data.preferences.ThemeManager
+import com.appdony.app.data.preferences.ThemeMode
+import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.ui.components.*
+import com.appdony.app.ui.components.AccountSheet
+import com.appdony.app.ui.components.AppBottomNav
+import com.appdony.app.ui.components.AppTopBar
+import com.appdony.app.ui.components.FloatingAssistant
+import com.appdony.app.ui.components.LoginSheet
+import com.appdony.app.ui.components.SpotlightTutorial
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import kotlinx.coroutines.launch
@@ -68,15 +77,10 @@ fun MainScreen() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
-    val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = false)
 
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
-    var showTutorial by remember { mutableStateOf(false) }
-
-    LaunchedEffect(hasSeenOnboarding) {
-        if (!hasSeenOnboarding) { showTutorial = true }
-    }
+    var showTutorial by remember { mutableStateOf(false) } // 👈 فقط با کلیک باز می‌شه
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -92,7 +96,7 @@ fun MainScreen() {
                         FloatingAssistant(
                             onSearchClick = { navController.navigate("search") },
                             onDownloadsClick = { navController.navigate("updates") },
-                            onHelpClick = { showTutorial = true },
+                            onHelpClick = { showTutorial = true }, // 👈 باز شدن با کلیک
                             onChatClick = { navController.navigate("chat") }
                         )
                     }
@@ -101,7 +105,7 @@ fun MainScreen() {
         }
 
         if (showTutorial) {
-            SpotlightTutorial(onFinish = { scope.launch { onboardingManager.setSeen() }; showTutorial = false })
+            SpotlightTutorial(onFinish = { showTutorial = false })
         }
 
         if (showLoginSheet) {
