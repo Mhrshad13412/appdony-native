@@ -1,58 +1,45 @@
-# ═══════════════════════════════════════
-# APPDONY PROGUARD RULES
-# ═══════════════════════════════════════
-
-# حفظ اطلاعات عمومی
--keepattributes Signature
--keepattributes *Annotation*
--keepattributes InnerClasses
--keepattributes EnclosingMethod
--keepattributes SourceFile
--keepattributes LineNumberTable
-
-# ─── Retrofit + OkHttp + Gson ───
+# ══════════════════ Appdony Models ══════════════════
 -keep class com.appdony.app.data.model.** { *; }
+
+# ══════════════════ Retrofit ══════════════════
 -keep class retrofit2.** { *; }
--keep class com.google.gson.** { *; }
--keepattributes RuntimeVisibleAnnotations
--keepattributes RuntimeVisibleParameterAnnotations
--keepclassmembers,allowshrinking,allowobfuscation interface * {
+-keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
+-dontwarn retrofit2.**
 -dontwarn okhttp3.**
 -dontwarn okio.**
--dontwarn retrofit2.**
--dontwarn com.google.gson.**
--dontwarn javax.annotation.**
--dontwarn kotlin.Unit
--dontwarn retrofit2.KotlinExtensions
--dontwarn retrofit2.KotlinExtensions$*
 
-# ─── Gson مدل‌ها ───
--keepclassmembers,allowobfuscation class * {
-    @com.google.gson.annotations.SerializedName <fields>;
+# ══════════════════ Gson ══════════════════
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+
+# ══════════════════ Jetpack Compose ══════════════════
+-dontwarn androidx.compose.**
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.material3.** { *; }
+-keepclassmembers class androidx.compose.ui.platform.** {
+    *;
 }
 
-# ─── Kotlin Coroutines ───
+# ══════════════════ Coil (تصاویر) ══════════════════
+-dontwarn coil.**
+-keep class coil.** { *; }
+
+# ══════════════════ DataStore & Security ══════════════════
+-keep class androidx.datastore.** { *; }
+-keep class androidx.security.crypto.** { *; }
+
+# ══════════════════ Kotlin Coroutines ══════════════════
 -dontwarn kotlinx.coroutines.**
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
 
-# ─── Compose ───
--dontwarn androidx.compose.**
--keep class androidx.compose.runtime.** { *; }
-
-# ─── Coil ───
--dontwarn coil.**
-
-# ─── DataStore ───
--keep class androidx.datastore.** { *; }
-
-# ─── Appdony Classes ───
+# ══════════════════ Appdony Custom ══════════════════
 -keep class com.appdony.app.** { *; }
-
-# ─── رفع مشکلات Reflection ───
 -keepclassmembers class * {
     @androidx.annotation.Keep <methods>;
 }
