@@ -20,9 +20,7 @@
 -keep class androidx.compose.runtime.** { *; }
 -keep class androidx.compose.ui.** { *; }
 -keep class androidx.compose.material3.** { *; }
--keepclassmembers class androidx.compose.ui.platform.** {
-    *;
-}
+-keepclassmembers class androidx.compose.ui.platform.** { *; }
 
 # ══════════════════ Coil (تصاویر) ══════════════════
 -dontwarn coil.**
@@ -43,4 +41,3 @@
 -keepclassmembers class * {
     @androidx.annotation.Keep <methods>;
 }
--keep @androidx.annotation.Keep class * { *; }
