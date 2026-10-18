@@ -20,6 +20,9 @@ data class CommentRequest(
     @SerializedName("author_name") val authorName: String? = null
 )
 
+// 👇 اینجا بیرون از اینترفیس تعریفش کردیم که خطا نده
+private const val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_embedded"
+
 interface AppdonyApi {
 
     // ══════════════════ کاربر ══════════════════
@@ -30,9 +33,6 @@ interface AppdonyApi {
     suspend fun checkAuth(): Response<ResponseBody>
 
     // ══════════════════ پست‌ها (بهینه‌شده برای سرعت) ══════════════════
-
-    // فیلدهای ضروری برای لیست‌ها (بدون متن کامل HTML)
-    private val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_embedded"
 
     @GET("wp-json/wp/v2/posts")
     suspend fun getPosts(
@@ -46,7 +46,6 @@ interface AppdonyApi {
     suspend fun getPost(
         @Path("id") id: Int,
         @Query("_embed") embed: Int = 1
-        // اینجا _fields نمی‌ذاریم چون به content نیاز داریم
     ): Post
 
     @GET("wp-json/wp/v2/posts")
