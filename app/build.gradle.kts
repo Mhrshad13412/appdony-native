@@ -12,8 +12,8 @@ android {
         applicationId = "com.appdony.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 35
-        versionName = "2.5.33"
+        versionCode = 2935
+        versionName = "2.9.35"
 
         // 👇 برای کاهش حجم (فقط پردازنده‌های واقعی گوشی)
         ndk {
