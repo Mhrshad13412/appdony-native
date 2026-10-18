@@ -3,18 +3,25 @@ package com.appdony.app.data.model
 import android.text.Html
 
 fun Post.featuredImageUrl(): String? {
-    // ۱. از _embedded
-    embedded?.featuredMedia?.firstOrNull()?.sourceUrl?.let {
-        if (it.isNotBlank()) return it
+    val media = embedded?.featuredMedia?.firstOrNull()
+
+    // ۱. تلاش برای گرفتن سایز متوسط (برای سرعت بالا در لیست‌ها)
+    media?.mediaDetails?.sizes?.let { sizes ->
+        sizes["medium"]?.sourceUrl?.let { if (it.isNotBlank()) return it }
+        sizes["medium_large"]?.sourceUrl?.let { if (it.isNotBlank()) return it }
+        sizes["thumbnail"]?.sourceUrl?.let { if (it.isNotBlank()) return it }
     }
-    // ۲. از HTML محتوا - اولین تصویر
+
+    // ۲. اگر سایزها نبود، عکس اصلی
+    media?.sourceUrl?.let { if (it.isNotBlank()) return it }
+
+    // ۳. اگر هیچی نبود، از HTML محتوا اولین عکس رو دربیار
     val regex = Regex("""<img[^>]+src=["']([^"']+)["']""")
     regex.find(content.rendered)?.groupValues?.getOrNull(1)?.let {
         if (it.isNotBlank()) return it
     }
-    // ۳. یه عکس از media_details
-    return embedded?.featuredMedia?.firstOrNull()
-        ?.mediaDetails?.sizes?.get("medium")?.sourceUrl
+
+    return null
 }
 
 fun Post.cleanTitle(): String {
