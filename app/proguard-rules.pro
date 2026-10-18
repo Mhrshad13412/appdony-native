@@ -1,7 +1,7 @@
-# ══════════════════ Appdony Models ══════════════════
+# ══════════════════ مدل‌های اپدونی (بسیار مهم) ══════════════════
 -keep class com.appdony.app.data.model.** { *; }
 
-# ══════════════════ Retrofit ══════════════════
+# ══════════════════ Retrofit & OkHttp ══════════════════
 -keep class retrofit2.** { *; }
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
@@ -16,28 +16,24 @@
 -keepattributes *Annotation*
 
 # ══════════════════ Jetpack Compose ══════════════════
--dontwarn androidx.compose.**
 -keep class androidx.compose.runtime.** { *; }
 -keep class androidx.compose.ui.** { *; }
 -keep class androidx.compose.material3.** { *; }
--keepclassmembers class androidx.compose.ui.platform.** { *; }
+-dontwarn androidx.compose.**
 
-# ══════════════════ Coil (تصاویر) ══════════════════
--dontwarn coil.**
+# ══════════════════ Coil (عکس‌ها) ══════════════════
 -keep class coil.** { *; }
+-dontwarn coil.**
 
 # ══════════════════ DataStore & Security ══════════════════
 -keep class androidx.datastore.** { *; }
 -keep class androidx.security.crypto.** { *; }
 
-# ══════════════════ Kotlin Coroutines ══════════════════
+# ══════════════════ Coroutines ══════════════════
 -dontwarn kotlinx.coroutines.**
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
 
-# ══════════════════ Appdony Custom ══════════════════
+# ══════════════════ کلاس‌های اصلی اپدونی ══════════════════
 -keep class com.appdony.app.** { *; }
--keepclassmembers class * {
-    @androidx.annotation.Keep <methods>;
-}
