@@ -28,6 +28,48 @@ class AppRepository {
         false
     }
 
+    // ══════════════════ بلاگ ══════════════════
+
+    /**
+     * گرفتن پست‌های وبلاگ
+     * ۱. اول دسته‌بندی‌های اصلی رو می‌گیریم
+     * ۲. دنبال دسته‌ای می‌گردیم که تو اسم یا slugش «blog»، «وبلاگ» یا «news» داره
+     * ۳. اگه پیدا شد، مستقیم پست‌های همون دسته رو می‌گیریم
+     * ۴. اگه پیدا نشد، همه پست‌ها رو می‌گیریم و اونایی که بازی/برنامه نیستن رو نشون می‌دیم
+     */
+    suspend fun getBlogPosts(): Result<List<Post>> = try {
+        val categories = api.getCategories(perPage = 100)
+
+        val blogCategory = categories.firstOrNull {
+            it.parent == 0 && (
+                it.slug.contains("blog", ignoreCase = true) ||
+                it.slug.contains("news", ignoreCase = true) ||
+                it.name.contains("وبلاگ") ||
+                it.name.contains("اخبار") ||
+                it.name.contains("مقاله")
+            )
+        }
+
+        val posts = if (blogCategory != null) {
+            // مسیر مستقیم: پست‌های همون دسته بلاگ
+            api.getPostsByCategory(categoryId = blogCategory.id, perPage = 30)
+        } else {
+            // مسیر پشتیبان: فیلتر کردن پست‌های بازی و برنامه
+            val gamesParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی")) }
+            val appsParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه")) }
+
+            val gamesIds = if (gamesParent != null) (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet() else emptySet()
+            val appsIds = if (appsParent != null) (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet() else emptySet()
+
+            val allPosts = api.getPosts(perPage = 40)
+            allPosts.filter { post -> post.categories.none { it in gamesIds || it in appsIds } }
+        }
+
+        Result.success(posts)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     // ══════════════════ پست‌ها ══════════════════
 
     suspend fun getPost(id: Int): Result<Post> = try {
@@ -49,51 +91,14 @@ class AppRepository {
         Result.failure(e)
     }
 
-    suspend fun getPostsByCategoryPaged(
-        categoryId: Int,
-        page: Int,
-        perPage: Int = 24
-    ): Result<List<Post>> = try {
-        Result.success(
-            api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page)
-        )
+    suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
+        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page))
     } catch (e: Exception) {
         Result.failure(e)
     }
 
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
         Result.success(api.searchPosts(query = query, perPage = 30))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    // ══════════════════ بلاگ ══════════════════
-
-    /**
-     * گرفتن پست‌های بلاگ
-     * 1. اول دنبال دسته slug=blog می‌گرده
-     * 2. اگه نبود، دنبال slug=news یا name=وبلاگ
-     * 3. اگه هیچی نبود، همه پست‌ها رو با ترتیب آخر برمی‌گردونه
-     */
-    suspend fun getBlogPosts(): Result<List<Post>> = try {
-        // ۱. تلاش برای پیدا کردن دسته بلاگ
-        val blogCategory = try {
-            api.getCategoryBySlug("blog").firstOrNull()
-                ?: api.getCategoryBySlug("news").firstOrNull()
-                ?: api.getCategoryBySlug("blog-news").firstOrNull()
-        } catch (e: Exception) {
-            null
-        }
-
-        val posts = if (blogCategory != null) {
-            // اگه دسته بلاگ رو پیدا کردیم، پست‌هاش رو بگیر
-            api.getBlogPosts(categoryId = blogCategory.id, perPage = 20)
-        } else {
-            // وگرنه همه پست‌ها
-            api.getPosts(perPage = 20)
-        }
-
-        Result.success(posts)
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -106,15 +111,8 @@ class AppRepository {
         Result.failure(e)
     }
 
-    suspend fun postComment(
-        postId: Int,
-        content: String,
-        nonce: String
-    ): Result<Comment> = try {
-        val comment = api.postComment(
-            nonce = nonce,
-            body = CommentRequest(post = postId, content = content)
-        )
+    suspend fun postComment(postId: Int, content: String, nonce: String): Result<Comment> = try {
+        val comment = api.postComment(nonce = nonce, body = CommentRequest(post = postId, content = content))
         Result.success(comment)
     } catch (e: Exception) {
         Result.failure(e)
@@ -125,13 +123,11 @@ class AppRepository {
     suspend fun loadPlusPosts(): Result<List<Post>> = try {
         val allCategories = api.getCategories(perPage = 100)
 
-        // دنبال دسته‌بندی پلاس می‌گردیم
         val plusParent = allCategories.firstOrNull {
             it.parent == 0 && (
                 it.name.contains("پلاس") ||
                 it.slug.contains("plus", ignoreCase = true) ||
                 it.name.contains("ویژه") ||
-                it.name.contains("کیفیت بالا") ||
                 it.slug.contains("premium", ignoreCase = true)
             )
         }
@@ -141,10 +137,8 @@ class AppRepository {
             val allIds = (listOf(plusParent.id) + childIds).joinToString(",")
             api.getPostsByMultipleCategories(categories = allIds, perPage = 12)
         } else {
-            // فالبک: ۶ پست آخر
             api.getPosts(perPage = 6)
         }
-
         Result.success(posts)
     } catch (e: Exception) {
         Result.failure(e)
@@ -160,33 +154,21 @@ class AppRepository {
             val posts = postsDeferred.await()
             val allCategories = categoriesDeferred.await()
 
-            val gamesParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games"))
-            }
-            val appsParent = allCategories.firstOrNull {
-                it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن"))
-            }
+            val gamesParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games")) }
+            val appsParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن")) }
 
             val relevantParent = when (feedType) {
                 "games" -> gamesParent
                 "apps" -> appsParent
-                "blog" -> null // بلاگ جدا مدیریت می‌شه
                 else -> null
             }
 
             val sections = if (relevantParent != null) {
-                val children = allCategories.filter {
-                    it.parent == relevantParent.id && it.count > 0
-                }
-                if (children.isNotEmpty()) {
-                    children.sortedByDescending { it.count }.take(30)
-                } else {
-                    listOf(relevantParent)
-                }
+                val children = allCategories.filter { it.parent == relevantParent.id && it.count > 0 }
+                if (children.isNotEmpty()) children.sortedByDescending { it.count }.take(30)
+                else listOf(relevantParent)
             } else {
-                allCategories.filter { it.parent == 0 && it.count > 0 }
-                    .sortedByDescending { it.count }
-                    .take(25)
+                allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
             }
 
             Result.success(
