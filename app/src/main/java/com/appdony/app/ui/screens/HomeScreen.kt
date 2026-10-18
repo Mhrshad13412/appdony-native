@@ -10,13 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,23 +22,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.request.CachePolicy
-import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
+import com.appdony.app.ui.components.BannerSkeleton
 import com.appdony.app.ui.components.SectionHeader
-import com.appdony.app.ui.theme.AppdonyBg
-import com.appdony.app.ui.theme.AppdonyGreen
-import com.appdony.app.ui.theme.AppdonyTextMuted
+import com.appdony.app.ui.components.SectionRowSkeleton
+import com.appdony.app.ui.components.SectionTitleSkeleton
 
 @Composable
 fun FeedScreen(
@@ -64,7 +57,6 @@ fun FeedScreen(
     val featuredList by vm.featured.collectAsStateWithLifecycle()
     val categoriesList by vm.categories.collectAsStateWithLifecycle()
     val sectionStates by vm.sections.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     when {
         loading -> HomeSkeleton()
@@ -85,11 +77,7 @@ fun FeedScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(topPosts, key = { "top_${it.id}" }) { p ->
-                            BannerCard(
-                                title = p.cleanTitle(),
-                                imageUrl = p.featuredImageUrl(),
-                                onClick = { onPostClick(p.id) }
-                            )
+                            BannerCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -105,12 +93,7 @@ fun FeedScreen(
                     }
                 }
 
-                SectionBlock(
-                    title = cat.name,
-                    state = sectionState,
-                    onPostClick = onPostClick,
-                    onMoreClick = { onCategoryClick(cat.id, cat.name) }
-                )
+                SectionBlock(title = cat.name, state = sectionState, onPostClick = onPostClick, onMoreClick = { onCategoryClick(cat.id, cat.name) })
             }
         }
     }
@@ -123,21 +106,21 @@ private fun HomeSkeleton() {
         contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        item { com.appdony.app.ui.components.SectionTitleSkeleton() }
+        item { SectionTitleSkeleton() }
         item {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(3) { com.appdony.app.ui.components.BannerSkeleton() }
+                items(3) { BannerSkeleton() }
             }
             Spacer(Modifier.height(16.dp))
         }
         items(4) {
             Column {
-                com.appdony.app.ui.components.SectionTitleSkeleton()
+                SectionTitleSkeleton()
                 Spacer(Modifier.height(4.dp))
-                com.appdony.app.ui.components.SectionRowSkeleton()
+                SectionRowSkeleton()
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -145,18 +128,12 @@ private fun HomeSkeleton() {
 }
 
 @Composable
-private fun SectionBlock(
-    title: String,
-    state: SectionState,
-    onPostClick: (Int) -> Unit,
-    onMoreClick: () -> Unit
-) {
+private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) -> Unit, onMoreClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         SectionHeader(title = title, onMoreClick = onMoreClick)
-
         when (state) {
             is SectionState.NotLoaded, is SectionState.Loading -> {
-                com.appdony.app.ui.components.SectionRowSkeleton()
+                SectionRowSkeleton()
                 Spacer(Modifier.height(12.dp))
             }
             is SectionState.Error -> {
@@ -175,11 +152,7 @@ private fun SectionBlock(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(state.posts, key = { it.id }) { p ->
-                            AppCard(
-                                title = p.cleanTitle(),
-                                imageUrl = p.featuredImageUrl(),
-                                onClick = { onPostClick(p.id) }
-                            )
+                            AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
                         }
                     }
                 }
@@ -195,9 +168,7 @@ private fun ErrorView(message: String, onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                Text("تلاش دوباره")
-            }
+            Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("تلاش دوباره") }
         }
     }
 }
