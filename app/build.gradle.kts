@@ -15,7 +15,7 @@ android {
         versionCode = 2935
         versionName = "2.9.35"
 
-        // 👇 برای کاهش حجم (فقط پردازنده‌های واقعی گوشی)
+        // کاهش حجم با حذف پردازنده‌های اضافی
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
@@ -32,16 +32,11 @@ android {
 
     buildTypes {
         release {
-            // 👇 اینا باید روشن باشن تا اپ سبک بشه، ولی با ProGuard که پایین دادم کرش نمی‌کنه
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // 👇 این دو خط رو FALSE کردیم تا هیچ کدی پاک نشه و کرش نکنه
+            isMinifyEnabled = false
+            isShrinkResources = false
             
             signingConfig = signingConfigs.getByName("release")
-            
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
         debug {
             isMinifyEnabled = false
@@ -61,17 +56,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/DEPENDENCIES"
-            excludes += "/META-INF/LICENSE"
-            excludes += "/META-INF/LICENSE.txt"
-            excludes += "/META-INF/NOTICE"
-            excludes += "/META-INF/NOTICE.txt"
-        }
     }
 }
 
