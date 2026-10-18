@@ -77,11 +77,7 @@ fun BlogScreen(onPostClick: (Int) -> Unit, onCategoryClick: (Int, String) -> Uni
                     }
                 }
                 if (posts.isEmpty()) {
-                    item {
-                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted)
-                        }
-                    }
+                    item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted) } }
                 } else {
                     items(posts, key = { it.id }) { post ->
                         BlogPostCard(post = post, context = context, onClick = { onPostClick(post.id) })
@@ -95,63 +91,25 @@ fun BlogScreen(onPostClick: (Int) -> Unit, onCategoryClick: (Int, String) -> Uni
 @Composable
 private fun BlogPostCard(post: Post, context: android.content.Context, onClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(AppdonyCardBg)
-            .clickable { onClick() }
-            .padding(bottom = 14.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(18.dp)).background(AppdonyCardBg).clickable { onClick() }.padding(bottom = 14.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-        ) {
+        Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             val img = post.featuredImageUrl()
             if (!img.isNullOrBlank()) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(img)
-                        .crossfade(true)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .build(),
-                    contentDescription = post.cleanTitle(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    model = ImageRequest.Builder(context).data(img).crossfade(true).diskCachePolicy(CachePolicy.ENABLED).memoryCachePolicy(CachePolicy.ENABLED).build(),
+                    contentDescription = post.cleanTitle(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
                 )
             }
         }
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             val catName = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
-            if (!catName.isNullOrBlank()) {
-                Text(catName, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-            }
-            Text(
-                post.cleanTitle(),
-                color = AppdonyTextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 22.sp
-            )
+            if (!catName.isNullOrBlank()) { Text(catName, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.height(4.dp)) }
+            Text(post.cleanTitle(), color = AppdonyTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
             Spacer(Modifier.height(6.dp))
             val excerpt = post.cleanExcerpt()
-            if (excerpt.isNotBlank()) {
-                Text(
-                    excerpt.take(120),
-                    color = AppdonyTextMuted,
-                    fontSize = 12.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 18.sp
-                )
-                Spacer(Modifier.height(6.dp))
-            }
+            if (excerpt.isNotBlank()) { Text(excerpt.take(120), color = AppdonyTextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp); Spacer(Modifier.height(6.dp)) }
             Text(post.date.take(10), color = AppdonyTextMuted, fontSize = 11.sp)
         }
     }
