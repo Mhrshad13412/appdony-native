@@ -1,4 +1,4 @@
-# ══════════════════ مدل‌های اپدونی (بسیار مهم) ══════════════════
+# ══════════════════ مدل‌های اپدونی ══════════════════
 -keep class com.appdony.app.data.model.** { *; }
 
 # ══════════════════ Retrofit & OkHttp ══════════════════
@@ -38,8 +38,11 @@
 # ══════════════════ کلاس‌های اصلی اپدونی ══════════════════
 -keep class com.appdony.app.** { *; }
 
-# ══════════════════ رفع خطای Security-Crypto (جدیترین بخش) ══════════════════
-# اینا برای کتابخونه رمزنگاری (Tink) هستن که تو بیلد R8 ارور میدن
+# ══════════════════ رفع خطای Security-Crypto و Tink ══════════════════
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn com.google.crypto.tink.**
 -keep class com.google.crypto.tink.** { *; }
+
+# ══════════════════ Firebase (اگر استفاده کردی) ══════════════════
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
