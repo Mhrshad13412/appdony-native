@@ -7,17 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -27,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -36,29 +27,29 @@ fun ShimmerBrush(): Brush {
         initialValue = -1000f,
         targetValue = 2000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = LinearEasing),
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer_translate"
     )
 
     val bg = MaterialTheme.colorScheme.surfaceVariant
+    val highlight = MaterialTheme.colorScheme.surface // رنگ روشن‌تر برای نور
+
+    // 👇 نور افقی از چپ به راست
     return Brush.linearGradient(
         colors = listOf(
             bg,
-            bg.copy(alpha = 0.4f),
+            highlight,
             bg
         ),
-        start = Offset(translateAnim, translateAnim),
-        end = Offset(translateAnim + 400f, translateAnim + 400f)
+        start = Offset(translateAnim, 0f),
+        end = Offset(translateAnim + 500f, 0f)
     )
 }
 
 @Composable
-fun ShimmerBox(
-    modifier: Modifier = Modifier,
-    cornerRadius: Int = 12
-) {
+fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Int = 12) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius.dp))
@@ -66,6 +57,7 @@ fun ShimmerBox(
     )
 }
 
+// اسکلت کارت (عکس بالا، متن پایین)
 @Composable
 fun CardSkeleton() {
     Column(
@@ -80,6 +72,7 @@ fun CardSkeleton() {
     }
 }
 
+// اسکلت بنر بزرگ
 @Composable
 fun BannerSkeleton() {
     Column(modifier = Modifier.width(280.dp)) {
@@ -89,6 +82,7 @@ fun BannerSkeleton() {
     }
 }
 
+// اسکلت یک ردیف کامل
 @Composable
 fun SectionRowSkeleton() {
     Row(
@@ -103,6 +97,7 @@ fun SectionRowSkeleton() {
     }
 }
 
+// اسکلت تیتر سکشن
 @Composable
 fun SectionTitleSkeleton() {
     Row(
@@ -117,6 +112,7 @@ fun SectionTitleSkeleton() {
     }
 }
 
+// اسکلت بلاگ
 @Composable
 fun BlogCardSkeleton() {
     Column(
@@ -126,7 +122,7 @@ fun BlogCardSkeleton() {
     ) {
         ShimmerBox(modifier = Modifier.fillMaxWidth().height(200.dp), cornerRadius = 16)
         Spacer(modifier = Modifier.height(10.dp))
-        ShimmerBox(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp), cornerRadius = 4)
+        ShimmerBox(modifier = Modifier.fillMaxWidth(0.8f).height(16.dp), cornerRadius = 4)
         Spacer(modifier = Modifier.height(6.dp))
         ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp), cornerRadius = 4)
         Spacer(modifier = Modifier.height(4.dp))
@@ -134,30 +130,33 @@ fun BlogCardSkeleton() {
     }
 }
 
+// اسکلت صفحه جزئیات
 @Composable
 fun DetailSkeleton() {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ShimmerBox(modifier = Modifier.fillMaxWidth().height(260.dp), cornerRadius = 0)
+        ShimmerBox(modifier = Modifier.fillMaxWidth().height(280.dp), cornerRadius = 0)
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            ShimmerBox(modifier = Modifier.size(78.dp), cornerRadius = 18)
-            Spacer(modifier = Modifier.width(14.dp))
+            ShimmerBox(modifier = Modifier.size(80.dp), cornerRadius = 20)
+            Spacer(modifier = Modifier.width(16.dp))
             Column {
-                ShimmerBox(modifier = Modifier.width(200.dp).height(16.dp))
+                ShimmerBox(modifier = Modifier.width(220.dp).height(18.dp))
                 Spacer(modifier = Modifier.height(8.dp))
-                ShimmerBox(modifier = Modifier.width(100.dp).height(12.dp))
+                ShimmerBox(modifier = Modifier.width(100.dp).height(14.dp))
             }
         }
-        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp), cornerRadius = 14)
-        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp), cornerRadius = 14)
+        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(54.dp), cornerRadius = 16)
+        Spacer(modifier = Modifier.height(12.dp))
+        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(54.dp), cornerRadius = 16)
+        Spacer(modifier = Modifier.height(24.dp))
         Column(modifier = Modifier.padding(16.dp)) {
             ShimmerBox(modifier = Modifier.width(100.dp).height(16.dp))
             Spacer(modifier = Modifier.height(12.dp))
-            ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth().height(14.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth().height(14.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            ShimmerBox(modifier = Modifier.fillMaxWidth(0.7f).height(12.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth(0.7f).height(14.dp))
         }
     }
 }
