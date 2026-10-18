@@ -37,3 +37,9 @@
 
 # ══════════════════ کلاس‌های اصلی اپدونی ══════════════════
 -keep class com.appdony.app.** { *; }
+
+# ══════════════════ رفع خطای Security-Crypto (جدیترین بخش) ══════════════════
+# اینا برای کتابخونه رمزنگاری (Tink) هستن که تو بیلد R8 ارور میدن
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn com.google.crypto.tink.**
+-keep class com.google.crypto.tink.** { *; }
