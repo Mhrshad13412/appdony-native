@@ -24,14 +24,12 @@ jobs:
       - name: Grant execute permission
         run: chmod +x ./gradlew
 
-      # 👇 اینجا فایل کلید رو از Secretها می‌سازیم
       - name: Decode Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
-          
-      # 👇 بیلد نسخه Release
+
       - name: Build Release APK
         env:
           KEYSTORE_FILE: release.keystore
@@ -44,4 +42,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: appdony-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/app-release.apk
