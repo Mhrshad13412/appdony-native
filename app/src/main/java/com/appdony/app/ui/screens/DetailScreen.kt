@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.CachePolicy
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
@@ -104,10 +106,20 @@ fun DetailScreen(postId: Int, onBack: () -> Unit, onSimilarClick: (Int) -> Unit)
 
 @Composable
 private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, isLoggedIn: Boolean, nonce: String, onSimilarClick: (Int) -> Unit, onDownload: (String, String) -> Unit, onShare: () -> Unit, onNeedLogin: () -> Unit) {
+    val context = LocalContext.current
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Box(modifier = Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
-                AsyncImage(model = post.featuredImageUrl(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(post.featuredImageUrl())
+                        .crossfade(true)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))))
             }
         }
@@ -115,8 +127,16 @@ private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, isLogg
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp).clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
                     val img = post.featuredImageUrl()
-                    if (!img.isNullOrBlank()) AsyncImage(model = img, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    else Icon(Icons.Default.Android, contentDescription = null, tint = AppdonyTextMuted, modifier = Modifier.size(40.dp))
+                    if (!img.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(img).crossfade(true).diskCachePolicy(CachePolicy.ENABLED).size(200).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(Icons.Default.Android, contentDescription = null, tint = AppdonyTextMuted, modifier = Modifier.size(40.dp))
+                    }
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
