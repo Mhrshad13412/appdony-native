@@ -4,7 +4,9 @@ import android.content.Context
 import com.franmontiel.persistentcookiejar.PersistentCookieJar
 import com.franmontiel.persistentcookiejar.cache.SetCookieCache
 import com.franmontiel.persistentcookiejar.persistence.SharedPrefsCookiePersistor
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -20,31 +22,35 @@ object ApiClient {
 
     fun init(context: Context) {
         if (cookieJar == null) {
-            cookieJar = PersistentCookieJar(
-                SetCookieCache(),
-                SharedPrefsCookiePersistor(context.applicationContext)
-            )
+            cookieJar = PersistentCookieJar(SetCookieCache(), SharedPrefsCookiePersistor(context.applicationContext))
         }
     }
 
-    fun clearCookies() {
-        cookieJar?.clear()
-    }
-
-    val cookieJarInstance: PersistentCookieJar?
-        get() = cookieJar
+    fun clearCookies() { cookieJar?.clear() }
+    val cookieJarInstance: PersistentCookieJar? get() = cookieJar
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .cookieJar(cookieJar ?: throw IllegalStateException("ApiClient.init() رو صدا بزن!"))
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.NONE
-            })
-            // ⬇️ افزایش Timeout به ۶۰ ثانیه برای لاگین
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .callTimeout(90, TimeUnit.SECONDS)
+            .cookieJar(cookieJar ?: throw IllegalStateException("ApiClient.init() صدا زده نشده!"))
+            // 👇 اینترسپتور برای دور زدن کش در مسیرهای حساس
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val url = request.url.toString()
+                
+                if (url.contains("/users/me") || url.contains("/comments")) {
+                    val newRequest = request.newBuilder()
+                        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                        .header("Pragma", "no-cache")
+                        .build()
+                    chain.proceed(newRequest)
+                } else {
+                    chain.proceed(request)
+                }
+            }
+            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.NONE })
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
