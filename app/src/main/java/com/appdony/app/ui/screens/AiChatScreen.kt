@@ -55,8 +55,7 @@ fun AiChatScreen(onBack: () -> Unit) {
             result.onSuccess { response ->
                 messages = messages + ChatMessage(response, false)
             }.onFailure { error ->
-                // 👇 نمایش خطا دقیق به کاربر
-                messages = messages + ChatMessage("خطا: ${error.message ?: "مشکل در اتصال به هوش مصنوعی"}", false)
+                messages = messages + ChatMessage("خطا: ${error.message ?: "مشکل در اتصال"}", false)
             }
             isLoading = false
         }
@@ -86,6 +85,7 @@ fun AiChatScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
+                .imePadding() // 👈 این خط جادوییه! کیبورد رو مدیریت می‌کنه
         ) {
             LazyColumn(
                 state = listState,
@@ -134,17 +134,18 @@ fun AiChatScreen(onBack: () -> Unit) {
                 }
             }
 
+            // 👇 باکس ارسال پیام (خوشگل‌تر شد)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) },
                     shape = RoundedCornerShape(24.dp),
                     maxLines = 4,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -157,13 +158,13 @@ fun AiChatScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
-                        .clip(CircleShape)
+                        .size(48.dp) // 👈 کوچیک‌تر شد
+                        .clip(RoundedCornerShape(16.dp)) // 👈 مربعی با گوشه گرد
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable { sendMessage() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "ارسال", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "ارسال", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
         }
