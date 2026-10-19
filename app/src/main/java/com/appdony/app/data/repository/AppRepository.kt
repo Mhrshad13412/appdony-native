@@ -65,7 +65,7 @@ class AppRepository(context: Context? = null) {
         }
     }
 
-    // 👇 این تابع اصلاح شد (استفاده از بلاک بدنه به جای Expression Body)
+    // 👇 این تابع اصلاح شد (بدون مساوی)
     suspend fun getPostsByCategoryPaged(
         categoryId: Int, 
         page: Int, 
