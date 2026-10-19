@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.Comment
@@ -15,9 +16,9 @@ sealed class CommentsUiState {
     data class Error(val message: String) : CommentsUiState()
 }
 
-class CommentsViewModel(private val postId: Int) : ViewModel() {
+class CommentsViewModel(private val postId: Int, context: Context) : ViewModel() {
 
-    private val repo = AppRepository()
+    private val repo = AppRepository(context)
 
     private val _state = MutableStateFlow<CommentsUiState>(CommentsUiState.Loading)
     val state: StateFlow<CommentsUiState> = _state.asStateFlow()
@@ -27,10 +28,6 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
 
     private val _sendResult = MutableStateFlow<String?>(null)
     val sendResult: StateFlow<String?> = _sendResult.asStateFlow()
-
-    // 👇 وضعیت نیاز به لاگین مجدد
-    private val _sessionExpired = MutableStateFlow(false)
-    val sessionExpired: StateFlow<Boolean> = _sessionExpired.asStateFlow()
 
     init { load() }
 
@@ -43,7 +40,7 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
         }
     }
 
-    fun sendComment(content: String, oldNonce: String) {
+    fun sendComment(content: String, currentNonce: String) {
         if (content.isBlank()) {
             _sendResult.value = "متن نظر خالی است"
             return
@@ -51,23 +48,30 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
 
         viewModelScope.launch {
             _sending.value = true
-            _sessionExpired.value = false
-            
-            var finalNonce = oldNonce
-            try {
+            var finalNonce = currentNonce
+
+            // 👇 ۱. اگر nonce نداریم، از API می‌گیریم
+            if (finalNonce.isBlank()) {
                 val freshUser = repo.getCurrentUser().getOrNull()
-                if (freshUser != null && freshUser.nonce.isNotBlank()) {
-                    finalNonce = freshUser.nonce
+                if (freshUser != null) finalNonce = freshUser.nonce
+            }
+
+            // 👇 ۲. اگر بازم نداریم (سشن مرده)، به صورت خودکار لاگین می‌کنیم
+            if (finalNonce.isBlank()) {
+                val autoLoginResult = repo.autoLogin()
+                if (autoLoginResult.isSuccess) {
+                    val freshUser = repo.getCurrentUser().getOrNull()
+                    finalNonce = freshUser?.nonce ?: ""
                 }
-            } catch (e: Exception) {}
+            }
 
             if (finalNonce.isBlank()) {
-                _sendResult.value = "سشن شما منقضی شده است."
-                _sessionExpired.value = true
+                _sendResult.value = "سشن شما منقضی شده و اطلاعات ورود هم ذخیره نشده است. لطفاً دستی وارد شوید."
                 _sending.value = false
                 return@launch
             }
 
+            // 👇 ۳. ارسال با nonce جدید
             repo.postComment(postId, content, finalNonce)
                 .onSuccess { newComment ->
                     val current = _state.value
@@ -77,11 +81,24 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
                     _sendResult.value = "نظر شما ثبت شد و در انتظار تأیید است ✓"
                 }
                 .onFailure { err ->
-                    // 👇 تشخیص ارور 401 یا 403
                     val errorMsg = err.message ?: ""
+                    // اگر خطای 401 داد، دوباره لاگین می‌کنیم و ارسال می‌کنیم
                     if (errorMsg.contains("401") || errorMsg.contains("403") || errorMsg.contains("Forbidden")) {
-                        _sessionExpired.value = true
-                        _sendResult.value = "سشن شما منقضی شده است. لطفاً دوباره وارد شوید."
+                        val autoLoginResult = repo.autoLogin()
+                        if (autoLoginResult.isSuccess) {
+                            val newNonce = repo.getCurrentUser().getOrNull()?.nonce ?: ""
+                            if (newNonce.isNotBlank()) {
+                                repo.postComment(postId, content, newNonce).onSuccess { newComment ->
+                                    val current = _state.value
+                                    if (current is CommentsUiState.Success) {
+                                        _state.value = CommentsUiState.Success(listOf(newComment) + current.comments)
+                                    }
+                                    _sendResult.value = "نظر شما ثبت شد ✓"
+                                }
+                            }
+                        } else {
+                            _sendResult.value = "سشن شما منقضی شده. لطفاً دوباره وارد شوید."
+                        }
                     } else {
                         _sendResult.value = "خطا در ثبت نظر: $errorMsg"
                     }
