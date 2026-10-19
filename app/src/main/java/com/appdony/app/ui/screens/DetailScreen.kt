@@ -42,6 +42,7 @@ import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.DetailSkeleton
 import com.appdony.app.ui.components.LoginSheet
+import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -66,6 +67,9 @@ fun DetailScreen(postId: Int, onBack: () -> Unit, onSimilarClick: (Int) -> Unit)
     val nonce by sessionManager.nonce.collectAsStateWithLifecycle(initialValue = "")
     val favorites by favoritesManager.favoriteIds.collectAsStateWithLifecycle(initialValue = emptySet())
     var showLoginSheet by remember { mutableStateOf(false) }
+    
+    // 👇 وضعیت امتیاز کاربر
+    var userRating by remember { mutableIntStateOf(0) }
 
     if (showLoginSheet) {
         LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
@@ -83,9 +87,17 @@ fun DetailScreen(postId: Int, onBack: () -> Unit, onSimilarClick: (Int) -> Unit)
             is DetailUiState.Success -> {
                 DetailContent(
                     post = s.post, info = s.info, similar = s.similar, isLoggedIn = isLoggedIn, nonce = nonce,
+                    userRating = userRating,
+                    onRatingChanged = { rating ->
+                        if (isLoggedIn) {
+                            userRating = rating
+                            // TODO: ارسال امتیاز به API (نیاز به افزونه در وردپرس)
+                        } else {
+                            showLoginSheet = true
+                        }
+                    },
                     onSimilarClick = onSimilarClick,
                     onDownload = { url, title -> 
-                        // 👇 فراخوانی تابع دانلود با scope
                         scope.launch { DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url)) }
                     },
                     onShare = {
@@ -106,7 +118,11 @@ fun DetailScreen(postId: Int, onBack: () -> Unit, onSimilarClick: (Int) -> Unit)
 }
 
 @Composable
-private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, isLoggedIn: Boolean, nonce: String, onSimilarClick: (Int) -> Unit, onDownload: (String, String) -> Unit, onShare: () -> Unit, onNeedLogin: () -> Unit) {
+private fun DetailContent(
+    post: Post, info: AppInfo, similar: List<Post>, isLoggedIn: Boolean, nonce: String,
+    userRating: Int, onRatingChanged: (Int) -> Unit,
+    onSimilarClick: (Int) -> Unit, onDownload: (String, String) -> Unit, onShare: () -> Unit, onNeedLogin: () -> Unit
+) {
     val context = LocalContext.current
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
@@ -130,9 +146,29 @@ private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, isLogg
                 }
             }
         }
+        
+        // 👇 بخش امتیازدهی ستاره‌ای
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("به این برنامه امتیاز دهید", color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                RatingBar(
+                    rating = userRating,
+                    onRatingChanged = onRatingChanged
+                )
+                if (userRating > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("ممنون از امتیاز شما! ⭐", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                }
+            }
+        }
+
         item {
             if (info.version != null || info.size != null || info.androidReq != null) {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     info.version?.let { InfoChip("نسخه", it) }
                     info.size?.let { InfoChip("حجم", it) }
                     info.androidReq?.let { InfoChip("اندروید", it.take(10)) }
@@ -141,7 +177,7 @@ private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, isLogg
         }
         item {
             if (info.downloadLinks.isNotEmpty()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     info.downloadLinks.forEachIndexed { index, link ->
                         Button(onClick = { onDownload(link.url, post.cleanTitle()) }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if (index == 0) MaterialTheme.colorScheme.primary else AppdonyCardBg)) {
                             Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else AppdonyTextPrimary)
