@@ -31,7 +31,7 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.BannerSkeleton // 👈 این خط اضافه شد
+import com.appdony.app.ui.components.BannerSkeleton // 👈 این حتما باید باشه
 import com.appdony.app.ui.components.EmptyState
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
