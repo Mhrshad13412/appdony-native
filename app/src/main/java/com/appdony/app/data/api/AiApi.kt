@@ -11,22 +11,18 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object AiApi {
-    // ⚠️ توجه: اینجا باید کلید API خودت رو از داشبورد llm7.io بذاری (کلیدی که شبیه sk-... هست)
-    private const val API_KEY = "YOUR_API_KEY_HERE"
+    // 👇 کلید خودت که تو عکس بود
+    private const val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
     
     private const val API_URL = "https://api.llm7.io/v1/chat/completions"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     suspend fun sendMessage(userMessage: String, history: List<Pair<String, String>> = emptyList()): Result<String> = withContext(Dispatchers.IO) {
         try {
-            if (API_KEY == "YOUR_API_KEY_HERE") {
-                return@withContext Result.failure(Exception("کلید API هوش مصنوعی تنظیم نشده است. لطفاً در فایل AiApi.kt آن را وارد کنید."))
-            }
-
             val messagesArray = JSONArray()
             
             messagesArray.put(JSONObject().apply {
@@ -47,7 +43,7 @@ object AiApi {
             })
 
             val jsonBody = JSONObject().apply {
-                put("model", "meta-llama/llama-3-8b-instruct") // مدل استاندارد و رایگان
+                put("model", "default") // 👈 مدل رایگان
                 put("messages", messagesArray)
             }
 
@@ -70,8 +66,7 @@ object AiApi {
                 val choices = jsonResponse.getJSONArray("choices")
                 if (choices.length() > 0) {
                     val message = choices.getJSONObject(0).getJSONObject("message")
-                    val content = message.getString("content")
-                    return@withContext Result.success(content)
+                    return@withContext Result.success(message.getString("content"))
                 }
             }
             Result.failure(Exception("پاسخی دریافت نشد."))
