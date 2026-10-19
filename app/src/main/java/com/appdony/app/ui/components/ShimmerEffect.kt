@@ -35,7 +35,6 @@ fun ShimmerBrush(): Brush {
     val bg = MaterialTheme.colorScheme.surfaceVariant
     val highlight = MaterialTheme.colorScheme.surface
 
-    // 👇 نور افقی از چپ به راست (دقیقا مثل یوتیوب)
     return Brush.linearGradient(
         colors = listOf(bg, highlight, bg),
         start = Offset(translateAnim, 0f),
@@ -45,19 +44,12 @@ fun ShimmerBrush(): Brush {
 
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Int = 12) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(cornerRadius.dp))
-            .background(ShimmerBrush())
-    )
+    Box(modifier = modifier.clip(RoundedCornerShape(cornerRadius.dp)).background(ShimmerBrush()))
 }
 
 @Composable
 fun CardSkeleton() {
-    Column(
-        modifier = Modifier.width(110.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(modifier = Modifier.width(110.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ShimmerBox(modifier = Modifier.size(100.dp), cornerRadius = 20)
         Spacer(modifier = Modifier.height(8.dp))
         ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp), cornerRadius = 4)
@@ -66,12 +58,19 @@ fun CardSkeleton() {
     }
 }
 
+// 👇 این تابع همان BannerSkeleton هست که ارور می داد
+@Composable
+fun BannerSkeleton() {
+    Column(modifier = Modifier.width(280.dp)) {
+        ShimmerBox(modifier = Modifier.fillMaxWidth().height(170.dp), cornerRadius = 18)
+        Spacer(modifier = Modifier.height(8.dp))
+        ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp), cornerRadius = 4)
+    }
+}
+
 @Composable
 fun SectionRowSkeleton() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         CardSkeleton()
         CardSkeleton()
         CardSkeleton()
@@ -80,10 +79,7 @@ fun SectionRowSkeleton() {
 
 @Composable
 fun SectionTitleSkeleton() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         ShimmerBox(modifier = Modifier.size(4.dp, 18.dp), cornerRadius = 2)
         Spacer(modifier = Modifier.width(8.dp))
         ShimmerBox(modifier = Modifier.width(120.dp).height(16.dp), cornerRadius = 4)
