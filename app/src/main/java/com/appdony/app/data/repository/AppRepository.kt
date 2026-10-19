@@ -17,7 +17,7 @@ class AppRepository {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // گرفتن لیست پست‌های وبلاگ از آدرس اختصاصی
+    // 👇 فقط و فقط از بخش وبلاگ می‌خونه
     suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
         val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
@@ -25,12 +25,11 @@ class AppRepository {
         Result.failure(e) 
     }
 
-    // 👇 تشخیص هوشمند: اگه پست عادی نبود، از وبلاگ بگیر
+    // 👇 اول چک می‌کنه بازیه یا برنامه، اگه نبود می‌فهمه وبلاگه
     suspend fun getPost(id: Int): Result<Post> = try {
         try {
             Result.success(api.getPost(id = id))
         } catch (e: Exception) {
-            // اگه خطای 404 داد (یعنی پست وبلاگه)، از این آدرس بگیر
             Result.success(api.getBlogPost(id = id))
         }
     } catch (e: Exception) { 
