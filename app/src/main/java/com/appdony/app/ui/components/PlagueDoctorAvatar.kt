@@ -12,10 +12,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape // 👈 تغییر کرد
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -29,7 +30,6 @@ fun PlagueDoctorAvatar(
     sizeDp: Int = 70,
     hasShadow: Boolean = true
 ) {
-    // انیمیشن شناور بودن (بالا و پایین رفتن نرم)
     val infiniteTransition = rememberInfiniteTransition(label = "floating")
     val floatY by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -45,12 +45,11 @@ fun PlagueDoctorAvatar(
         modifier = modifier
             .size(sizeDp.dp)
             .offset(y = floatY.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary) // رنگ اصلی اپ پشت عکس
-            .padding(6.dp), // یه حاشیه کوچیک که عکس تو دایره قشنگ بشینه
-        contentAlignment = androidx.compose.ui.Alignment.Center
+            .clip(RoundedCornerShape(24.dp)) // 👈 مربعی با گوشه گرد شد
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
     ) {
-        // 👇 اینجا عکسی که آپلود کردی رو فراخوانی می‌کنیم
         Image(
             painter = painterResource(id = R.drawable.plague_doctor),
             contentDescription = "دستیار اپدونی",
