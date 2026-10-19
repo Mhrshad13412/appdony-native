@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,9 +83,20 @@ fun DownloadsScreen() {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                                 context.startActivity(intent)
-                            } catch (e: Exception) {
-                                // نمایش خطا در صورت خراب بودن فایل
-                            }
+                            } catch (e: Exception) {}
+                        },
+                        onShare = {
+                            try {
+                                // 👇 منطق اشتراک‌گذاری فایل APK
+                                val file = File(Uri.parse(item.localUri).path!!)
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/vnd.android.package-archive"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "اشتراک‌گذاری فایل نصب با..."))
+                            } catch (e: Exception) {}
                         }
                     )
                 }
@@ -94,7 +106,7 @@ fun DownloadsScreen() {
 }
 
 @Composable
-private fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: () -> Unit) {
+private fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: () -> Unit, onShare: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant).padding(14.dp)
@@ -126,7 +138,7 @@ private fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: ()
                     color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = when {
                         item.isCompleted() -> "✓ آماده نصب"
@@ -144,7 +156,7 @@ private fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: ()
         }
 
         if (item.isRunning() && item.totalBytes > 0) {
-            Spacer(Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             LinearProgressIndicator(
                 progress = { item.progress() },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
@@ -153,18 +165,34 @@ private fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: ()
             )
         }
 
-        // 👇 دکمه نصب فقط وقتی فایل دانلود شده
+        // 👇 دکمه‌های نصب و اشتراک‌گذاری
         if (item.isCompleted()) {
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = onInstall,
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(10.dp)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.InstallMobile, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("نصب برنامه", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onInstall,
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.InstallMobile, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("نصب", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                // دکمه اشتراک‌گذاری (آیکون)
+                Button(
+                    onClick = onShare,
+                    modifier = Modifier.size(40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.background),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Default.Share, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
             }
         }
     }
