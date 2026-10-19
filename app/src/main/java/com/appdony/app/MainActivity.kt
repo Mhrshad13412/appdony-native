@@ -1,5 +1,7 @@
 package com.appdony.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,12 +36,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AppRoot() }
+        setContent { AppRoot(intent) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // لینک جدید رو جایگزین میکنیم
     }
 }
 
 @Composable
-fun AppRoot() {
+fun AppRoot(intent: Intent?) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
@@ -48,13 +55,13 @@ fun AppRoot() {
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
         AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK, primaryColor = ThemeManager.themeColors[themeState.colorIndex]) {
-            MainScreen()
+            MainScreen(incomingIntent = intent)
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(incomingIntent: Intent?) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: ""
@@ -62,24 +69,35 @@ fun MainScreen() {
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    // 👇 وضعیت اسپلش
     var isLoading by remember { mutableStateOf(true) }
 
-    // 👇 منطق پیش‌بارگذاری (Prefetching)
+    // 👇 پردازش لینک‌های ورودی (Deep Link)
+    LaunchedEffect(incomingIntent) {
+        incomingIntent?.data?.let { uri ->
+            val postId = uri.getQueryParameter("p") // گرفتن آیدی پست از لینک
+            if (postId != null) {
+                navController.navigate("detail/$postId")
+            }
+        }
+        
+        // 👇 پردازش میانبرهای اپ (Shortcuts)
+        incomingIntent?.getStringExtra("shortcut_route")?.let { route ->
+            if (route == "search" || route == "updates" || route == "favorites") {
+                navController.navigate(route)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
-        // ۱. به API می‌گیم یه بار دیتای بازی‌ها رو بگیره و تو کش بریزه
         val repo = com.appdony.app.data.repository.AppRepository(context)
         val result = repo.loadInitial("games")
         
-        // ۲. اگه دیتا اومد، عکس‌های کارت‌های اول رو هم دانلود می‌کنیم
         result.onSuccess { data ->
             val imageUrls = listOfNotNull(
                 data.banner?.featuredImageUrl(),
                 data.singleFeature?.featuredImageUrl()
             ) + data.featured.mapNotNull { it.featuredImageUrl() }
 
-            // به Coil میگیم این عکس‌ها رو دانلود کن
             imageUrls.take(10).forEach { url ->
                 val request = ImageRequest.Builder(context)
                     .data(url)
@@ -89,8 +107,6 @@ fun MainScreen() {
                 context.imageLoader.enqueue(request)
             }
         }
-
-        // یه مکث کوتاه برای زیبایی اسپلش
         delay(1500) 
         isLoading = false
     }
@@ -98,7 +114,6 @@ fun MainScreen() {
     if (isLoading) {
         SplashScreen()
     } else {
-        // 👇 کدهای اصلی صفحه (همون قبلی‌ها)
         val sessionManager = remember { SessionManager(context) }
         val onboardingManager = remember { OnboardingManager(context) }
         val snackbarHostState = remember { SnackbarHostState() }
