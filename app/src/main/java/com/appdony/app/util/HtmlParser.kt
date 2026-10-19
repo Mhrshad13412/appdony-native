@@ -19,10 +19,12 @@ data class AppInfo(
 
 object HtmlParser {
 
+    // سایت‌های خبری و تبلیغاتی که نباید به عنوان لینک دانلود شناسایی بشن
     private val blockedDomains = listOf(
         "google.com", "doubleclick", "googlesyndication",
         "facebook.com", "google-analytics", "t.me/", 
-        "telegram.me/", "twitter.com", "pinterest.com"
+        "telegram.me/", "twitter.com", "pinterest.com",
+        "gamerant", "ign.com", "youtube.com", "aparat.com", "youtu.be"
     )
 
     fun parsePostContent(html: String): AppInfo {
@@ -99,6 +101,7 @@ object HtmlParser {
         return null
     }
 
+    // فیلتر فوق سخت‌گیرانه برای لینک‌های دانلود
     private fun extractDownloadLinks(html: String): List<DownloadLink> {
         val result = mutableListOf<DownloadLink>()
 
@@ -110,14 +113,16 @@ object HtmlParser {
             val url = m.groupValues[1].trim()
             val rawText = Html.fromHtml(m.groupValues[2], Html.FROM_HTML_MODE_LEGACY).toString().trim()
 
-            val isBroken = rawText.contains("خطا در بارگذاری") || 
-                           rawText.contains("Error") ||
-                           url == "#" || 
-                           url.startsWith("javascript")
-            
             val isBlocked = blockedDomains.any { url.contains(it, ignoreCase = true) }
+            
+            // فقط لینک‌هایی که پسوند فایل دارن یا مال دامنه دانلود خودمون هستن
+            val isDirectFile = url.contains(".apk", true) || 
+                               url.contains(".zip", true) || 
+                               url.contains(".rar", true) || 
+                               url.contains("appdony.ir/download") || 
+                               url.contains("dl.appdony.ir")
 
-            if (url.startsWith("http") && !isBroken && !isBlocked) {
+            if (url.startsWith("http") && !isBlocked && isDirectFile) {
                 val title = rawText.ifBlank { "دانلود" }.replace(Regex("\\s+"), " ").take(60)
                 if (result.none { it.url == url }) {
                     result.add(DownloadLink(title = title, url = url))
