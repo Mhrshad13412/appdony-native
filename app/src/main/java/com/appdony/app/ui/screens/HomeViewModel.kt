@@ -40,7 +40,6 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
     private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
     val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
 
-    // 👇 برای جلوگیری از درخواست‌های همزمان و کرش کردن
     private val loadingCategories = mutableSetOf<Int>()
 
     init {
@@ -74,7 +73,6 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
 
     fun loadSection(categoryId: Int) {
         val current = _sections.value[categoryId]
-        // اگه قبلاً لود شده یا در حال لود بود، بیخیال شو
         if (current is SectionState.Loading || current is SectionState.Loaded || loadingCategories.contains(categoryId)) {
             return
         }
