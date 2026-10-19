@@ -7,9 +7,5 @@ fun AppsScreen(
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit
 ) {
-    FeedScreen(
-        feedType = "apps",
-        onPostClick = onPostClick,
-        onCategoryClick = onCategoryClick
-    )
+    FeedScreen(feedType = "apps", onPostClick = onPostClick, onCategoryClick = onCategoryClick)
 }
