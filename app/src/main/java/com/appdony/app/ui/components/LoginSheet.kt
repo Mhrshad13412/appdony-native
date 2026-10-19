@@ -1,64 +1,34 @@
 package com.appdony.app.ui.components
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.webkit.CookieManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.appdony.app.data.api.WordPressLogin
+import androidx.compose.ui.viewinterop.AndroidView
 import com.appdony.app.data.model.UserData
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
+import com.appdony.app.data.repository.AppRepository
+import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginSheet(
     onDismiss: () -> Unit,
@@ -66,222 +36,91 @@ fun LoginSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(false) }
-    var errorMsg by remember { mutableStateOf<String?>(null) }
-
-    fun performLogin() {
-        if (username.isBlank() || password.isBlank()) {
-            errorMsg = "نام کاربری و رمز عبور رو وارد کن"
-            return
-        }
-        loading = true
-        errorMsg = null
-
-        scope.launch {
-            val result = WordPressLogin.login(username.trim(), password)
-            result
-                .onSuccess { user ->
-                    loading = false
-                    onLoginSuccess(user)
-                }
-                .onFailure { err ->
-                    loading = false
-                    errorMsg = err.message ?: "خطا در لاگین"
-                }
-        }
-    }
+    var isLoading by remember { mutableStateOf(true) }
+    var loginDone by remember { mutableStateOf(false) }
+    var sawLoginPage by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = AppdonyBg,
         dragHandle = null
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(top = 16.dp, bottom = 24.dp)
-                .imePadding()
-        ) {
-            // هدر
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "ورود به اپدونی",
-                        color = AppdonyTextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "با حساب کاربری سایت وارد شو",
-                        color = AppdonyTextMuted,
-                        fontSize = 13.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .clickable { onDismiss() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "بستن",
-                        tint = AppdonyTextPrimary
-                    )
-                }
-            }
+        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
 
-            Spacer(Modifier.height(24.dp))
+                        CookieManager.getInstance().setAcceptCookie(true)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-            // فیلد نام کاربری
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it; errorMsg = null },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("نام کاربری یا ایمیل", color = AppdonyTextMuted) },
-                leadingIcon = {
-                    Icon(Icons.Default.Person, null, tint = AppdonyTextMuted)
-                },
-                singleLine = true,
-                enabled = !loading,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = AppdonyCardBg,
-                    focusedContainerColor = AppdonyCardBg,
-                    unfocusedContainerColor = AppdonyCardBg,
-                    focusedTextColor = AppdonyTextPrimary,
-                    unfocusedTextColor = AppdonyTextPrimary,
-                    disabledContainerColor = AppdonyCardBg,
-                    disabledTextColor = AppdonyTextMuted
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-            )
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                if (url?.contains("wp-login.php") == true) sawLoginPage = true
+                            }
 
-            Spacer(Modifier.height(12.dp))
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isLoading = false
+                                view?.evaluateJavascript(hideThemeScript, null)
 
-            // فیلد رمز عبور
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it; errorMsg = null },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("رمز عبور", color = AppdonyTextMuted) },
-                leadingIcon = {
-                    Icon(Icons.Default.Lock, null, tint = AppdonyTextMuted)
-                },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff
-                            else Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = AppdonyTextMuted
-                        )
+                                if (!loginDone && sawLoginPage && url?.contains("wp-login.php") != true) {
+                                    loginDone = true
+                                    scope.launch {
+                                        delay(1000)
+                                        val repo = AppRepository(ctx)
+                                        val result = withContext(Dispatchers.IO) { repo.getCurrentUser() }
+                                        result.onSuccess { user -> if (user.id > 0) onLoginSuccess(user) }
+                                    }
+                                }
+                            }
+                        }
+                        loadUrl("https://appdony.ir/wp-login.php")
                     }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                singleLine = true,
-                enabled = !loading,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = AppdonyCardBg,
-                    focusedContainerColor = AppdonyCardBg,
-                    unfocusedContainerColor = AppdonyCardBg,
-                    focusedTextColor = AppdonyTextPrimary,
-                    unfocusedTextColor = AppdonyTextPrimary,
-                    disabledContainerColor = AppdonyCardBg,
-                    disabledTextColor = AppdonyTextMuted
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = { performLogin() }
-                )
+                }
             )
-
-            // نمایش خطا
-            if (errorMsg != null) {
-                Spacer(Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x33FF5252))
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        text = errorMsg!!,
-                        color = Color(0xFFFF8A80),
-                        fontSize = 13.sp
-                    )
+            if (isLoading) {
+                Box(Modifier.fillMaxSize().background(AppdonyBg), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // دکمه ورود
-            Button(
-                onClick = { performLogin() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                enabled = !loading && username.isNotBlank() && password.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = AppdonyCardBg
-                )
-            ) {
-                if (loading) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(22.dp)
-                    )
-                } else {
-                    Text(
-                        text = "ورود",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "حساب نداری؟ ",
-                    color = AppdonyTextMuted,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = "ثبت‌نام کن",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable {
-                        // TODO
-                    }
-                )
             }
         }
     }
 }
+
+private val hideThemeScript = """
+(function() {
+    var css = document.createElement('style');
+    css.innerHTML = `
+        * { font-family: -apple-system, sans-serif !important; }
+        body, html { background: #121517 !important; }
+        body.login { background: #121517 !important; display: flex !important; align-items: center !important; justify-content: center !important; min-height: 100vh !important; margin: 0 !important; }
+        #login { width: 100% !important; max-width: 400px !important; padding: 20px !important; margin: 0 auto !important; }
+        .login h1, .login h1 a { color: #E6E1E5 !important; background: none !important; font-size: 24px !important; text-align: center !important; padding: 0 0 20px 0 !important; text-indent: 0 !important; width: auto !important; height: auto !important; text-shadow: none !important; }
+        .login form { background: #1E2225 !important; border: 1px solid #0D7377 !important; border-radius: 16px !important; padding: 24px !important; box-shadow: 0 4px 20px rgba(13,115,119,0.3) !important; margin-top: 0 !important; }
+        .login label { color: #E6E1E5 !important; font-size: 13px !important; display: block !important; margin-bottom: 6px !important; }
+        .login input[type=text], .login input[type=password], .login input[type=email] { background: #23262A !important; color: #E6E1E5 !important; border: 1px solid #0D7377 !important; border-radius: 10px !important; padding: 12px !important; width: 100% !important; box-sizing: border-box !important; font-size: 14px !important; margin-bottom: 12px !important; box-shadow: none !important; outline: none !important; }
+        .login input:focus { border-color: #14A0A6 !important; box-shadow: 0 0 0 3px rgba(13,115,119,0.3) !important; }
+        .login .button-primary, .login #wp-submit { background: #0D7377 !important; color: #fff !important; border: none !important; border-radius: 12px !important; padding: 14px !important; width: 100% !important; font-weight: bold !important; font-size: 15px !important; cursor: pointer !important; margin-top: 8px !important; text-shadow: none !important; box-shadow: none !important; height: auto !important; line-height: 1.2 !important; }
+        .login #nav, .login #backtoblog { text-align: center !important; margin-top: 16px !important; }
+        .login #nav a, .login #backtoblog a { color: #14A0A6 !important; font-size: 13px !important; text-decoration: none !important; }
+        .login .message, .login .notice, .login .error { background: #23262A !important; color: #E6E1E5 !important; border: none !important; border-left: 4px solid #0D7377 !important; border-radius: 8px !important; padding: 12px !important; margin-bottom: 16px !important; box-shadow: none !important; }
+        .login .error { border-left-color: #FF5252 !important; color: #FF8A80 !important; }
+        .login .forgetmenot label { color: #939396 !important; font-size: 12px !important; }
+        .login .forgetmenot input { width: auto !important; margin-right: 6px !important; }
+        .login .privacy-policy-page-link, .login .language-switcher { display: none !important; }
+    `;
+    document.head.appendChild(css);
+    
+    // 👇 تیک زدن خودکار "مرا به خاطر بسپار"
+    setTimeout(function() {
+        var remember = document.getElementById('rememberme');
+        if (remember) { remember.checked = true; }
+    }, 500);
+})();
+""".trimIndent()
