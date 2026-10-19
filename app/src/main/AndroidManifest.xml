@@ -2,21 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- دسترسی‌های لازم -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-
-    <!-- برای دانلود در اندروید ۱۳+ -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- برای نصب APK دانلود شده -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
-    <!-- چک کردن اتصال شبکه -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
@@ -34,7 +25,6 @@
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="34">
 
-        <!-- Activity اصلی -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -43,13 +33,28 @@
             android:launchMode="singleTop"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.Appdony">
+            
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- 👇 اینتنت‌فیلتر برای Deep Linking -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- دامنه سایت اپدونی -->
+                <data android:scheme="https" android:host="appdony.ir" />
+                <data android:scheme="http" android:host="appdony.ir" />
+            </intent-filter>
+
+            <!-- 👇 متادیتا برای App Shortcuts -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- FileProvider برای نصب APK -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -60,11 +65,8 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Coil: کش تصاویر -->
         <meta-data
             android:name="coil.ImageLoaderFactory"
             android:value="com.appdony.app.AppdonyApp" />
-
     </application>
-
 </manifest>
