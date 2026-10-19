@@ -3,9 +3,11 @@ package com.appdony.app.data.repository
 import android.content.Context
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.api.CommentRequest
+import com.appdony.app.data.api.WordPressLogin
 import com.appdony.app.data.local.AppDatabase
 import com.appdony.app.data.local.CachedPost
 import com.appdony.app.data.model.*
+import com.appdony.app.data.session.CredentialsManager
 import com.google.gson.Gson
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -15,6 +17,7 @@ class AppRepository(context: Context? = null) {
     private val api = ApiClient.api
     private val db = context?.let { AppDatabase.getDatabase(it) }
     private val gson = Gson()
+    private val credentialsManager = context?.let { CredentialsManager(it) }
 
     private val cacheInitial = mutableMapOf<String, InitialData>()
 
@@ -24,6 +27,14 @@ class AppRepository(context: Context? = null) {
     suspend fun clearCache() {
         cacheInitial.clear()
         db?.postDao()?.clearAll()
+    }
+    
+    // 👇 تابع لاگین خودکار با اطلاعات ذخیره شده
+    suspend fun autoLogin(): Result<UserData> {
+        val user = credentialsManager?.getUsername()
+        val pass = credentialsManager?.getPassword()
+        if (user.isNullOrBlank() || pass.isNullOrBlank()) return Result.failure(Exception("no saved credentials"))
+        return WordPressLogin.login(user, pass)
     }
 
     suspend fun getCurrentUser(): Result<UserData> = try {
@@ -43,7 +54,6 @@ class AppRepository(context: Context? = null) {
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 اینجا از بلاک بدنه استفاده کردیم
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6, forceRefresh: Boolean = false): Result<List<Post>> {
         return try {
             if (!forceRefresh) {
@@ -52,40 +62,21 @@ class AppRepository(context: Context? = null) {
                     return Result.success(cachedList.map { jsonToPost(it.jsonData) })
                 }
             }
-
             val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
             val entities = posts.map { CachedPost(it.id, postToJson(it), categoryId) }
             db?.postDao()?.insertPosts(entities)
-            
             Result.success(posts)
-        } catch (e: Exception) { 
+        } catch (e: Exception) {
             val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
-            if (cachedList.isNotEmpty()) {
-                Result.success(cachedList.map { jsonToPost(it.jsonData) })
-            } else {
-                Result.failure(e) 
-            }
+            if (cachedList.isNotEmpty()) Result.success(cachedList.map { jsonToPost(it.jsonData) })
+            else Result.failure(e)
         }
     }
 
-    suspend fun getPostsByCategoryPaged(
-        categoryId: Int, 
-        page: Int, 
-        perPage: Int = 24,
-        orderBy: String = "date",
-        order: String = "desc"
-    ): Result<List<Post>> {
+    suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24, orderBy: String = "date", order: String = "desc"): Result<List<Post>> {
         return try {
-            Result.success(api.getPostsByCategory(
-                categoryId = categoryId, 
-                perPage = perPage, 
-                page = page,
-                orderBy = orderBy,
-                order = order
-            ))
-        } catch (e: Exception) { 
-            Result.failure(e) 
-        }
+            Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page, orderBy = orderBy, order = order))
+        } catch (e: Exception) { Result.failure(e) }
     }
 
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
@@ -121,29 +112,19 @@ class AppRepository(context: Context? = null) {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 اینجا هم از بلاک بدنه استفاده کردیم
     suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> {
         return try {
             if (!forceRefresh) {
                 cacheInitial[feedType]?.let { return Result.success(it) }
             }
-
             coroutineScope {
                 val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
                 val categoriesDeferred = async { api.getCategories(perPage = 100) }
-
                 val posts = postsDeferred.await()
                 val allCategories = categoriesDeferred.await()
-
                 val gamesParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games")) }
                 val appsParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن")) }
-
-                val relevantParent = when (feedType) {
-                    "games" -> gamesParent
-                    "apps" -> appsParent
-                    else -> null
-                }
-
+                val relevantParent = when (feedType) { "games" -> gamesParent; "apps" -> appsParent; else -> null }
                 val sections = if (relevantParent != null) {
                     val children = allCategories.filter { it.parent == relevantParent.id && it.count > 0 }
                     if (children.isNotEmpty()) children.sortedByDescending { it.count }.take(30)
@@ -151,20 +132,14 @@ class AppRepository(context: Context? = null) {
                 } else {
                     allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
                 }
-
                 val data = InitialData(
-                    banner = posts.getOrNull(0),
-                    singleFeature = posts.getOrNull(1),
-                    featured = posts.take(6),
-                    categories = sections
+                    banner = posts.getOrNull(0), singleFeature = posts.getOrNull(1),
+                    featured = posts.take(6), categories = sections
                 )
-                
                 cacheInitial[feedType] = data
                 Result.success(data)
             }
-        } catch (e: Exception) { 
-            Result.failure(e) 
-        }
+        } catch (e: Exception) { Result.failure(e) }
     }
 }
 
