@@ -10,20 +10,20 @@ class AppRepository {
 
     private val api = ApiClient.api
 
-    // 🧠 حافظه کش برای جلوگیری از درخواست‌های تکراری
     private val cacheInitial = mutableMapOf<String, InitialData>()
     private val cacheSections = mutableMapOf<Int, List<Post>>()
-    private val cacheBlog: List<Post>? = null
 
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getBlogPosts(): Result<List<Post>> = try {
-        if (cacheBlog != null) return Result.success(cacheBlog)
-        val posts = api.getCustomBlogPosts(perPage = 20)
+    // 👇 متد وبلاگ با پشتیبانی از صفحه‌بندی
+    suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
+        val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
-    } catch (e: Exception) { Result.failure(e) }
+    } catch (e: Exception) { 
+        Result.failure(e) 
+    }
 
     suspend fun getPost(id: Int): Result<Post> = try {
         Result.success(api.getPost(id = id))
@@ -35,7 +35,6 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        // اگه سکشن تو کش بود، فوراً بده
         cacheSections[categoryId]?.let { return Result.success(it) }
         
         val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
@@ -76,7 +75,6 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
-        // اگه دیتای این تب تو کش بود، فوراً بده
         cacheInitial[feedType]?.let { return Result.success(it) }
 
         coroutineScope {
@@ -110,9 +108,7 @@ class AppRepository {
                 categories = sections
             )
             
-            // ذخیره تو کش
             cacheInitial[feedType] = data
-            
             Result.success(data)
         }
     } catch (e: Exception) { Result.failure(e) }
