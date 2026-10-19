@@ -48,7 +48,6 @@ fun BlogScreen(
 
     val listState = rememberLazyListState()
 
-    // 👇 تشخیص اینکه کاربر به انتهای لیست رسیده یا نه
     val isAtBottom by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -61,7 +60,6 @@ fun BlogScreen(
         }
     }
 
-    // وقتی به انتهای لیست رسید، صفحه بعد رو لود کن
     LaunchedEffect(isAtBottom) {
         if (isAtBottom && posts.isNotEmpty()) {
             viewModel.loadMore()
@@ -73,7 +71,9 @@ fun BlogScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(vertical = 8.dp)
-            ) { items(4) { BlogCardSkeleton() } }
+            ) { 
+                items(4) { BlogCardSkeleton() } 
+            }
         }
 
         errorMsg != null && posts.isEmpty() -> {
@@ -107,7 +107,6 @@ fun BlogScreen(
                     }
                 }
 
-                // 👇 لودینگ پایین صفحه وقتی داره دیتای جدید می‌گیره
                 if (isLoadingMore) {
                     item {
                         Box(
@@ -143,12 +142,18 @@ private fun BlogPostCard(post: Post, context: android.content.Context, onClick: 
         }
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             val catName = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
-            if (!catName.isNullOrBlank()) { Text(catName, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.height(4.dp)) }
+            if (!catName.isNullOrBlank()) { 
+                Text(catName, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp)) 
+            }
             Text(post.cleanTitle(), color = AppdonyTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
             Spacer(Modifier.height(6.dp))
             val excerpt = post.cleanExcerpt()
-            if (excerpt.isNotBlank()) { Text(excerpt.take(120), color = AppdonyTextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp); Spacer(Modifier.height(6.dp)) }
-            Text(post.date.take(10), color = AppdonyTextMuted, fontSize = 11.sp)
+            if (excerpt.isNotBlank()) { 
+                Text(excerpt.take(120), color = AppdonyTextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
+                Spacer(Modifier.height(6.dp)) 
+            }
+            Text(post.date?.take(10) ?: "", color = AppdonyTextMuted, fontSize = 11.sp)
         }
     }
 }
