@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 object DownloadHelper {
 
-    suspend fun startDownload(context: Context, url: String, fileName: String) {
+    suspend fun startDownload(context: Context, url: String, fileName: String, wifiOnly: Boolean = false) {
         Toast.makeText(context, "در حال آماده‌سازی لینک دانلود...", Toast.LENGTH_SHORT).show()
         
         val finalUrl = resolveDirectUrl(url)
@@ -32,8 +32,10 @@ object DownloadHelper {
                     setDescription("در حال دانلود از اپدونی...")
                     setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                    setAllowedOverMetered(true)
-                    setAllowedOverRoaming(true)
+                    
+                    // 👇 اعمال محدودیت وای‌فای
+                    setAllowedOverMetered(!wifiOnly) 
+                    setAllowedOverRoaming(false)
 
                     val ext = MimeTypeMap.getFileExtensionFromUrl(finalUrl).lowercase()
                     val mime = when (ext) {
@@ -61,33 +63,19 @@ object DownloadHelper {
         }
     }
 
-    // این تابع میره ببینته لینک اصلی کجاست (حل مشکل ریدایرکت)
     private suspend fun resolveDirectUrl(url: String): String? = withContext(Dispatchers.IO) {
         try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .followRedirects(true)
-                .build()
-
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
-                .get()
-                .build()
+            val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).followRedirects(true).build()
+            val request = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 10)").get().build()
 
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    // اگه به یه فایل واقعی رسیدیم
                     val finalUrl = response.request.url.toString()
                     val contentType = response.header("Content-Type") ?: ""
-                    
-                    // اگه لینک به apk ختم میشد یا نوعش فایل بود
                     if (finalUrl.contains(".apk") || contentType.contains("application/vnd.android.package-archive")) {
                         return@withContext finalUrl
                     }
                 }
-                
-                // اگه لینک واقعی پیدا نشد، همون لینک اولیه رو بده
                 return@withContext url
             }
         } catch (e: Exception) {
