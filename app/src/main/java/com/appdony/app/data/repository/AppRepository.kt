@@ -17,6 +17,7 @@ class AppRepository {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
+    // گرفتن لیست پست‌های وبلاگ از آدرس اختصاصی
     suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
         val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
@@ -24,13 +25,12 @@ class AppRepository {
         Result.failure(e) 
     }
 
-    // 👇 تشخیص خودکار نوع پست (عادی یا وبلاگ)
+    // 👇 تشخیص هوشمند: اگه پست عادی نبود، از وبلاگ بگیر
     suspend fun getPost(id: Int): Result<Post> = try {
         try {
-            // اول تلاش می‌کنیم از پست‌های عادی بگیریم
             Result.success(api.getPost(id = id))
         } catch (e: Exception) {
-            // اگه خطا داد (مثلاً 404)، یعنی این یه پست وبلاگه
+            // اگه خطای 404 داد (یعنی پست وبلاگه)، از این آدرس بگیر
             Result.success(api.getBlogPost(id = id))
         }
     } catch (e: Exception) { 
@@ -44,14 +44,9 @@ class AppRepository {
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
         cacheSections[categoryId]?.let { return Result.success(it) }
-        
         val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
         cacheSections[categoryId] = posts
         Result.success(posts)
-    } catch (e: Exception) { Result.failure(e) }
-
-    suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
-        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
