@@ -10,41 +10,25 @@ class AppRepository {
 
     private val api = ApiClient.api
 
-    private var cachedInitialData: Map<String, InitialData> = emptyMap()
-    private val cachedSections = mutableMapOf<Int, List<Post>>()
-    private val cachedPosts = mutableMapOf<Int, Post>()
-
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 منطق جدید و ضدگلوله برای بلاگ
     suspend fun getBlogPosts(): Result<List<Post>> = try {
         val categories = api.getCategories(perPage = 100)
-
-        // پیدا کردن آیدی دسته‌های اصلی بازی و برنامه
         val gamesParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی")) }
         val appsParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه") || it.name.contains("اپلیکیشن")) }
 
         val gamesIds = if (gamesParent != null) (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet() else emptySet()
         val appsIds = if (appsParent != null) (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet() else emptySet()
 
-        // گرفتن ۴۰ پست آخر سایت
         val allPosts = api.getPosts(perPage = 40)
-        
-        // هر پستی که تو دسته بازی یا برنامه نبود = وبلاگ
-        val blogPosts = allPosts.filter { post -> 
-            post.categories.none { it in gamesIds || it in appsIds } 
-        }
-        
+        val blogPosts = allPosts.filter { post -> post.categories.none { it in gamesIds || it in appsIds } }
         Result.success(blogPosts)
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPost(id: Int): Result<Post> = try {
-        cachedPosts[id]?.let { return Result.success(it) }
-        val post = api.getPost(id = id)
-        cachedPosts[id] = post
-        Result.success(post)
+        Result.success(api.getPost(id = id))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
@@ -53,10 +37,7 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        cachedSections[categoryId]?.let { return Result.success(it) }
-        val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
-        cachedSections[categoryId] = posts
-        Result.success(posts)
+        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
@@ -91,11 +72,7 @@ class AppRepository {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> = try {
-        if (!forceRefresh) {
-            cachedInitialData[feedType]?.let { return Result.success(it) }
-        }
-
+    suspend fun loadInitial(feedType: String): Result<InitialData> = try {
         coroutineScope {
             val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
             val categoriesDeferred = async { api.getCategories(perPage = 100) }
@@ -120,22 +97,18 @@ class AppRepository {
                 allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
             }
 
-            val data = InitialData(
-                banner = posts.getOrNull(0),
-                singleFeature = posts.getOrNull(1),
-                featured = posts.take(6),
-                categories = sections
+            Result.success(
+                InitialData(
+                    banner = posts.getOrNull(0),
+                    singleFeature = posts.getOrNull(1),
+                    featured = posts.take(6),
+                    categories = sections
+                )
             )
-            
-            cachedInitialData = cachedInitialData + (feedType to data)
-            
-            Result.success(data)
         }
     } catch (e: Exception) { Result.failure(e) }
 }
 
 private fun matchesAny(cat: Category, keywords: List<String>): Boolean {
     val name = cat.name.lowercase()
-    val slug = cat.slug.lowercase()
-    return keywords.any { name.contains(it.lowercase()) || slug.contains(it.lowercase()) }
-}
+    val slug = cat.s
