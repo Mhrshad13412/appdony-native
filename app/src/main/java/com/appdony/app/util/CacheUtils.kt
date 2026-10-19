@@ -7,14 +7,12 @@ import java.io.File
 
 object CacheUtils {
 
-    // محاسبه حجم کش
     suspend fun getCacheSize(context: Context): String = withContext(Dispatchers.IO) {
         val cacheDir = context.cacheDir
         val size = getDirSize(cacheDir)
         formatSize(size)
     }
 
-    // پاک کردن کش
     suspend fun clearCache(context: Context) = withContext(Dispatchers.IO) {
         val cacheDir = context.cacheDir
         cacheDir.deleteRecursively()
@@ -34,7 +32,8 @@ object CacheUtils {
     private fun formatSize(bytes: Long): String {
         if (bytes <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        // 👇 غلط املایی اینجا اصلاح شد (digitGroups)
         val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
-        return String.format("%.1f %s", bytes / Math.pow(1024.0, digitGroup.toDouble()), units[digitGroup])
+        return String.format("%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
     }
 }
