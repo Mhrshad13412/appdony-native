@@ -10,30 +10,20 @@ class AppRepository {
 
     private val api = ApiClient.api
 
+    // 🧠 حافظه کش برای جلوگیری از درخواست‌های تکراری
+    private val cacheInitial = mutableMapOf<String, InitialData>()
+    private val cacheSections = mutableMapOf<Int, List<Post>>()
+    private val cacheBlog: List<Post>? = null
+
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 حالا مستقیم از خود وبلاگ می‌خونیم!
     suspend fun getBlogPosts(): Result<List<Post>> = try {
+        if (cacheBlog != null) return Result.success(cacheBlog)
         val posts = api.getCustomBlogPosts(perPage = 20)
         Result.success(posts)
-    } catch (e: Exception) {
-        // اگه آدرس وبلاگ خطا داد (مثلاً اسمش فرق داشت)، برمی‌گردیم به روش قبلی
-        try {
-            val categories = api.getCategories(perPage = 100)
-            val gamesParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی")) }
-            val appsParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه")) }
-            val gamesIds = if (gamesParent != null) (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet() else emptySet()
-            val appsIds = if (appsParent != null) (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet() else emptySet()
-            
-            val allPosts = api.getPosts(perPage = 40)
-            val blogPosts = allPosts.filter { post -> post.categories.none { it in gamesIds || it in appsIds } }
-            Result.success(blogPosts)
-        } catch (e2: Exception) {
-            Result.failure(e)
-        }
-    }
+    } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPost(id: Int): Result<Post> = try {
         Result.success(api.getPost(id = id))
@@ -45,7 +35,12 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage))
+        // اگه سکشن تو کش بود، فوراً بده
+        cacheSections[categoryId]?.let { return Result.success(it) }
+        
+        val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
+        cacheSections[categoryId] = posts
+        Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
@@ -81,6 +76,9 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun loadInitial(feedType: String): Result<InitialData> = try {
+        // اگه دیتای این تب تو کش بود، فوراً بده
+        cacheInitial[feedType]?.let { return Result.success(it) }
+
         coroutineScope {
             val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
             val categoriesDeferred = async { api.getCategories(perPage = 100) }
@@ -105,14 +103,17 @@ class AppRepository {
                 allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
             }
 
-            Result.success(
-                InitialData(
-                    banner = posts.getOrNull(0),
-                    singleFeature = posts.getOrNull(1),
-                    featured = posts.take(6),
-                    categories = sections
-                )
+            val data = InitialData(
+                banner = posts.getOrNull(0),
+                singleFeature = posts.getOrNull(1),
+                featured = posts.take(6),
+                categories = sections
             )
+            
+            // ذخیره تو کش
+            cacheInitial[feedType] = data
+            
+            Result.success(data)
         }
     } catch (e: Exception) { Result.failure(e) }
 }
