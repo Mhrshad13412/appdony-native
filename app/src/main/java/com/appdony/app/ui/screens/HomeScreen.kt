@@ -31,7 +31,7 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.BannerSkeleton
+import com.appdony.app.ui.components.BannerSkeleton // 👈 این ایمپورت اضافه شد
 import com.appdony.app.ui.components.EmptyState
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
@@ -75,7 +75,6 @@ fun FeedScreen(
             )
         }
         else -> {
-            // 👇 Swipe to Refresh
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
                 onRefresh = { vm.refresh() },
@@ -134,7 +133,7 @@ private fun HomeSkeleton() {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(3) { BannerSkeleton() }
+                items(3) { BannerSkeleton() } // 👈 استفاده از BannerSkeleton
             }
             Spacer(Modifier.height(16.dp))
         }
