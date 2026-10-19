@@ -10,43 +10,38 @@ class AppRepository {
 
     private val api = ApiClient.api
 
-    // 🧠 حافظه موقت (Memory Cache) برای جلوگیری از درخواست‌های تکراری
     private var cachedInitialData: Map<String, InitialData> = emptyMap()
     private val cachedSections = mutableMapOf<Int, List<Post>>()
     private val cachedPosts = mutableMapOf<Int, Post>()
 
-    // ══════════════════ لاگین و کاربر ══════════════════
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // ══════════════════ بلاگ ══════════════════
+    // 👇 منطق جدید و ضدگلوله برای بلاگ
     suspend fun getBlogPosts(): Result<List<Post>> = try {
         val categories = api.getCategories(perPage = 100)
-        val blogCategory = categories.firstOrNull {
-            it.parent == 0 && (it.slug.contains("blog", true) || it.slug.contains("news", true) || it.name.contains("وبلاگ") || it.name.contains("اخبار"))
-        }
 
-        val posts = if (blogCategory != null) {
-            api.getPostsByCategory(categoryId = blogCategory.id, perPage = 30)
-        } else {
-            val gamesParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی")) }
-            val appsParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه")) }
-            val gamesIds = if (gamesParent != null) (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet() else emptySet()
-            val appsIds = if (appsParent != null) (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet() else emptySet()
+        // پیدا کردن آیدی دسته‌های اصلی بازی و برنامه
+        val gamesParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("game", true) || it.name.contains("بازی")) }
+        val appsParent = categories.firstOrNull { it.parent == 0 && (it.slug.contains("app", true) || it.name.contains("برنامه") || it.name.contains("اپلیکیشن")) }
 
-            val allPosts = api.getPosts(perPage = 40)
-            allPosts.filter { post -> post.categories.none { it in gamesIds || it in appsIds } }
+        val gamesIds = if (gamesParent != null) (listOf(gamesParent.id) + categories.filter { it.parent == gamesParent.id }.map { it.id }).toSet() else emptySet()
+        val appsIds = if (appsParent != null) (listOf(appsParent.id) + categories.filter { it.parent == appsParent.id }.map { it.id }).toSet() else emptySet()
+
+        // گرفتن ۴۰ پست آخر سایت
+        val allPosts = api.getPosts(perPage = 40)
+        
+        // هر پستی که تو دسته بازی یا برنامه نبود = وبلاگ
+        val blogPosts = allPosts.filter { post -> 
+            post.categories.none { it in gamesIds || it in appsIds } 
         }
-        Result.success(posts)
+        
+        Result.success(blogPosts)
     } catch (e: Exception) { Result.failure(e) }
 
-    // ══════════════════ پست‌ها ══════════════════
-
     suspend fun getPost(id: Int): Result<Post> = try {
-        // اگه تو کش بود، همون رو برگردون
         cachedPosts[id]?.let { return Result.success(it) }
-        
         val post = api.getPost(id = id)
         cachedPosts[id] = post
         Result.success(post)
@@ -58,9 +53,7 @@ class AppRepository {
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        // اگه سکشن تو کش بود، همون رو بده
         cachedSections[categoryId]?.let { return Result.success(it) }
-        
         val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
         cachedSections[categoryId] = posts
         Result.success(posts)
@@ -74,7 +67,6 @@ class AppRepository {
         Result.success(api.searchPosts(query = query, perPage = 30))
     } catch (e: Exception) { Result.failure(e) }
 
-    // ══════════════════ کامنت‌ها ══════════════════
     suspend fun getComments(postId: Int): Result<List<Comment>> = try {
         Result.success(api.getComments(postId = postId, perPage = 50))
     } catch (e: Exception) { Result.failure(e) }
@@ -84,7 +76,6 @@ class AppRepository {
         Result.success(comment)
     } catch (e: Exception) { Result.failure(e) }
 
-    // ══════════════════ اپدونی پلاس ══════════════════
     suspend fun loadPlusPosts(): Result<List<Post>> = try {
         val allCategories = api.getCategories(perPage = 100)
         val plusParent = allCategories.firstOrNull {
@@ -100,9 +91,7 @@ class AppRepository {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    // ══════════════════ لود اولیه (با کش) ══════════════════
     suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> = try {
-        // اگه تو کش بود و کاربر مجبور به رفرش نکرده بود، فوراً بده
         if (!forceRefresh) {
             cachedInitialData[feedType]?.let { return Result.success(it) }
         }
@@ -138,7 +127,6 @@ class AppRepository {
                 categories = sections
             )
             
-            // ذخیره تو کش
             cachedInitialData = cachedInitialData + (feedType to data)
             
             Result.success(data)
