@@ -17,7 +17,6 @@ class AppRepository {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 متد وبلاگ با پشتیبانی از صفحه‌بندی
     suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
         val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
@@ -25,9 +24,18 @@ class AppRepository {
         Result.failure(e) 
     }
 
+    // 👇 تشخیص خودکار نوع پست (عادی یا وبلاگ)
     suspend fun getPost(id: Int): Result<Post> = try {
-        Result.success(api.getPost(id = id))
-    } catch (e: Exception) { Result.failure(e) }
+        try {
+            // اول تلاش می‌کنیم از پست‌های عادی بگیریم
+            Result.success(api.getPost(id = id))
+        } catch (e: Exception) {
+            // اگه خطا داد (مثلاً 404)، یعنی این یه پست وبلاگه
+            Result.success(api.getBlogPost(id = id))
+        }
+    } catch (e: Exception) { 
+        Result.failure(e) 
+    }
 
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
         if (ids.isEmpty()) Result.success(emptyList())
