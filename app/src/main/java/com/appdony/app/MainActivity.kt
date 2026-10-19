@@ -23,10 +23,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -118,7 +120,7 @@ fun MainScreen() {
         val info = UpdateHelper.checkForUpdate()
         if (info != null && info.latestVersion != currentVersion) {
             updateInfo = info
-            delay(2000) // کمی صبر میکنیم تا UI کامل لود بشه
+            delay(2000) // کمی صبر می‌کنیم تا UI کامل لود بشه
             showUpdateBanner = true
         }
     }
