@@ -28,13 +28,19 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me")
     suspend fun checkAuth(): Response<ResponseBody>
 
-    // 👇 اضافه شدن پارامتر page برای لود تنبل
     @GET("wp-json/wp/v2/blog")
     suspend fun getCustomBlogPosts(
         @Query("per_page") perPage: Int = 10,
         @Query("page") page: Int = 1,
         @Query("_embed") embed: Int = 1
     ): List<Post>
+
+    // 👇 این تابع برای وقتیه که روی یه پست وبلاگ کلیک می‌کنیم
+    @GET("wp-json/wp/v2/blog/{id}")
+    suspend fun getBlogPost(
+        @Path("id") id: Int,
+        @Query("_embed") embed: Int = 1
+    ): Post
 
     @GET("wp-json/wp/v2/posts")
     suspend fun getPosts(
