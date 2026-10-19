@@ -5,7 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -13,60 +15,76 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.CachePolicy
-import androidx.compose.ui.platform.LocalContext
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
-fun BlogScreen(onPostClick: (Int) -> Unit, onCategoryClick: (Int, String) -> Unit) {
-    var loading by remember { mutableStateOf(true) }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
-    var errorMsg by remember { mutableStateOf<String?>(null) }
+fun BlogScreen(
+    onPostClick: (Int) -> Unit,
+    onCategoryClick: (Int, String) -> Unit,
+    viewModel: BlogViewModel = viewModel()
+) {
     val context = LocalContext.current
+    val posts by viewModel.posts.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val errorMsg by viewModel.errorMsg.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        loading = true
-        errorMsg = null
-        try {
-            val repo = AppRepository()
-            val result = withContext(Dispatchers.IO) { repo.getBlogPosts() }
-            result.onSuccess { posts = it }
-                .onFailure { errorMsg = it.message ?: "خطا در دریافت اطلاعات" }
-        } catch (e: Exception) {
-            errorMsg = e.message ?: "خطا در دریافت اطلاعات"
-        } finally {
-            loading = false
+    val listState = rememberLazyListState()
+
+    // 👇 تشخیص اینکه کاربر به انتهای لیست رسیده یا نه
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) false
+            else {
+                val lastVisibleItem = visibleItems.last()
+                lastVisibleItem.index >= layoutInfo.totalItemsCount - 3
+            }
+        }
+    }
+
+    // وقتی به انتهای لیست رسید، صفحه بعد رو لود کن
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom && posts.isNotEmpty()) {
+            viewModel.loadMore()
         }
     }
 
     when {
-        loading -> LazyColumn(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) { items(4) { BlogCardSkeleton() } }
+        isLoading && posts.isEmpty() -> {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) { items(4) { BlogCardSkeleton() } }
+        }
 
-        errorMsg != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(errorMsg!!, color = AppdonyTextMuted)
+        errorMsg != null && posts.isEmpty() -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(errorMsg!!, color = AppdonyTextMuted)
+            }
         }
 
         else -> {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
@@ -76,11 +94,31 @@ fun BlogScreen(onPostClick: (Int) -> Unit, onCategoryClick: (Int, String) -> Uni
                         Text("آخرین مطالب و اخبار", color = AppdonyTextMuted, fontSize = 13.sp)
                     }
                 }
-                if (posts.isEmpty()) {
-                    item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted) } }
+
+                if (posts.isEmpty() && !isLoading) {
+                    item {
+                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted)
+                        }
+                    }
                 } else {
                     items(posts, key = { it.id }) { post ->
                         BlogPostCard(post = post, context = context, onClick = { onPostClick(post.id) })
+                    }
+                }
+
+                // 👇 لودینگ پایین صفحه وقتی داره دیتای جدید می‌گیره
+                if (isLoadingMore) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }
