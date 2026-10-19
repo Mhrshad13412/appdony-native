@@ -64,7 +64,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // 🎨 تم و ظاهر
+        // تم و ظاهر
         item { SettingsHeader("ظاهر اپلیکیشن", Icons.Default.Palette, primary) }
         item {
             SettingsSwitchRow("حالت تاریک", Icons.Default.DarkMode, themeState.mode == ThemeMode.DARK) { checked ->
@@ -82,7 +82,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // 📥 دانلود
+        // دانلود
         item { SettingsHeader("دانلود", Icons.Default.Download, primary) }
         item {
             SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Wifi, wifiOnly) { checked ->
@@ -90,7 +90,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // 🧹 حافظه
+        // حافظه
         item { SettingsHeader("حافظه و داده‌ها", Icons.Default.Storage, primary) }
         item {
             SettingsActionRow("پاک کردن حافظه کش", "حجم فعلی: $cacheSize", Icons.Default.Delete) {
@@ -111,7 +111,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // 🔔 اعلان‌ها
+        // اعلان‌ها
         item { SettingsHeader("اعلان‌ها", Icons.Default.Notifications, primary) }
         item {
             SettingsSwitchRow("اعلان وبلاگ", Icons.Default.Article, notifyBlog) { checked ->
@@ -124,7 +124,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // 👤 حساب کاربری
+        // حساب کاربری
         item { SettingsHeader("حساب کاربری", Icons.Default.Person, primary) }
         item {
             SettingsActionRow("خروج از حساب", "پاک کردن اطلاعات ورود", Icons.Default.Logout) {
@@ -132,7 +132,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
         
-        // 🚀 درباره
+        // درباره
         item { Spacer(Modifier.height(24.dp)); SettingsHeader("درباره اپدونی", Icons.Default.Info, primary) }
         item {
             Box(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
@@ -162,7 +162,19 @@ fun SettingsSwitchRow(title: String, icon: androidx.compose.ui.graphics.vector.I
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(16.dp))
         Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary))
+        
+        // 👇 این بخش اصلاح شد تا کلیدها استاندارد و قشنگ بشن
+        Switch(
+            checked = checked, 
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline
+            )
+        )
     }
 }
 
