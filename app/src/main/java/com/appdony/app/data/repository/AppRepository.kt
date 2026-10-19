@@ -17,9 +17,14 @@ class AppRepository(context: Context? = null) {
     private val gson = Gson()
 
     private val cacheInitial = mutableMapOf<String, InitialData>()
-    
+
     private fun postToJson(post: Post): String = gson.toJson(post)
     private fun jsonToPost(json: String): Post = gson.fromJson(json, Post::class.java)
+
+    suspend fun clearCache() {
+        cacheInitial.clear()
+        db?.postDao()?.clearAll()
+    }
 
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
@@ -38,20 +43,18 @@ class AppRepository(context: Context? = null) {
         } catch (e: Exception) {
             Result.success(api.getBlogPost(id = id))
         }
-    } catch (e: Exception) { 
-        Result.failure(e) 
-    }
+    } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 منطق جدید دیتابیس برای سکشن‌ها
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
-        
-        if (cachedList.isNotEmpty()) {
-            return Result.success(cachedList.map { jsonToPost(it.jsonData) })
+    // 👇 اضافه شدن forceRefresh
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6, forceRefresh: Boolean = false): Result<List<Post>> = try {
+        if (!forceRefresh) {
+            val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
+            if (cachedList.isNotEmpty()) {
+                return Result.success(cachedList.map { jsonToPost(it.jsonData) })
+            }
         }
 
         val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
-        
         val entities = posts.map { CachedPost(it.id, postToJson(it), categoryId) }
         db?.postDao()?.insertPosts(entities)
         
@@ -102,8 +105,11 @@ class AppRepository(context: Context? = null) {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun loadInitial(feedType: String): Result<InitialData> = try {
-        cacheInitial[feedType]?.let { return Result.success(it) }
+    // 👇 اضافه شدن forceRefresh
+    suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> = try {
+        if (!forceRefresh) {
+            cacheInitial[feedType]?.let { return Result.success(it) }
+        }
 
         coroutineScope {
             val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
