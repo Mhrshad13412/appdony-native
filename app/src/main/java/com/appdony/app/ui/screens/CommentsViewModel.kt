@@ -46,14 +46,24 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
             _sendResult.value = "متن نظر خالی است"
             return
         }
-        if (nonce.isBlank()) {
-            _sendResult.value = "لطفاً ابتدا وارد حساب شو"
-            return
-        }
 
         viewModelScope.launch {
             _sending.value = true
-            repo.postComment(postId, content, nonce)
+            
+            // 👇 اگه nonce خالی بود، خودمون میریم از API می‌گیریم
+            var finalNonce = nonce
+            if (finalNonce.isBlank()) {
+                val user = repo.getCurrentUser().getOrNull()
+                finalNonce = user?.nonce ?: ""
+            }
+
+            if (finalNonce.isBlank()) {
+                _sendResult.value = "سشن شما منقضی شده. لطفاً از حساب خارج شده و دوباره وارد شوید."
+                _sending.value = false
+                return@launch
+            }
+
+            repo.postComment(postId, content, finalNonce)
                 .onSuccess { newComment ->
                     val current = _state.value
                     if (current is CommentsUiState.Success) {
