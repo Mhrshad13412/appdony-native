@@ -17,10 +17,11 @@ sealed class CategoryUiState {
 
 class CategoryViewModel(
     private val categoryId: Int,
-    private val categoryName: String
+    private val categoryName: String,
+    private val context: android.content.Context
 ) : ViewModel() {
 
-    private val repo = AppRepository()
+    private val repo = AppRepository(context)
 
     private val _state = MutableStateFlow<CategoryUiState>(CategoryUiState.Loading)
     val state: StateFlow<CategoryUiState> = _state.asStateFlow()
@@ -28,39 +29,60 @@ class CategoryViewModel(
     private val _title = MutableStateFlow(categoryName)
     val title: StateFlow<String> = _title.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
     private var currentPage = 1
-    private var isLoadingMore = false
+    private var isEndReached = false
+    private var isLoadingData = false
 
-    init { load() }
+    init { loadInitial() }
 
-    fun load() {
+    fun loadInitial() {
+        if (isLoadingData) return
+        isLoadingData = true
+        currentPage = 1
+        isEndReached = false
+
         viewModelScope.launch {
             _state.value = CategoryUiState.Loading
-            currentPage = 1
-            repo.getPostsByCategory(categoryId, perPage = 24)
+            repo.getPostsByCategoryPaged(categoryId, page = 1, perPage = 24)
                 .onSuccess { posts ->
                     _state.value = CategoryUiState.Success(posts)
+                    if (posts.size < 24) isEndReached = true
                 }
                 .onFailure {
                     _state.value = CategoryUiState.Error(it.message ?: "خطا")
                 }
+            isLoadingData = false
         }
     }
 
     fun loadMore() {
-        if (isLoadingMore) return
-        val current = _state.value
-        if (current !is CategoryUiState.Success) return
-        isLoadingMore = true
+        if (isLoadingData || isEndReached) return
+        isLoadingData = true
+
         viewModelScope.launch {
+            _isLoadingMore.value = true
             currentPage++
-            repo.getPostsByCategoryPaged(categoryId, currentPage, 24)
+
+            repo.getPostsByCategoryPaged(categoryId, page = currentPage, perPage = 24)
                 .onSuccess { newPosts ->
-                    if (newPosts.isNotEmpty()) {
-                        _state.value = CategoryUiState.Success(current.posts + newPosts)
+                    if (newPosts.isEmpty()) {
+                        isEndReached = true
+                    } else {
+                        val current = _state.value
+                        if (current is CategoryUiState.Success) {
+                            _state.value = CategoryUiState.Success(current.posts + newPosts)
+                        }
+                        if (newPosts.size < 24) isEndReached = true
                     }
                 }
-            isLoadingMore = false
+                .onFailure {
+                    currentPage-- // اگه خطا داد، صفحه رو برمی‌گردونیم
+                }
+            _isLoadingMore.value = false
+            isLoadingData = false
         }
     }
 }
