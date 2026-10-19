@@ -21,13 +21,16 @@ sealed class SectionState {
 
 class HomeViewModel(
     private val feedType: String = "games",
-    private val context: Context // 👈 اضافه شد
+    private val context: Context
 ) : ViewModel() {
 
-    private val repo = AppRepository(context) // 👈 پاس دادن کانتکست
+    private val repo = AppRepository(context)
 
     private val _initialLoading = MutableStateFlow(true)
     val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -51,21 +54,33 @@ class HomeViewModel(
         loadPlus()
     }
 
-    fun loadInitial() {
+    fun loadInitial(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            _initialLoading.value = true
+            if (!forceRefresh) _initialLoading.value = true
             _error.value = null
-            repo.loadInitial(feedType)
+            
+            repo.loadInitial(feedType, forceRefresh)
                 .onSuccess { data ->
                     _featured.value = data.featured
                     _categories.value = data.categories
                     _sections.value = data.categories.associate { it.id to SectionState.NotLoaded }
                     _initialLoading.value = false
+                    _isRefreshing.value = false
                 }
                 .onFailure { err ->
                     _error.value = err.message ?: "خطا در دریافت اطلاعات"
                     _initialLoading.value = false
+                    _isRefreshing.value = false
                 }
+        }
+    }
+
+    fun refresh() {
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            repo.clearCache() // پاک کردن کش قبل از رفرش
+            loadInitial(forceRefresh = true)
+            loadPlus()
         }
     }
 
