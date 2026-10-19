@@ -28,6 +28,10 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
     private val _sendResult = MutableStateFlow<String?>(null)
     val sendResult: StateFlow<String?> = _sendResult.asStateFlow()
 
+    // 👇 وضعیت نیاز به لاگین مجدد
+    private val _sessionExpired = MutableStateFlow(false)
+    val sessionExpired: StateFlow<Boolean> = _sessionExpired.asStateFlow()
+
     init { load() }
 
     fun load() {
@@ -35,9 +39,7 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
             _state.value = CommentsUiState.Loading
             repo.getComments(postId)
                 .onSuccess { _state.value = CommentsUiState.Success(it) }
-                .onFailure {
-                    _state.value = CommentsUiState.Error(it.message ?: "خطا در دریافت نظرات")
-                }
+                .onFailure { _state.value = CommentsUiState.Error(it.message ?: "خطا در دریافت نظرات") }
         }
     }
 
@@ -49,8 +51,8 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
 
         viewModelScope.launch {
             _sending.value = true
+            _sessionExpired.value = false
             
-            // همیشه قبل از ارسال، nonce جدید از سرور می‌گیریم
             var finalNonce = oldNonce
             try {
                 val freshUser = repo.getCurrentUser().getOrNull()
@@ -60,7 +62,8 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
             } catch (e: Exception) {}
 
             if (finalNonce.isBlank()) {
-                _sendResult.value = "سشن شما منقضی شده. لطفاً از حساب خارج شده و دوباره وارد شوید."
+                _sendResult.value = "سشن شما منقضی شده است."
+                _sessionExpired.value = true
                 _sending.value = false
                 return@launch
             }
@@ -69,20 +72,23 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
                 .onSuccess { newComment ->
                     val current = _state.value
                     if (current is CommentsUiState.Success) {
-                        _state.value = CommentsUiState.Success(
-                            listOf(newComment) + current.comments
-                        )
+                        _state.value = CommentsUiState.Success(listOf(newComment) + current.comments)
                     }
                     _sendResult.value = "نظر شما ثبت شد و در انتظار تأیید است ✓"
                 }
                 .onFailure { err ->
-                    _sendResult.value = "خطا در ثبت نظر: ${err.message}"
+                    // 👇 تشخیص ارور 401 یا 403
+                    val errorMsg = err.message ?: ""
+                    if (errorMsg.contains("401") || errorMsg.contains("403") || errorMsg.contains("Forbidden")) {
+                        _sessionExpired.value = true
+                        _sendResult.value = "سشن شما منقضی شده است. لطفاً دوباره وارد شوید."
+                    } else {
+                        _sendResult.value = "خطا در ثبت نظر: $errorMsg"
+                    }
                 }
             _sending.value = false
         }
     }
 
-    fun clearSendResult() {
-        _sendResult.value = null
-    }
+    fun clearSendResult() { _sendResult.value = null }
 }
