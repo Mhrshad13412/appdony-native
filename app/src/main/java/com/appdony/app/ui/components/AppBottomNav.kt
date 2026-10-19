@@ -17,15 +17,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState
 import com.appdony.app.ui.navigation.bottomNavItems
 
 @Composable
-fun AppBottomNav(navController: NavHostController) {
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-
+fun AppBottomNav(
+    currentRoute: String?,
+    onTabSelected: (String) -> Unit // 👈 اینترفیس جدید
+) {
     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
         bottomNavItems.forEach { item ->
             val selected = currentRoute == item.route
@@ -34,7 +32,11 @@ fun AppBottomNav(navController: NavHostController) {
 
             NavigationBarItem(
                 selected = selected,
-                onClick = { if (currentRoute != item.route) navController.navigate(item.route) { popUpTo(navController.graph.startDestinationId) { saveState = true }; launchSingleTop = true; restoreState = true } },
+                onClick = { 
+                    if (currentRoute != item.route) {
+                        onTabSelected(item.route) // 👈 صدا زدن انیمیشن
+                    }
+                },
                 icon = { Icon(if (selected) item.selectedIcon else item.unselectedIcon, contentDescription = item.label, modifier = Modifier.size(24.dp).scale(iconScale)) },
                 label = { Text(item.label, fontSize = 11.sp, color = labelColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
                 colors = NavigationBarItemDefaults.colors(
