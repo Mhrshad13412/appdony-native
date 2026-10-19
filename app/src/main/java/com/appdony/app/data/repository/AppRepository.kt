@@ -1,23 +1,30 @@
 package com.appdony.app.data.repository
 
+import android.content.Context
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.api.CommentRequest
+import com.appdony.app.data.local.AppDatabase
+import com.appdony.app.data.local.CachedPost
 import com.appdony.app.data.model.*
+import com.google.gson.Gson
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-class AppRepository {
+class AppRepository(context: Context? = null) {
 
     private val api = ApiClient.api
+    private val db = context?.let { AppDatabase.getDatabase(it) }
+    private val gson = Gson()
 
     private val cacheInitial = mutableMapOf<String, InitialData>()
-    private val cacheSections = mutableMapOf<Int, List<Post>>()
+    
+    private fun postToJson(post: Post): String = gson.toJson(post)
+    private fun jsonToPost(json: String): Post = gson.fromJson(json, Post::class.java)
 
     suspend fun getCurrentUser(): Result<UserData> = try {
         Result.success(api.getCurrentUser())
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 فقط و فقط از بخش وبلاگ می‌خونه
     suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
         val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
@@ -25,7 +32,6 @@ class AppRepository {
         Result.failure(e) 
     }
 
-    // 👇 اول چک می‌کنه بازیه یا برنامه، اگه نبود می‌فهمه وبلاگه
     suspend fun getPost(id: Int): Result<Post> = try {
         try {
             Result.success(api.getPost(id = id))
@@ -36,16 +42,36 @@ class AppRepository {
         Result.failure(e) 
     }
 
+    // 👇 منطق جدید دیتابیس برای سکشن‌ها
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
+        val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
+        
+        if (cachedList.isNotEmpty()) {
+            return Result.success(cachedList.map { jsonToPost(it.jsonData) })
+        }
+
+        val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
+        
+        val entities = posts.map { CachedPost(it.id, postToJson(it), categoryId) }
+        db?.postDao()?.insertPosts(entities)
+        
+        Result.success(posts)
+    } catch (e: Exception) { 
+        val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
+        if (cachedList.isNotEmpty()) {
+            Result.success(cachedList.map { jsonToPost(it.jsonData) })
+        } else {
+            Result.failure(e) 
+        }
+    }
+
+    suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
+        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page))
+    } catch (e: Exception) { Result.failure(e) }
+
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
         if (ids.isEmpty()) Result.success(emptyList())
         else Result.success(api.getPostsByIds(ids = ids.joinToString(",")))
-    } catch (e: Exception) { Result.failure(e) }
-
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6): Result<List<Post>> = try {
-        cacheSections[categoryId]?.let { return Result.success(it) }
-        val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
-        cacheSections[categoryId] = posts
-        Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun searchPosts(query: String): Result<List<Post>> = try {
