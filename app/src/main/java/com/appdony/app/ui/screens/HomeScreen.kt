@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,12 +42,14 @@ fun FeedScreen(
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit
 ) {
+    val context = LocalContext.current // 👈 گرفتن کانتکست
+    
     val vm: HomeViewModel = viewModel(
         key = "feed_$feedType",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(feedType = feedType) as T
+                return HomeViewModel(feedType = feedType, context = context) as T // 👈 پاس دادن کانتکست
             }
         }
     )
