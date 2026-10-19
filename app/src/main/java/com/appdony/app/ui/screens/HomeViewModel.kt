@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.Category
@@ -18,9 +19,12 @@ sealed class SectionState {
     data class Error(val message: String) : SectionState()
 }
 
-class HomeViewModel(private val feedType: String = "games") : ViewModel() {
+class HomeViewModel(
+    private val feedType: String = "games",
+    private val context: Context // 👈 اضافه شد
+) : ViewModel() {
 
-    private val repo = AppRepository()
+    private val repo = AppRepository(context) // 👈 پاس دادن کانتکست
 
     private val _initialLoading = MutableStateFlow(true)
     val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
