@@ -43,29 +43,31 @@ class AppRepository(context: Context? = null) {
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6, forceRefresh: Boolean = false): Result<List<Post>> = try {
-        if (!forceRefresh) {
+    // 👇 اینجا از بلاک بدنه استفاده کردیم
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6, forceRefresh: Boolean = false): Result<List<Post>> {
+        return try {
+            if (!forceRefresh) {
+                val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
+                if (cachedList.isNotEmpty()) {
+                    return Result.success(cachedList.map { jsonToPost(it.jsonData) })
+                }
+            }
+
+            val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
+            val entities = posts.map { CachedPost(it.id, postToJson(it), categoryId) }
+            db?.postDao()?.insertPosts(entities)
+            
+            Result.success(posts)
+        } catch (e: Exception) { 
             val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
             if (cachedList.isNotEmpty()) {
-                return Result.success(cachedList.map { jsonToPost(it.jsonData) })
+                Result.success(cachedList.map { jsonToPost(it.jsonData) })
+            } else {
+                Result.failure(e) 
             }
-        }
-
-        val posts = api.getPostsByCategory(categoryId = categoryId, perPage = perPage)
-        val entities = posts.map { CachedPost(it.id, postToJson(it), categoryId) }
-        db?.postDao()?.insertPosts(entities)
-        
-        Result.success(posts)
-    } catch (e: Exception) { 
-        val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
-        if (cachedList.isNotEmpty()) {
-            Result.success(cachedList.map { jsonToPost(it.jsonData) })
-        } else {
-            Result.failure(e) 
         }
     }
 
-    // 👇 این تابع اصلاح شد (بدون مساوی)
     suspend fun getPostsByCategoryPaged(
         categoryId: Int, 
         page: Int, 
@@ -119,46 +121,51 @@ class AppRepository(context: Context? = null) {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> = try {
-        if (!forceRefresh) {
-            cacheInitial[feedType]?.let { return Result.success(it) }
-        }
-
-        coroutineScope {
-            val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
-            val categoriesDeferred = async { api.getCategories(perPage = 100) }
-
-            val posts = postsDeferred.await()
-            val allCategories = categoriesDeferred.await()
-
-            val gamesParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games")) }
-            val appsParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن")) }
-
-            val relevantParent = when (feedType) {
-                "games" -> gamesParent
-                "apps" -> appsParent
-                else -> null
+    // 👇 اینجا هم از بلاک بدنه استفاده کردیم
+    suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> {
+        return try {
+            if (!forceRefresh) {
+                cacheInitial[feedType]?.let { return Result.success(it) }
             }
 
-            val sections = if (relevantParent != null) {
-                val children = allCategories.filter { it.parent == relevantParent.id && it.count > 0 }
-                if (children.isNotEmpty()) children.sortedByDescending { it.count }.take(30)
-                else listOf(relevantParent)
-            } else {
-                allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
-            }
+            coroutineScope {
+                val postsDeferred = async { api.getPosts(perPage = 10, page = 1) }
+                val categoriesDeferred = async { api.getCategories(perPage = 100) }
 
-            val data = InitialData(
-                banner = posts.getOrNull(0),
-                singleFeature = posts.getOrNull(1),
-                featured = posts.take(6),
-                categories = sections
-            )
-            
-            cacheInitial[feedType] = data
-            Result.success(data)
+                val posts = postsDeferred.await()
+                val allCategories = categoriesDeferred.await()
+
+                val gamesParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("game", "بازی", "games")) }
+                val appsParent = allCategories.firstOrNull { it.parent == 0 && matchesAny(it, listOf("app", "application", "برنامه", "اپلیکیشن")) }
+
+                val relevantParent = when (feedType) {
+                    "games" -> gamesParent
+                    "apps" -> appsParent
+                    else -> null
+                }
+
+                val sections = if (relevantParent != null) {
+                    val children = allCategories.filter { it.parent == relevantParent.id && it.count > 0 }
+                    if (children.isNotEmpty()) children.sortedByDescending { it.count }.take(30)
+                    else listOf(relevantParent)
+                } else {
+                    allCategories.filter { it.parent == 0 && it.count > 0 }.sortedByDescending { it.count }.take(25)
+                }
+
+                val data = InitialData(
+                    banner = posts.getOrNull(0),
+                    singleFeature = posts.getOrNull(1),
+                    featured = posts.take(6),
+                    categories = sections
+                )
+                
+                cacheInitial[feedType] = data
+                Result.success(data)
+            }
+        } catch (e: Exception) { 
+            Result.failure(e) 
         }
-    } catch (e: Exception) { Result.failure(e) }
+    }
 }
 
 private fun matchesAny(cat: Category, keywords: List<String>): Boolean {
