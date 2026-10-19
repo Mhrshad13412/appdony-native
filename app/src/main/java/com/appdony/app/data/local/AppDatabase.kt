@@ -29,6 +29,10 @@ interface PostDao {
 
     @Query("DELETE FROM cached_posts WHERE categoryId = :categoryId")
     suspend fun clearCategory(categoryId: Int)
+
+    // 👇 این تابع رو اضافه کردیم
+    @Query("DELETE FROM cached_posts")
+    suspend fun clearAll()
 }
 
 @Database(entities = [CachedPost::class], version = 1, exportSchema = false)
