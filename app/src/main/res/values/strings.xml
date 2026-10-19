@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">اپدونی</string>
+    <string name="shortcut_search">جستجو</string>
+    <string name="shortcut_search_long">جستجوی برنامه و بازی</string>
+    <string name="shortcut_downloads">دانلودها</string>
+    <string name="shortcut_downloads_long">مشاهده دانلودها</string>
+    <string name="shortcut_favorites">علاقه‌مندی</string>
+    <string name="shortcut_favorites_long">برنامه‌های ذخیره شده</string>
 </resources>
