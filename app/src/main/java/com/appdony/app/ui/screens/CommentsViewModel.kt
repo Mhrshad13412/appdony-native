@@ -41,7 +41,7 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
         }
     }
 
-    fun sendComment(content: String, nonce: String) {
+    fun sendComment(content: String, oldNonce: String) {
         if (content.isBlank()) {
             _sendResult.value = "متن نظر خالی است"
             return
@@ -50,12 +50,14 @@ class CommentsViewModel(private val postId: Int) : ViewModel() {
         viewModelScope.launch {
             _sending.value = true
             
-            // 👇 اگه nonce خالی بود، خودمون میریم از API می‌گیریم
-            var finalNonce = nonce
-            if (finalNonce.isBlank()) {
-                val user = repo.getCurrentUser().getOrNull()
-                finalNonce = user?.nonce ?: ""
-            }
+            // همیشه قبل از ارسال، nonce جدید از سرور می‌گیریم
+            var finalNonce = oldNonce
+            try {
+                val freshUser = repo.getCurrentUser().getOrNull()
+                if (freshUser != null && freshUser.nonce.isNotBlank()) {
+                    finalNonce = freshUser.nonce
+                }
+            } catch (e: Exception) {}
 
             if (finalNonce.isBlank()) {
                 _sendResult.value = "سشن شما منقضی شده. لطفاً از حساب خارج شده و دوباره وارد شوید."
