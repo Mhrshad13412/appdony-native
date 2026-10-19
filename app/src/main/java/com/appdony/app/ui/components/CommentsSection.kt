@@ -3,35 +3,15 @@ package com.appdony.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,14 +26,12 @@ import coil.compose.AsyncImage
 import com.appdony.app.data.model.Comment
 import com.appdony.app.ui.screens.CommentsUiState
 import com.appdony.app.ui.screens.CommentsViewModel
+import com.appdony.app.ui.theme.AppdonyCardBg
+import com.appdony.app.ui.theme.AppdonyTextMuted
+import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
-fun CommentsSection(
-    postId: Int,
-    isLoggedIn: Boolean,
-    nonce: String,
-    onNeedLogin: () -> Unit
-) {
+fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin: () -> Unit) {
     val vm: CommentsViewModel = viewModel(
         key = "comments_$postId",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -66,15 +44,13 @@ fun CommentsSection(
     val state by vm.state.collectAsStateWithLifecycle()
     val sending by vm.sending.collectAsStateWithLifecycle()
     val sendResult by vm.sendResult.collectAsStateWithLifecycle()
+    val sessionExpired by vm.sessionExpired.collectAsStateWithLifecycle()
 
     var showComposer by remember { mutableStateOf(false) }
     var commentText by remember { mutableStateOf("") }
 
     LaunchedEffect(showComposer) {
-        if (showComposer && !isLoggedIn) {
-            showComposer = false
-            onNeedLogin()
-        }
+        if (showComposer && !isLoggedIn) { showComposer = false; onNeedLogin() }
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -82,13 +58,8 @@ fun CommentsSection(
             Text("نظرات کاربران", color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable {
-                        if (isLoggedIn) showComposer = !showComposer
-                        else onNeedLogin()
-                    }
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary)
+                    .clickable { if (isLoggedIn) showComposer = !showComposer else onNeedLogin() }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -101,42 +72,30 @@ fun CommentsSection(
 
         Spacer(Modifier.height(12.dp))
 
-        if (showComposer && isLoggedIn) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(12.dp)
+        // 👇 اگر سشن منقضی شده، دکمه لاگین مجدد نشون بده
+        if (sessionExpired) {
+            Button(
+                onClick = { onNeedLogin() },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
+                Text("سشن شما منقضی شده. برای ورود مجدد کلیک کنید", color = Color.White)
+            }
+        }
+
+        if (showComposer && isLoggedIn) {
+            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp)) {
                 OutlinedTextField(
-                    value = commentText,
-                    onValueChange = { commentText = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    value = commentText, onValueChange = { commentText = it }, modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("نظرت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    minLines = 3,
-                    maxLines = 6,
-                    enabled = !sending,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.background,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.background,
-                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-                    )
+                    minLines = 3, maxLines = 6, enabled = !sending, shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, focusedContainerColor = MaterialTheme.colorScheme.background, unfocusedContainerColor = MaterialTheme.colorScheme.background, focusedTextColor = MaterialTheme.colorScheme.onBackground, unfocusedTextColor = MaterialTheme.colorScheme.onBackground)
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickable(enabled = !sending && commentText.isNotBlank()) {
-                                vm.sendComment(commentText, nonce)
-                                commentText = ""
-                            }
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary)
+                            .clickable(enabled = !sending && commentText.isNotBlank()) { vm.sendComment(commentText, nonce); commentText = "" }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -157,48 +116,23 @@ fun CommentsSection(
 
         if (sendResult != null) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        else Color(0x33FF5252)
-                    )
-                    .clickable { vm.clearSendResult() }
-                    .padding(12.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .background(if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color(0x33FF5252))
+                    .clickable { vm.clearSendResult() }.padding(12.dp)
             ) {
-                Text(
-                    text = sendResult!!,
-                    color = if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary else Color(0xFFFF8A80),
-                    fontSize = 13.sp
-                )
+                Text(sendResult!!, color = if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary else Color(0xFFFF8A80), fontSize = 13.sp)
             }
             Spacer(Modifier.height(12.dp))
         }
 
         when (val s = state) {
-            is CommentsUiState.Loading -> {
-                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                }
-            }
-            is CommentsUiState.Error -> {
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(s.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                }
-            }
+            is CommentsUiState.Loading -> Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) }
+            is CommentsUiState.Error -> Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(20.dp), contentAlignment = Alignment.Center) { Text(s.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) }
             is CommentsUiState.Success -> {
                 if (s.comments.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                            .padding(24.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(14.dp)).padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -209,9 +143,7 @@ fun CommentsSection(
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        s.comments.take(20).forEach { comment ->
-                            CommentItem(comment)
-                        }
+                        s.comments.take(20).forEach { comment -> CommentItem(comment) }
                     }
                 }
             }
@@ -221,26 +153,11 @@ fun CommentsSection(
 
 @Composable
 private fun CommentItem(comment: Comment) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
-        ) {
+    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp)) {
+        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
             val avatar = comment.avatarUrl()
-            if (!avatar.isNullOrBlank()) {
-                AsyncImage(model = avatar, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
-            }
+            if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
