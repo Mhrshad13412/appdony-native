@@ -26,11 +26,13 @@ import com.appdony.app.ui.screens.SettingsScreen
 import com.appdony.app.ui.screens.UpdatesScreen
 
 @Composable
-fun AppNavGraph(navController: NavHostController) {
+fun AppNavGraph(
+    navController: NavHostController,
+    startDestination: String = "games" // 👈 اینجا اضافه شد
+) {
     NavHost(
         navController = navController,
-        startDestination = "games",
-        // 👇 انیمیشن پیش‌فرض برای جابه‌جایی بین تب‌ها (مثل بازی‌ها به برنامه‌ها)
+        startDestination = startDestination, // 👈 اینجا استفاده شد
         enterTransition = {
             fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.95f, animationSpec = tween(300))
         },
@@ -112,10 +114,9 @@ fun AppNavGraph(navController: NavHostController) {
         composable(
             route = "detail/{postId}",
             arguments = listOf(navArgument("postId") { type = NavType.IntType }),
-            // 👇 انیمیشن اختصاصی برای صفحه جزئیات (ورود از راست، خروج به راست)
             enterTransition = {
                 slideInHorizontally(
-                    initialOffsetX = { it }, // از سمت راست صفحه وارد میشه
+                    initialOffsetX = { it },
                     animationSpec = tween(400, easing = FastOutSlowInEasing)
                 ) + fadeIn(animationSpec = tween(400))
             },
@@ -127,7 +128,7 @@ fun AppNavGraph(navController: NavHostController) {
             },
             popExitTransition = {
                 slideOutHorizontally(
-                    targetOffsetX = { it }, // موقع برگشت به سمت راست میره
+                    targetOffsetX = { it },
                     animationSpec = tween(400, easing = FastOutSlowInEasing)
                 ) + fadeOut(animationSpec = tween(400))
             }
