@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp // 👈 اضافه شد
 import kotlin.math.sqrt
 
 @Composable
@@ -23,15 +24,17 @@ fun CircularRevealAnimation(
     val radius = remember { Animatable(0f) }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    
+    // 👇 رنگ رو اینجا می‌گیریم
+    val primaryColor = MaterialTheme.colorScheme.primary
 
-    // محاسبه بزرگترین شعاع ممکن برای پوشش کل صفحه
     val maxRadius = remember(configuration) {
         val widthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
         val heightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-        sqrt(widthPx * widthPx + heightPx * heightPx)
+        // 👇 تبدیل به Float
+        sqrt((widthPx * widthPx + heightPx * heightPx).toDouble()).toFloat()
     }
 
-    // نقطه شروع انیمیشن (پایین وسط صفحه، جایی که منوی باتم هست)
     val origin = remember {
         Offset(
             x = with(density) { (configuration.screenWidthDp / 2f).dp.toPx() },
@@ -40,20 +43,17 @@ fun CircularRevealAnimation(
     }
 
     LaunchedEffect(targetRoute) {
-        // انیمیشن بزرگ شدن دایره
         radius.animateTo(
             targetValue = maxRadius,
             animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
         )
-        // وقتی دایره کل صفحه رو پوشاند، مسیر رو عوض کن
         onAnimationEnd()
-        // بعد از عوض شدن صفحه، دایره رو محو کن (برمی‌گرده به صفر)
         radius.snapTo(0f)
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         drawCircle(
-            color = MaterialTheme.colorScheme.primary,
+            color = primaryColor, // 👈 استفاده از رنگ گرفته شده
             radius = radius.value,
             center = origin
         )
