@@ -2,249 +2,205 @@ package com.appdony.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
+import com.appdony.app.data.preferences.SearchHistoryManager
+import com.appdony.app.data.session.SessionManager
+import com.appdony.app.data.preferences.FavoritesManager
+import com.appdony.app.util.CacheUtils
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
+    val settingsManager = remember { SettingsManager(context) }
+    val historyManager = remember { SearchHistoryManager(context) }
+    val sessionManager = remember { SessionManager(context) }
+    val favoritesManager = remember { FavoritesManager(context) }
+    
     val scope = rememberCoroutineScope()
-    val state by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
+    val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val primary = MaterialTheme.colorScheme.primary
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    // تنظیمات
+    val wifiOnly by settingsManager.wifiOnly.collectAsStateWithLifecycle(initialValue = false)
+    val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
+    val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
+    val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
+
+    var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
+    LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
+
+    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .clickable { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "بازگشت",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "تنظیمات",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Spacer(Modifier.width(8.dp))
+                Text("تنظیمات", color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
 
+        // 🎨 تم و ظاهر
+        item { SettingsHeader("ظاهر اپلیکیشن", Icons.Default.Palette, primary) }
         item {
-            SettingsSection(title = "حالت نمایش", icon = Icons.Default.DarkMode, tint = primary)
-            SettingsOption(
-                icon = Icons.Default.DarkMode,
-                title = "تیره",
-                selected = state.mode == ThemeMode.DARK,
-                onClick = { scope.launch { themeManager.setMode(ThemeMode.DARK) } },
-                selectedColor = primary
-            )
-            SettingsOption(
-                icon = Icons.Default.LightMode,
-                title = "روشن",
-                selected = state.mode == ThemeMode.LIGHT,
-                onClick = { scope.launch { themeManager.setMode(ThemeMode.LIGHT) } },
-                selectedColor = primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            SettingsSwitchRow("حالت تاریک", Icons.Default.DarkMode, themeState.mode == ThemeMode.DARK) { checked ->
+                scope.launch { themeManager.setMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT) }
+            }
         }
-
+        item { ThemeColorsRow(themeState.colorIndex, primary) { index -> scope.launch { themeManager.setColorIndex(index) } } }
         item {
-            SettingsSection(title = "رنگ تم", icon = Icons.Default.Palette, tint = primary)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                ThemeManager.themeColors.forEachIndexed { index, colorLong ->
-                    ColorCircle(
-                        color = Color(colorLong),
-                        selected = state.colorIndex == index,
-                        onClick = { scope.launch { themeManager.setColorIndex(index) } }
-                    )
+            SettingsDropdownRow("سایز فونت", Icons.Default.FormatSize, themeState.fontSize.name) { expanded ->
+                Column {
+                    FontSize.values().forEach { size ->
+                        DropdownMenuItem(text = { Text(size.name) }, onClick = { scope.launch { themeManager.setFontSize(size) }; expanded(false) })
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // 📥 دانلود
+        item { SettingsHeader("دانلود", Icons.Default.Download, primary) }
         item {
-            SettingsSection(title = "سایز فونت", icon = Icons.Default.FormatSize, tint = primary)
-            SettingsOption(
-                title = "کوچک",
-                selected = state.fontSize == FontSize.SMALL,
-                onClick = { scope.launch { themeManager.setFontSize(FontSize.SMALL) } },
-                selectedColor = primary
-            )
-            SettingsOption(
-                title = "متوسط",
-                selected = state.fontSize == FontSize.MEDIUM,
-                onClick = { scope.launch { themeManager.setFontSize(FontSize.MEDIUM) } },
-                selectedColor = primary
-            )
-            SettingsOption(
-                title = "بزرگ",
-                selected = state.fontSize == FontSize.LARGE,
-                onClick = { scope.launch { themeManager.setFontSize(FontSize.LARGE) } },
-                selectedColor = primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            SettingsSection(title = "درباره", icon = Icons.Default.Info, tint = primary)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = "اپدونی",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "نسخه 2.5.33",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "مرجع دانلود اپلیکیشن و بازی اندروید",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
+            SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Wifi, wifiOnly) { checked ->
+                scope.launch { settingsManager.setWifiOnly(checked) }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // 🧹 حافظه
+        item { SettingsHeader("حافظه و داده‌ها", Icons.Default.Storage, primary) }
+        item {
+            SettingsActionRow("پاک کردن حافظه کش", "حجم فعلی: $cacheSize", Icons.Default.Delete) {
+                scope.launch {
+                    CacheUtils.clearCache(context)
+                    cacheSize = CacheUtils.getCacheSize(context)
+                }
+            }
+        }
+        item {
+            SettingsActionRow("پاک کردن تاریخچه جستجو", "پاک کردن کلمات جستجو شده", Icons.Default.History) {
+                scope.launch { historyManager.clearHistory() }
+            }
+        }
+        item {
+            SettingsActionRow("پاک کردن علاقه‌مندی‌ها", "حذف تمام برنامه‌های ذخیره شده", Icons.Default.FavoriteBorder) {
+                scope.launch { favoritesManager.clear() }
+            }
+        }
+
+        // 🔔 اعلان‌ها
+        item { SettingsHeader("اعلان‌ها", Icons.Default.Notifications, primary) }
+        item {
+            SettingsSwitchRow("اعلان وبلاگ", Icons.Default.Article, notifyBlog) { checked ->
+                scope.launch { settingsManager.setNotifyBlog(checked) }
+            }
+        }
+        item {
+            SettingsSwitchRow("اعلان آپدیت برنامه", Icons.Default.Update, notifyUpdates) { checked ->
+                scope.launch { settingsManager.setNotifyUpdates(checked) }
+            }
+        }
+
+        // 👤 حساب کاربری
+        item { SettingsHeader("حساب کاربری", Icons.Default.Person, primary) }
+        item {
+            SettingsActionRow("خروج از حساب", "پاک کردن اطلاعات ورود", Icons.Default.Logout) {
+                scope.launch { sessionManager.clearSession() }
+            }
+        }
+        
+        // 🚀 درباره
+        item { Spacer(Modifier.height(24.dp)); SettingsHeader("درباره اپدونی", Icons.Default.Info, primary) }
+        item {
+            Box(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
+                Column {
+                    Text("اپدونی", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("نسخه 2.9.35", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(Modifier.height(8.dp))
+                    Text("پشتیبانی: @AppdonySupport", fontSize = 12.sp, color = primary)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsSection(title: String, icon: ImageVector, tint: Color) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(text = title, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+fun SettingsHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color) {
+    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(title, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 
 @Composable
-private fun SettingsOption(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    selectedColor: Color,
-    icon: ImageVector? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (icon != null) {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 14.sp,
-            modifier = Modifier.weight(1f)
-        )
-        if (selected) {
-            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = selectedColor, modifier = Modifier.size(20.dp))
+fun SettingsSwitchRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary))
+    }
+}
+
+@Composable
+fun SettingsActionRow(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, fontSize = 14.sp)
+            Text(subtitle, fontSize = 12.sp, color = Color.Gray)
         }
     }
 }
 
 @Composable
-private fun ColorCircle(color: Color, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(color)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (selected) {
-            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+fun ThemeColorsRow(selectedIndex: Int, primary: Color, onColorSelected: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        ThemeManager.themeColors.forEachIndexed { index, color ->
+            Box(Modifier.size(32.dp).clip(CircleShape).background(Color(color)).clickable { onColorSelected(index) }, contentAlignment = Alignment.Center) {
+                if (selectedIndex == index) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsDropdownRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, currentValue: String, items: @Composable (expanded: (Boolean) -> Unit) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(Modifier.fillMaxWidth().clickable { expanded = true }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(16.dp))
+            Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
+            Text(currentValue, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            items { expanded = it }
         }
     }
 }
