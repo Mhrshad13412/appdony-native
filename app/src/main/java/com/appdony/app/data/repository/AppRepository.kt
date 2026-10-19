@@ -45,7 +45,6 @@ class AppRepository(context: Context? = null) {
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 اضافه شدن forceRefresh
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int = 6, forceRefresh: Boolean = false): Result<List<Post>> = try {
         if (!forceRefresh) {
             val cachedList = db?.postDao()?.getPostsByCategory(categoryId) ?: emptyList()
@@ -68,8 +67,21 @@ class AppRepository(context: Context? = null) {
         }
     }
 
-    suspend fun getPostsByCategoryPaged(categoryId: Int, page: Int, perPage: Int = 24): Result<List<Post>> = try {
-        Result.success(api.getPostsByCategory(categoryId = categoryId, perPage = perPage, page = page))
+    // 👇 اضافه شدن پارامترهای مرتب‌سازی
+    suspend fun getPostsByCategoryPaged(
+        categoryId: Int, 
+        page: Int, 
+        perPage: Int = 24,
+        orderBy: String = "date",
+        order: String = "desc"
+    ): Result<List<Post>> = try {
+        Result.success(api.getPostsByCategory(
+            categoryId = categoryId, 
+            perPage = perPage, 
+            page = page,
+            orderBy = orderBy,
+            order = order
+        ))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
@@ -105,7 +117,6 @@ class AppRepository(context: Context? = null) {
         Result.success(posts)
     } catch (e: Exception) { Result.failure(e) }
 
-    // 👇 اضافه شدن forceRefresh
     suspend fun loadInitial(feedType: String, forceRefresh: Boolean = false): Result<InitialData> = try {
         if (!forceRefresh) {
             cacheInitial[feedType]?.let { return Result.success(it) }
