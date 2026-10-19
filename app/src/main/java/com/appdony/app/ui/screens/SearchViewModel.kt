@@ -9,8 +9,10 @@ import com.appdony.app.data.repository.AppRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn // 👈 این ایمپورت اضافه شد
 import kotlinx.coroutines.launch
 
 sealed class SearchUiState {
@@ -31,10 +33,9 @@ class SearchViewModel(private val context: Context) : ViewModel() {
     private val _state = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
-    // 👇 لیست تاریخچه
     val history: StateFlow<List<String>> = historyManager.history.stateIn(
         viewModelScope,
-        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        SharingStarted.WhileSubscribed(5000),
         emptyList()
     )
 
@@ -53,7 +54,6 @@ class SearchViewModel(private val context: Context) : ViewModel() {
             delay(400)
             _state.value = SearchUiState.Loading
             
-            // 👇 ذخیره کلمه در تاریخچه
             historyManager.addQuery(newQuery.trim())
             
             repo.searchPosts(newQuery)
@@ -64,14 +64,12 @@ class SearchViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // پاک کردن تاریخچه
     fun clearHistory() {
         viewModelScope.launch {
             historyManager.clearHistory()
         }
     }
     
-    // انتخاب از تاریخچه
     fun setQueryFromHistory(q: String) {
         onQueryChange(q)
     }
