@@ -20,7 +20,6 @@ data class CommentRequest(
     @SerializedName("author_name") val authorName: String? = null
 )
 
-// 👇 فیلدهای ضروری برای لیست‌ها (بدون متن کامل پست)
 private const val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_links,_embedded"
 
 interface AppdonyApi {
@@ -49,7 +48,7 @@ interface AppdonyApi {
         @Query("per_page") perPage: Int = 10,
         @Query("page") page: Int = 1,
         @Query("_embed") embed: Int = 1,
-        @Query("_fields") fields: String = LIST_FIELDS // 👈 بهینه‌سازی
+        @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts/{id}")
@@ -58,13 +57,16 @@ interface AppdonyApi {
         @Query("_embed") embed: Int = 1
     ): Post
 
+    // 👇 پارامترهای مرتب‌سازی اضافه شدن
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByCategory(
         @Query("categories") categoryId: Int,
         @Query("per_page") perPage: Int = 6,
         @Query("page") page: Int = 1,
+        @Query("orderby") orderBy: String = "date",
+        @Query("order") order: String = "desc",
         @Query("_embed") embed: Int = 1,
-        @Query("_fields") fields: String = LIST_FIELDS // 👈 بهینه‌سازی
+        @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts")
