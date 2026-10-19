@@ -1,11 +1,12 @@
 package com.appdony.app
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -19,6 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.appdony.app.data.preferences.*
@@ -26,11 +32,13 @@ import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.*
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
+import com.appdony.app.util.BlogUpdateWorker
 import com.appdony.app.util.DownloadHelper
 import com.appdony.app.util.UpdateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,11 +46,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent { AppRoot(intent) }
     }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent) // لینک جدید رو جایگزین میکنیم
-    }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent) }
 }
 
 @Composable
@@ -70,41 +74,39 @@ fun MainScreen(incomingIntent: Intent?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
+    
+    // 👇 خواندن تنظیمات اولیه
+    val settingsManager = remember { SettingsManager(context) }
+    val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
 
-    // 👇 پردازش لینک‌های ورودی (Deep Link)
+    // 👇 درخواست اجازه نوتیفیکیشن و راه‌اندازی WorkManager
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val blogWorkRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, blogWorkRequest)
+    }
+
+    // 👇 پردازش لینک‌های ورودی
     LaunchedEffect(incomingIntent) {
         incomingIntent?.data?.let { uri ->
-            val postId = uri.getQueryParameter("p") // گرفتن آیدی پست از لینک
-            if (postId != null) {
-                navController.navigate("detail/$postId")
-            }
+            val postId = uri.getQueryParameter("p")
+            if (postId != null) navController.navigate("detail/$postId")
         }
-        
-        // 👇 پردازش میانبرهای اپ (Shortcuts)
         incomingIntent?.getStringExtra("shortcut_route")?.let { route ->
-            if (route == "search" || route == "updates" || route == "favorites") {
-                navController.navigate(route)
-            }
+            if (route == "search" || route == "updates" || route == "favorites") navController.navigate(route)
         }
     }
 
+    // 👇 پیش‌بارگذاری دیتا و عکس‌ها (Splash)
     LaunchedEffect(Unit) {
         val repo = com.appdony.app.data.repository.AppRepository(context)
         val result = repo.loadInitial("games")
-        
         result.onSuccess { data ->
-            val imageUrls = listOfNotNull(
-                data.banner?.featuredImageUrl(),
-                data.singleFeature?.featuredImageUrl()
-            ) + data.featured.mapNotNull { it.featuredImageUrl() }
-
+            val imageUrls = listOfNotNull(data.banner?.featuredImageUrl(), data.singleFeature?.featuredImageUrl()) + data.featured.mapNotNull { it.featuredImageUrl() }
             imageUrls.take(10).forEach { url ->
-                val request = ImageRequest.Builder(context)
-                    .data(url)
-                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .build()
-                context.imageLoader.enqueue(request)
+                context.imageLoader.enqueue(ImageRequest.Builder(context).data(url).diskCachePolicy(coil.request.CachePolicy.ENABLED).memoryCachePolicy(coil.request.CachePolicy.ENABLED).build())
             }
         }
         delay(1500) 
@@ -132,7 +134,6 @@ fun MainScreen(incomingIntent: Intent?) {
 
         LaunchedEffect(Unit) {
             if (!hasSeenOnboarding) showTutorial = true
-            
             val currentVersion = BuildConfig.VERSION_NAME
             val info = UpdateHelper.checkForUpdate()
             if (info != null && info.latestVersion != currentVersion) {
@@ -153,11 +154,7 @@ fun MainScreen(incomingIntent: Intent?) {
                                 versionName = updateInfo?.latestVersion ?: "",
                                 onDownloadClick = {
                                     showUpdateBanner = false
-                                    updateInfo?.let { info ->
-                                        scope.launch(Dispatchers.Main) {
-                                            DownloadHelper.startDownload(context, info.downloadUrl, "Appdony-Update-${info.latestVersion}.apk")
-                                        }
-                                    }
+                                    updateInfo?.let { info -> scope.launch(Dispatchers.Main) { DownloadHelper.startDownload(context, info.downloadUrl, "Appdony-Update-${info.latestVersion}.apk") } }
                                 },
                                 onDismiss = { showUpdateBanner = false }
                             )
@@ -166,16 +163,14 @@ fun MainScreen(incomingIntent: Intent?) {
                 },
                 bottomBar = {
                     if (showChrome) {
-                        AppBottomNav(
-                            currentRoute = currentRoute,
-                            onTabSelected = { route -> transitionTarget = route }
-                        )
+                        AppBottomNav(currentRoute = currentRoute, onTabSelected = { route -> transitionTarget = route })
                     }
                 },
                 snackbarHost = { SnackbarHost(snackbarHostState) }
             ) { padding ->
                 Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    AppNavGraph(navController)
+                    // 👇 پاس دادن startPage به ناوبری
+                    AppNavGraph(navController = navController, startDestination = startPage)
                     
                     if (showChrome && !showTutorial) {
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
@@ -191,45 +186,19 @@ fun MainScreen(incomingIntent: Intent?) {
             }
 
             transitionTarget?.let { target ->
-                CircularRevealAnimation(
-                    targetRoute = target,
-                    onAnimationEnd = {
-                        navController.navigate(target) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        transitionTarget = null
+                CircularRevealAnimation(targetRoute = target, onAnimationEnd = {
+                    navController.navigate(target) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                )
-            }
-
-            if (showTutorial) {
-                SpotlightTutorial(onFinish = { scope.launch { onboardingManager.setSeen() }; showTutorial = false })
-            }
-
-            if (showLoginSheet) {
-                LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
-                    scope.launch {
-                        sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
-                        showLoginSheet = false
-                        snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
-                    }
+                    transitionTarget = null
                 })
             }
 
-            if (showAccountSheet) {
-                AccountSheet(
-                    displayName = displayName.ifBlank { username }, username = username,
-                    onDismiss = { showAccountSheet = false },
-                    onDownloads = { navController.navigate("updates") },
-                    onSettings = { navController.navigate("settings") },
-                    onFavorites = { navController.navigate("favorites") },
-                    onHelp = { showTutorial = true },
-                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
-                    onLogout = { scope.launch { sessionManager.clearSession(); showAccountSheet = false; snackbarHostState.showSnackbar("از حساب خارج شدی") } }
-                )
-            }
+            if (showTutorial) SpotlightTutorial(onFinish = { scope.launch { onboardingManager.setSeen() }; showTutorial = false })
+            if (showLoginSheet) LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user -> scope.launch { sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce); showLoginSheet = false; snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋") } })
+            if (showAccountSheet) AccountSheet(displayName = displayName.ifBlank { username }, username = username, onDismiss = { showAccountSheet = false }, onDownloads = { navController.navigate("updates") }, onSettings = { navController.navigate("settings") }, onFavorites = { navController.navigate("favorites") }, onHelp = { showTutorial = true }, onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } }, onLogout = { scope.launch { sessionManager.clearSession(); showAccountSheet = false; snackbarHostState.showSnackbar("از حساب خارج شدی") } })
         }
     }
 }
