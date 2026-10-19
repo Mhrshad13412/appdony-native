@@ -40,6 +40,9 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
     private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
     val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
 
+    // 👇 برای جلوگیری از درخواست‌های همزمان و کرش کردن
+    private val loadingCategories = mutableSetOf<Int>()
+
     init {
         loadInitial()
         loadPlus()
@@ -65,26 +68,30 @@ class HomeViewModel(private val feedType: String = "games") : ViewModel() {
 
     fun loadPlus() {
         viewModelScope.launch {
-            repo.loadPlusPosts()
-                .onSuccess { _plusPosts.value = it }
+            repo.loadPlusPosts().onSuccess { _plusPosts.value = it }
         }
     }
 
     fun loadSection(categoryId: Int) {
         val current = _sections.value[categoryId]
-        if (current is SectionState.Loading || current is SectionState.Loaded) return
+        // اگه قبلاً لود شده یا در حال لود بود، بیخیال شو
+        if (current is SectionState.Loading || current is SectionState.Loaded || loadingCategories.contains(categoryId)) {
+            return
+        }
 
         viewModelScope.launch {
+            loadingCategories.add(categoryId)
             _sections.update { it + (categoryId to SectionState.Loading) }
+            
             repo.getPostsByCategory(categoryId, perPage = 15)
                 .onSuccess { posts ->
                     _sections.update { it + (categoryId to SectionState.Loaded(posts)) }
                 }
                 .onFailure { err ->
-                    _sections.update { currentMap ->
-                        currentMap + (categoryId to SectionState.Error(err.message ?: "خطا"))
-                    }
+                    _sections.update { it + (categoryId to SectionState.Error(err.message ?: "خطا")) }
                 }
+            
+            loadingCategories.remove(categoryId)
         }
     }
 }
