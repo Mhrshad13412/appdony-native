@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,29 +32,32 @@ import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
 import com.appdony.app.ui.components.BannerSkeleton
+import com.appdony.app.ui.components.EmptyState
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
 import com.appdony.app.ui.components.SectionTitleSkeleton
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
     feedType: String,
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit
 ) {
-    val context = LocalContext.current // 👈 گرفتن کانتکست
+    val context = LocalContext.current
     
     val vm: HomeViewModel = viewModel(
         key = "feed_$feedType",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(feedType = feedType, context = context) as T // 👈 پاس دادن کانتکست
+                return HomeViewModel(feedType = feedType, context = context) as T
             }
         }
     )
 
     val loading by vm.initialLoading.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val errorMsg by vm.error.collectAsStateWithLifecycle()
     val plusPosts by vm.plusPosts.collectAsStateWithLifecycle()
     val featuredList by vm.featured.collectAsStateWithLifecycle()
@@ -63,40 +66,56 @@ fun FeedScreen(
 
     when {
         loading -> HomeSkeleton()
-        errorMsg != null -> ErrorView(errorMsg!!) { vm.loadInitial() }
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val topPosts = if (plusPosts.isNotEmpty()) plusPosts else featuredList
-            val topTitle = if (plusPosts.isNotEmpty()) "اپدونی پلاس" else "ویژه"
+        errorMsg != null && categoriesList.isEmpty() -> {
+            EmptyState(
+                title = "اتصال برقرار نشد!",
+                description = "دکتر طاعون میگه اینترنتت قطع شده یا سرور جواب نمیده. یه بار دیگه امتحان کن.",
+                buttonText = "تلاش دوباره",
+                onButtonClick = { vm.loadInitial() }
+            )
+        }
+        else -> {
+            // 👇 Swipe to Refresh
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { vm.refresh() },
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val topPosts = if (plusPosts.isNotEmpty()) plusPosts else featuredList
+                    val topTitle = if (plusPosts.isNotEmpty()) "اپدونی پلاس" else "ویژه"
 
-            if (topPosts.isNotEmpty()) {
-                item(key = "top_title") { SectionHeader(title = topTitle) }
-                item(key = "top_row") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(topPosts, key = { "top_${it.id}" }) { p ->
-                            BannerCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
+                    if (topPosts.isNotEmpty()) {
+                        item(key = "top_title") { SectionHeader(title = topTitle) }
+                        item(key = "top_row") {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(topPosts, key = { "top_${it.id}" }) { p ->
+                                    BannerCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
                         }
                     }
-                    Spacer(Modifier.height(16.dp))
-                }
-            }
 
-            items(categoriesList, key = { "cat_${it.id}" }) { cat ->
-                val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
+                    items(categoriesList, key = { "cat_${it.id}" }) { cat ->
+                        val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
 
-                LaunchedEffect(cat.id) {
-                    if (sectionState is SectionState.NotLoaded) {
-                        vm.loadSection(cat.id)
+                        LaunchedEffect(cat.id) {
+                            if (sectionState is SectionState.NotLoaded) {
+                                vm.loadSection(cat.id)
+                            }
+                        }
+
+                        SectionBlock(title = cat.name, state = sectionState, onPostClick = onPostClick, onMoreClick = { onCategoryClick(cat.id, cat.name) })
                     }
                 }
-
-                SectionBlock(title = cat.name, state = sectionState, onPostClick = onPostClick, onMoreClick = { onCategoryClick(cat.id, cat.name) })
             }
         }
     }
@@ -141,7 +160,7 @@ private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) 
             }
             is SectionState.Error -> {
                 Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                    Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text("خطا در دریافت این بخش", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             }
             is SectionState.Loaded -> {
@@ -162,16 +181,5 @@ private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) 
             }
         }
         Spacer(Modifier.height(12.dp))
-    }
-}
-
-@Composable
-private fun ErrorView(message: String, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("تلاش دوباره") }
-        }
     }
 }
