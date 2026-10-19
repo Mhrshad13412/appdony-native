@@ -31,28 +31,41 @@ data class ChatMessage(val text: String, val isUser: Boolean)
 fun AiChatScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var messages by remember { mutableStateOf(listOf(ChatMessage("سلام! من دکتر طاعونم. چطور می‌تونم کمکت کنم؟", false))) }
+    var messages by remember { 
+        mutableStateOf(listOf(ChatMessage("سلام! من دکتر طاعونم. چطور می‌تونم کمکت کنم؟", false))) 
+    }
 
     fun sendMessage() {
         if (inputText.isBlank() || isLoading) return
+        
         val userMsg = inputText.trim()
         messages = messages + ChatMessage(userMsg, true)
         inputText = ""
         isLoading = true
 
         scope.launch {
-            val history = messages.dropLast(1).map { (if (it.isUser) "user" else "assistant") to it.text }
-            AiApi.sendMessage(userMsg, history)
-                .onSuccess { response -> messages = messages + ChatMessage(response, false) }
-                .onFailure { error -> messages = messages + ChatMessage("خطا: ${error.message}", false) }
+            val history = messages.dropLast(1).map { 
+                (if (it.isUser) "user" else "assistant") to it.text 
+            }
+            
+            val result = AiApi.sendMessage(userMsg, history)
+            result.onSuccess { response ->
+                messages = messages + ChatMessage(response, false)
+            }.onFailure { error ->
+                // 👇 نمایش خطا دقیق به کاربر
+                messages = messages + ChatMessage("خطا: ${error.message ?: "مشکل در اتصال به هوش مصنوعی"}", false)
+            }
             isLoading = false
         }
     }
 
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
     }
 
     Scaffold(
@@ -68,23 +81,48 @@ fun AiChatScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(messages) { msg ->
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
+                    ) {
                         if (!msg.isUser) {
                             PlagueDoctorAvatar(sizeDp = 40)
                             Spacer(modifier = Modifier.width(8.dp))
                         }
+                        
                         Box(
-                            modifier = Modifier.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (msg.isUser) 16.dp else 4.dp, bottomEnd = if (msg.isUser) 4.dp else 16.dp))
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(
+                                    topStart = 16.dp, topEnd = 16.dp,
+                                    bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                                    bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                                ))
                                 .background(if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                                 .padding(12.dp)
                         ) {
-                            Text(text = msg.text, color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, lineHeight = 22.sp)
+                            Text(
+                                text = msg.text,
+                                color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                                fontSize = 14.sp,
+                                lineHeight = 22.sp
+                            )
                         }
                     }
                 }
+                
                 if (isLoading) {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -95,15 +133,36 @@ fun AiChatScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedTextField(
-                    value = inputText, onValueChange = { inputText = it }, modifier = Modifier.weight(1f),
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    modifier = Modifier.weight(1f),
                     placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    shape = RoundedCornerShape(24.dp), maxLines = 4,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Transparent, focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 4,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable { sendMessage() }, contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { sendMessage() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "ارسال", tint = Color.White)
                 }
             }
