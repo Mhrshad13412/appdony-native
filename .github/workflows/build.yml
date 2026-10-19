@@ -1,5 +1,10 @@
 name: Build APK
 
+# 👇 این بخش جادویی جدید: هر بیلد جدید، بیلدهای قبلیِ گیرکرده رو به زور کنسل می‌کنه
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main ]
