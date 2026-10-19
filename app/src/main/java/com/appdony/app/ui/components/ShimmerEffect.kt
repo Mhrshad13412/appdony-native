@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -34,15 +33,11 @@ fun ShimmerBrush(): Brush {
     )
 
     val bg = MaterialTheme.colorScheme.surfaceVariant
-    val highlight = MaterialTheme.colorScheme.surface // رنگ روشن‌تر برای نور
+    val highlight = MaterialTheme.colorScheme.surface
 
-    // 👇 نور افقی از چپ به راست
+    // 👇 نور افقی از چپ به راست (دقیقا مثل یوتیوب)
     return Brush.linearGradient(
-        colors = listOf(
-            bg,
-            highlight,
-            bg
-        ),
+        colors = listOf(bg, highlight, bg),
         start = Offset(translateAnim, 0f),
         end = Offset(translateAnim + 500f, 0f)
     )
@@ -57,7 +52,6 @@ fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Int = 12) {
     )
 }
 
-// اسکلت کارت (عکس بالا، متن پایین)
 @Composable
 fun CardSkeleton() {
     Column(
@@ -72,23 +66,10 @@ fun CardSkeleton() {
     }
 }
 
-// اسکلت بنر بزرگ
-@Composable
-fun BannerSkeleton() {
-    Column(modifier = Modifier.width(280.dp)) {
-        ShimmerBox(modifier = Modifier.fillMaxWidth().height(170.dp), cornerRadius = 18)
-        Spacer(modifier = Modifier.height(8.dp))
-        ShimmerBox(modifier = Modifier.fillMaxWidth().height(12.dp), cornerRadius = 4)
-    }
-}
-
-// اسکلت یک ردیف کامل
 @Composable
 fun SectionRowSkeleton() {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         CardSkeleton()
@@ -97,13 +78,10 @@ fun SectionRowSkeleton() {
     }
 }
 
-// اسکلت تیتر سکشن
 @Composable
 fun SectionTitleSkeleton() {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ShimmerBox(modifier = Modifier.size(4.dp, 18.dp), cornerRadius = 2)
@@ -112,14 +90,9 @@ fun SectionTitleSkeleton() {
     }
 }
 
-// اسکلت بلاگ
 @Composable
 fun BlogCardSkeleton() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         ShimmerBox(modifier = Modifier.fillMaxWidth().height(200.dp), cornerRadius = 16)
         Spacer(modifier = Modifier.height(10.dp))
         ShimmerBox(modifier = Modifier.fillMaxWidth(0.8f).height(16.dp), cornerRadius = 4)
@@ -130,7 +103,6 @@ fun BlogCardSkeleton() {
     }
 }
 
-// اسکلت صفحه جزئیات
 @Composable
 fun DetailSkeleton() {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
