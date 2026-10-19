@@ -33,9 +33,7 @@ class AppRepository(context: Context? = null) {
     suspend fun getBlogPosts(page: Int, perPage: Int = 10): Result<List<Post>> = try {
         val posts = api.getCustomBlogPosts(perPage = perPage, page = page)
         Result.success(posts)
-    } catch (e: Exception) { 
-        Result.failure(e) 
-    }
+    } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getPost(id: Int): Result<Post> = try {
         try {
@@ -67,22 +65,26 @@ class AppRepository(context: Context? = null) {
         }
     }
 
-    // 👇 اضافه شدن پارامترهای مرتب‌سازی
+    // 👇 استفاده از بلاک بدنه به جای expression body
     suspend fun getPostsByCategoryPaged(
         categoryId: Int, 
         page: Int, 
         perPage: Int = 24,
         orderBy: String = "date",
         order: String = "desc"
-    ): Result<List<Post>> = try {
-        Result.success(api.getPostsByCategory(
-            categoryId = categoryId, 
-            perPage = perPage, 
-            page = page,
-            orderBy = orderBy,
-            order = order
-        ))
-    } catch (e: Exception) { Result.failure(e) }
+    ): Result<List<Post>> {
+        return try {
+            Result.success(api.getPostsByCategory(
+                categoryId = categoryId, 
+                perPage = perPage, 
+                page = page,
+                orderBy = orderBy,
+                order = order
+            ))
+        } catch (e: Exception) { 
+            Result.failure(e) 
+        }
+    }
 
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = try {
         if (ids.isEmpty()) Result.success(emptyList())
