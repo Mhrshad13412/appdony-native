@@ -4,10 +4,10 @@ import com.google.gson.annotations.SerializedName
 
 data class Post(
     val id: Int,
-    val date: String,
+    val date: String? = null,
     val title: RenderedText,
     val content: RenderedText,
-    val excerpt: RenderedText,
+    val excerpt: RenderedText? = null, // 👈 اینجا اختیاری شد
     @SerializedName("featured_media") val featuredMedia: Int? = null,
     val categories: List<Int> = emptyList(),
     @SerializedName("_embedded") val embedded: Embedded? = null
