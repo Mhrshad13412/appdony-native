@@ -28,7 +28,13 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me")
     suspend fun checkAuth(): Response<ResponseBody>
 
-    // 👇 _fields رو حذف کردیم تا _embedded (عکس‌ها) کامل برگرده
+    // 👇 آدرس اختصاصی وبلاگ (Custom Post Type)
+    @GET("wp-json/wp/v2/blog")
+    suspend fun getCustomBlogPosts(
+        @Query("per_page") perPage: Int = 20,
+        @Query("_embed") embed: Int = 1
+    ): List<Post>
+
     @GET("wp-json/wp/v2/posts")
     suspend fun getPosts(
         @Query("per_page") perPage: Int = 10,
