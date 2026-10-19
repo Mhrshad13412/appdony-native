@@ -38,6 +38,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
             DownloadManager.STATUS_RUNNING or
             DownloadManager.STATUS_PENDING or
             DownloadManager.STATUS_PAUSED or
+            DownloadManager.STATUS_SUCCESSFUL or
             DownloadManager.STATUS_FAILED
         )
 
@@ -56,23 +57,16 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
 
                 list.add(
                     DownloadItem(
-                        id = id,
-                        title = title,
-                        status = status,
-                        bytesDownloaded = downloaded,
-                        totalBytes = total,
-                        localUri = localUri,
-                        mimeType = mime,
-                        fileName = fileName
+                        id = id, title = title, status = status, bytesDownloaded = downloaded,
+                        totalBytes = total, localUri = localUri, mimeType = mime, fileName = fileName
                     )
                 )
             } while (cursor.moveToNext())
         }
         cursor.close()
 
-        _downloads.value = list
-            .sortedByDescending { it.id }
-            .filter { it.status != DownloadManager.STATUS_SUCCESSFUL }
+        // 👇 بدون فیلتر، همه رو نشون بده
+        _downloads.value = list.sortedByDescending { it.id }
     }
 
     fun removeDownload(id: Long) {
