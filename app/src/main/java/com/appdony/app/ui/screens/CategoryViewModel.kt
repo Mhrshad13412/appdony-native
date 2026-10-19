@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+enum class SortOption(val title: String, val apiValue: String, val order: String) {
+    NEWEST("جدیدترین", "date", "desc"),
+    POPULAR("محبوب‌ترین", "comment_count", "desc"),
+    ALPHABETICAL("الفبا", "title", "asc")
+}
+
 sealed class CategoryUiState {
     object Loading : CategoryUiState()
     data class Success(val posts: List<Post>) : CategoryUiState()
@@ -32,11 +38,21 @@ class CategoryViewModel(
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
+    // 👇 وضعیت مرتب‌سازی فعلی
+    private val _currentSort = MutableStateFlow(SortOption.NEWEST)
+    val currentSort: StateFlow<SortOption> = _currentSort.asStateFlow()
+
     private var currentPage = 1
     private var isEndReached = false
     private var isLoadingData = false
 
     init { loadInitial() }
+
+    fun setSort(option: SortOption) {
+        if (_currentSort.value == option) return
+        _currentSort.value = option
+        loadInitial() // دوباره از اول لود کن
+    }
 
     fun loadInitial() {
         if (isLoadingData) return
@@ -46,14 +62,20 @@ class CategoryViewModel(
 
         viewModelScope.launch {
             _state.value = CategoryUiState.Loading
-            repo.getPostsByCategoryPaged(categoryId, page = 1, perPage = 24)
-                .onSuccess { posts ->
-                    _state.value = CategoryUiState.Success(posts)
-                    if (posts.size < 24) isEndReached = true
-                }
-                .onFailure {
-                    _state.value = CategoryUiState.Error(it.message ?: "خطا")
-                }
+            val sort = _currentSort.value
+            
+            repo.getPostsByCategoryPaged(
+                categoryId = categoryId, 
+                page = 1, 
+                perPage = 24,
+                orderBy = sort.apiValue,
+                order = sort.order
+            ).onSuccess { posts ->
+                _state.value = CategoryUiState.Success(posts)
+                if (posts.size < 24) isEndReached = true
+            }.onFailure {
+                _state.value = CategoryUiState.Error(it.message ?: "خطا")
+            }
             isLoadingData = false
         }
     }
@@ -65,22 +87,27 @@ class CategoryViewModel(
         viewModelScope.launch {
             _isLoadingMore.value = true
             currentPage++
+            val sort = _currentSort.value
 
-            repo.getPostsByCategoryPaged(categoryId, page = currentPage, perPage = 24)
-                .onSuccess { newPosts ->
-                    if (newPosts.isEmpty()) {
-                        isEndReached = true
-                    } else {
-                        val current = _state.value
-                        if (current is CategoryUiState.Success) {
-                            _state.value = CategoryUiState.Success(current.posts + newPosts)
-                        }
-                        if (newPosts.size < 24) isEndReached = true
+            repo.getPostsByCategoryPaged(
+                categoryId = categoryId, 
+                page = currentPage, 
+                perPage = 24,
+                orderBy = sort.apiValue,
+                order = sort.order
+            ).onSuccess { newPosts ->
+                if (newPosts.isEmpty()) {
+                    isEndReached = true
+                } else {
+                    val current = _state.value
+                    if (current is CategoryUiState.Success) {
+                        _state.value = CategoryUiState.Success(current.posts + newPosts)
                     }
+                    if (newPosts.size < 24) isEndReached = true
                 }
-                .onFailure {
-                    currentPage-- // اگه خطا داد، صفحه رو برمی‌گردونیم
-                }
+            }.onFailure {
+                currentPage--
+            }
             _isLoadingMore.value = false
             isLoadingData = false
         }
