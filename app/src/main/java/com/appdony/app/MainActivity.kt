@@ -13,22 +13,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -38,13 +29,7 @@ import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.ui.components.AccountSheet
-import com.appdony.app.ui.components.AppBottomNav
-import com.appdony.app.ui.components.AppTopBar
-import com.appdony.app.ui.components.FloatingAssistant
-import com.appdony.app.ui.components.LoginSheet
-import com.appdony.app.ui.components.SpotlightTutorial
-import com.appdony.app.ui.components.UpdateBanner
+import com.appdony.app.ui.components.*
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.DownloadHelper
@@ -57,9 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            AppRoot()
-        }
+        setContent { AppRoot() }
     }
 }
 
@@ -68,12 +51,7 @@ fun AppRoot() {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
-
-    val fontScale = when (themeState.fontSize) { 
-        FontSize.SMALL -> 0.85f
-        FontSize.MEDIUM -> 1.0f
-        FontSize.LARGE -> 1.2f 
-    }
+    val fontScale = when (themeState.fontSize) { FontSize.SMALL -> 0.85f; FontSize.MEDIUM -> 1.0f; FontSize.LARGE -> 1.2f }
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
@@ -105,22 +83,19 @@ fun MainScreen() {
     var showAccountSheet by remember { mutableStateOf(false) }
     var showTutorial by remember { mutableStateOf(false) }
 
-    // 👇 وضعیت‌های مربوط به سیستم آپدیت
+    // 👇 وضعیت‌های آپدیت و انیمیشن
     var updateInfo by remember { mutableStateOf<UpdateHelper.UpdateInfo?>(null) }
     var showUpdateBanner by remember { mutableStateOf(false) }
+    var transitionTarget by remember { mutableStateOf<String?>(null) } // برای انیمیشن
 
     LaunchedEffect(Unit) {
-        // نمایش راهنما در اولین اجرا
-        if (!hasSeenOnboarding) {
-            showTutorial = true
-        }
+        if (!hasSeenOnboarding) showTutorial = true
         
-        // 👇 چک کردن آپدیت در پس‌زمینه
         val currentVersion = BuildConfig.VERSION_NAME
         val info = UpdateHelper.checkForUpdate()
         if (info != null && info.latestVersion != currentVersion) {
             updateInfo = info
-            delay(2000) // کمی صبر می‌کنیم تا UI کامل لود بشه
+            delay(2000)
             showUpdateBanner = true
         }
     }
@@ -130,14 +105,7 @@ fun MainScreen() {
             topBar = {
                 if (showChrome) {
                     Column {
-                        AppTopBar(
-                            isLoggedIn = isLoggedIn, 
-                            userInitial = displayName, 
-                            onSearchClick = { navController.navigate("search") }, 
-                            onLoginClick = { if (isLoggedIn) showAccountSheet = true else showLoginSheet = true }
-                        )
-                        
-                        // 👇 بنر آپدیت دقیقاً زیر سرچ
+                        AppTopBar(isLoggedIn, displayName, { navController.navigate("search") }, { if (isLoggedIn) showAccountSheet = true else showLoginSheet = true })
                         UpdateBanner(
                             isVisible = showUpdateBanner,
                             versionName = updateInfo?.latestVersion ?: "",
@@ -145,22 +113,26 @@ fun MainScreen() {
                                 showUpdateBanner = false
                                 updateInfo?.let { info ->
                                     scope.launch(Dispatchers.Main) {
-                                        DownloadHelper.startDownload(
-                                            context, 
-                                            info.downloadUrl, 
-                                            "Appdony-Update-${info.latestVersion}.apk"
-                                        )
+                                        DownloadHelper.startDownload(context, info.downloadUrl, "Appdony-Update-${info.latestVersion}.apk")
                                     }
                                 }
                             },
-                            onDismiss = {
-                                showUpdateBanner = false
-                            }
+                            onDismiss = { showUpdateBanner = false }
                         )
                     }
                 }
             },
-            bottomBar = { if (showChrome) AppBottomNav(navController) },
+            bottomBar = {
+                if (showChrome) {
+                    AppBottomNav(
+                        currentRoute = currentRoute,
+                        onTabSelected = { route ->
+                            // 👇 به جای ناوبری مستقیم، انیمیشن رو صدا می‌زنیم
+                            transitionTarget = route
+                        }
+                    )
+                }
+            },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -177,6 +149,21 @@ fun MainScreen() {
                     }
                 }
             }
+        }
+
+        // 👇 نمایش لایه انیمیشن
+        transitionTarget?.let { target ->
+            CircularRevealAnimation(
+                targetRoute = target,
+                onAnimationEnd = {
+                    navController.navigate(target) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                    transitionTarget = null // پاک کردن انیمیشن
+                }
+            )
         }
 
         if (showTutorial) {
