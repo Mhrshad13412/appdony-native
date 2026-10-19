@@ -20,6 +20,9 @@ data class CommentRequest(
     @SerializedName("author_name") val authorName: String? = null
 )
 
+// 👇 فیلدهای ضروری برای لیست‌ها (بدون متن کامل پست)
+private const val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_links,_embedded"
+
 interface AppdonyApi {
 
     @GET("wp-json/wp/v2/users/me?context=edit")
@@ -35,7 +38,6 @@ interface AppdonyApi {
         @Query("_embed") embed: Int = 1
     ): List<Post>
 
-    // 👇 این تابع برای وقتیه که روی یه پست وبلاگ کلیک می‌کنیم
     @GET("wp-json/wp/v2/blog/{id}")
     suspend fun getBlogPost(
         @Path("id") id: Int,
@@ -46,7 +48,8 @@ interface AppdonyApi {
     suspend fun getPosts(
         @Query("per_page") perPage: Int = 10,
         @Query("page") page: Int = 1,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: Int = 1,
+        @Query("_fields") fields: String = LIST_FIELDS // 👈 بهینه‌سازی
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts/{id}")
@@ -60,35 +63,40 @@ interface AppdonyApi {
         @Query("categories") categoryId: Int,
         @Query("per_page") perPage: Int = 6,
         @Query("page") page: Int = 1,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: Int = 1,
+        @Query("_fields") fields: String = LIST_FIELDS // 👈 بهینه‌سازی
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByMultipleCategories(
         @Query("categories") categories: String,
         @Query("per_page") perPage: Int = 6,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: Int = 1,
+        @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByIds(
         @Query("include") ids: String,
         @Query("per_page") perPage: Int = 50,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: Int = 1,
+        @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts")
     suspend fun searchPosts(
         @Query("search") query: String,
         @Query("per_page") perPage: Int = 20,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: Int = 1,
+        @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/categories")
     suspend fun getCategories(
         @Query("per_page") perPage: Int = 100,
         @Query("orderby") orderBy: String = "count",
-        @Query("order") order: String = "desc"
+        @Query("order") order: String = "desc",
+        @Query("_fields") fields: String = "id,name,slug,count,parent"
     ): List<Category>
 
     @GET("wp-json/wp/v2/comments")
