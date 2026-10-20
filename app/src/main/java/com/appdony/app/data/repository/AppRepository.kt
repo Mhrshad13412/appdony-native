@@ -29,7 +29,8 @@ class AppRepository(private val context: Context? = null) {
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
     private val gson = Gson()
 
-    suspend fun loadInitial(page: String): Result<InitialData> = withContext(Dispatchers.IO) {
+    // 👈 پارامتر forceRefresh اضافه شد تا با HomeViewModel هماهنگ باشه
+    suspend fun loadInitial(page: String, forceRefresh: Boolean = false): Result<InitialData> = withContext(Dispatchers.IO) {
         try {
             val postsReq = Request.Builder().url("${baseUrl}posts?per_page=10&_embed").build()
             val postsBody = client.newCall(postsReq).execute().use { resp ->
@@ -60,6 +61,63 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
+    // 👈 متدهای گم‌شده که ViewModelها نیاز داشتن
+    suspend fun loadPlusPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchPosts(query: String): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?search=$query&per_page=20&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            if (ids.isEmpty()) return@withContext Result.success(emptyList())
+            val idsString = ids.joinToString(",")
+            val request = Request.Builder().url("${baseUrl}posts?include=$idsString&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun clearCache() {
+        try {
+            client.cache?.evictAll()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    // ... (بقیه متدهای getBlogPosts, getPostsByCategory, getPost, getComments, postComment, autoLogin, getCurrentUser دقیقاً مثل قبل اینجا قرار می‌گیرن)
     suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage&_embed").build()
