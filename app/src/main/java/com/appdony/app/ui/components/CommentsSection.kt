@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize // 👈 این خط جا افتاده بود
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,14 +50,14 @@ import com.appdony.app.ui.screens.CommentsViewModel
 
 @Composable
 fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin: () -> Unit) {
-    val context = LocalContext.current // 👈 کانتکست گرفته می‌شود
+    val context = LocalContext.current
     
     val vm: CommentsViewModel = viewModel(
         key = "comments_$postId",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return CommentsViewModel(postId, context) as T // 👈 پاس داده می‌شود
+                return CommentsViewModel(postId, context) as T
             }
         }
     )
@@ -82,13 +83,13 @@ fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text("نظر جدید", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (showComposer && isLoggedIn) {
             Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp)) {
@@ -105,7 +106,7 @@ fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin
                         unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                     )
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary)
@@ -115,17 +116,17 @@ fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (sending) {
                                 CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                             } else {
                                 Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                             }
                             Text("ارسال", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         if (sendResult != null) {
@@ -136,7 +137,7 @@ fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin
             ) {
                 Text(sendResult!!, color = if (sendResult!!.contains("✓")) MaterialTheme.colorScheme.primary else Color(0xFFFF8A80), fontSize = 13.sp)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         when (val s = state) {
@@ -155,7 +156,7 @@ fun CommentsSection(postId: Int, isLoggedIn: Boolean, nonce: String, onNeedLogin
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("هنوز نظری ثبت نشده", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text("اولین نفر باش!", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                         }
                     }
