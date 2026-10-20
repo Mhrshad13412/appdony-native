@@ -249,7 +249,6 @@ private fun DetailContent(
             }
         }
 
-        // 🚀 بخش بازی و برنامه (غیر وبلاگ)
         if (!isBlog) {
             item {
                 Column(
@@ -347,8 +346,7 @@ private fun DetailContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                // 👈 به جای info.description از post.content استفاده شد
-                text = post.content.ifBlank { "توضیحاتی ثبت نشده است." },
+                text = info.description.orEmpty().ifBlank { "توضیحاتی ثبت نشده است." }, // 👈 اصلاح شد
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
@@ -374,7 +372,6 @@ private fun DetailContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(similar, key = { it.id }) { p ->
-                        // 👈 پارامترهای AppCard اصلاح شدن
                         AppCard(
                             title = p.cleanTitle(),
                             imageUrl = p.featuredImageUrl() ?: "",
