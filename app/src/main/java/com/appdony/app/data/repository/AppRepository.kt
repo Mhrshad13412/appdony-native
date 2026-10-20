@@ -3,14 +3,22 @@ package com.appdony.app.data.repository
 import android.content.Context
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.UserData
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+
+// 👈 دیتاکلاس HomeData که در MainActivity استفاده شده بود
+data class HomeData(
+    val banner: Post? = null,
+    val singleFeature: Post? = null,
+    val featured: List<Post> = emptyList()
+)
 
 class AppRepository(private val context: Context? = null) {
 
@@ -19,32 +27,52 @@ class AppRepository(private val context: Context? = null) {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1))
+            .protocols(listOf(Protocol.HTTP_1_1)) // اجبار به HTTP/1.1 برای رفع خطای وبلاگ
             .build()
     }
 
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
+    private val gson = Gson()
 
-    suspend fun getPosts(categoryId: Int? = null): List<Post> = withContext(Dispatchers.IO) {
+    // 👈 متد loadInitial که MainActivity به آن نیاز داشت
+    suspend fun loadInitial(page: String): Result<HomeData> = withContext(Dispatchers.IO) {
         try {
-            val url = if (categoryId != null) "${baseUrl}posts?categories=$categoryId&per_page=20" else "${baseUrl}posts?per_page=20"
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder().url("${baseUrl}posts?per_page=10").build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val body = response.body?.string() ?: return@withContext emptyList()
-                val jsonArray = JSONArray(body)
-                val posts = mutableListOf<Post>()
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    posts.add(Post.fromJson(obj)) // 👈 فرض بر این است که این متد در دیتاکلاس Post وجود دارد
-                }
-                posts
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                
+                val homeData = HomeData(
+                    banner = posts.firstOrNull(),
+                    singleFeature = posts.getOrNull(1),
+                    featured = posts.drop(2)
+                )
+                Result.success(homeData)
             }
         } catch (e: Exception) {
-            emptyList()
+            Result.failure(e)
         }
     }
 
+    // 👈 متد getBlogPosts که BlogViewModel به آن نیاز داشت
+    suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // 👈 متد getCurrentUser برای لاگین (با پاس دادن کوکی و توکن)
     suspend fun getCurrentUser(cookies: String = "", nonce: String = ""): Result<UserData> = withContext(Dispatchers.IO) {
         try {
             val requestBuilder = Request.Builder()
@@ -61,18 +89,10 @@ class AppRepository(private val context: Context? = null) {
                     return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 }
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
-                val obj = JSONObject(body)
                 
-                // 👈 سازگار با دیتاکلاس UserData شما
-                val user = UserData(
-                    id = obj.optInt("id"),
-                    username = obj.optString("slug"),
-                    name = obj.optString("name"),
-                    email = obj.optString("email"),
-                    avatarUrl = obj.optJSONObject("avatar_urls")?.optString("96") ?: "",
-                    nonce = nonce
-                )
-                Result.success(user)
+                // استفاده از Gson برای تبدیل خودکار (چون UserData فیلدهای @SerializedName دارد)
+                val user: UserData = gson.fromJson(body, UserData::class.java)
+                Result.success(user.copy(nonce = nonce))
             }
         } catch (e: Exception) {
             Result.failure(e)
