@@ -346,7 +346,8 @@ private fun DetailContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = post.content.orEmpty().ifBlank { "توضیحاتی ثبت نشده است." },
+                // 👈 خط اصلاح شده (حذف orEmpty)
+                text = post.content.ifBlank { "توضیحاتی ثبت نشده است." }, 
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
