@@ -40,7 +40,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.appdony.app.data.model.featuredImageUrl // 👈 این ایمپورت اضافه شد
+import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.SettingsManager
@@ -86,6 +86,7 @@ fun AppRoot(intent: Intent?) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
+    
     val fontScale = when (themeState.fontSize) { 
         FontSize.SMALL -> 0.85f
         FontSize.MEDIUM -> 1.0f
@@ -94,7 +95,10 @@ fun AppRoot(intent: Intent?) {
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK, primaryColor = ThemeManager.themeColors[themeState.colorIndex]) {
+        AppdonyTheme(
+            darkTheme = themeState.mode == ThemeMode.DARK, 
+            primaryColor = ThemeManager.themeColors[themeState.colorIndex]
+        ) {
             MainScreen(incomingIntent = intent)
         }
     }
@@ -110,19 +114,20 @@ fun MainScreen(incomingIntent: Intent?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
-    
+
+    // 👇 دریافت تنظیمات از SettingsManager
     val settingsManager = remember { SettingsManager(context) }
     val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
+    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
 
+    // 👇 درخواست اجازه نوتیفیکیشن و راه‌اندازی WorkManager
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-        val blogWorkRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(constraints).build()
+        val blogWorkRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "BlogUpdateWork",
             ExistingPeriodicWorkPolicy.KEEP,
@@ -130,16 +135,18 @@ fun MainScreen(incomingIntent: Intent?) {
         )
     }
 
+    // 👇 پردازش لینک‌های ورودی (Deep Link و Shortcuts)
     LaunchedEffect(incomingIntent) {
         incomingIntent?.data?.let { uri ->
             val postId = uri.getQueryParameter("p")
-            if (postId != null) navController.navigate("detail/$postId")
+            if (postId != null) navController.navigate("detail/$postId?isBlog=false")
         }
         incomingIntent?.getStringExtra("shortcut_route")?.let { route ->
             if (route == "search" || route == "updates" || route == "favorites") navController.navigate(route)
         }
     }
 
+    // 👇 پیش‌بارگذاری دیتا و عکس‌ها برای اسپلش اسکرین
     LaunchedEffect(Unit) {
         val repo = AppRepository(context)
         val result = repo.loadInitial("games")
@@ -234,7 +241,8 @@ fun MainScreen(incomingIntent: Intent?) {
                 Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     AppNavGraph(navController = navController, startDestination = startPage)
                     
-                    if (showChrome && !showTutorial) {
+                    // 👇 اعمال شرط showAiAssistant
+                    if (showChrome && !showTutorial && showAiAssistant) {
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
                             FloatingAssistant(
                                 onSearchClick = { navController.navigate("search") },
