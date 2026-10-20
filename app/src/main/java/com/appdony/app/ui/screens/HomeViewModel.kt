@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 class HomeViewModel : ViewModel() {
     private val repo = AppRepository()
-    
+
     private val _initialData = MutableStateFlow<InitialData?>(null)
     val initialData: StateFlow<InitialData?> = _initialData.asStateFlow()
 
@@ -54,7 +54,6 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoadingMore.value = true
             currentPage++
-            // 👈 پارامترها اینجا پاس داده شدن
             repo.loadPlusPosts(page = currentPage, perPage = 10).onSuccess { newPosts ->
                 if (newPosts.isEmpty()) {
                     isEndReached = true
