@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,14 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.appdony.app.data.preferences.FontSize
-import com.appdony.app.data.preferences.SettingsManager
-import com.appdony.app.data.preferences.ThemeManager
-import com.appdony.app.data.preferences.ThemeMode
-import com.appdony.app.data.preferences.ThemeState
-import com.appdony.app.data.preferences.SearchHistoryManager
+import com.appdony.app.data.preferences.*
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.util.CacheUtils
 import kotlinx.coroutines.launch
 
@@ -39,6 +34,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val historyManager = remember { SearchHistoryManager(context) }
     val sessionManager = remember { SessionManager(context) }
     val favoritesManager = remember { FavoritesManager(context) }
+    val chatHistoryManager = remember { ChatHistoryManager(context) } // 👈 جدید
     
     val scope = rememberCoroutineScope()
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
@@ -48,7 +44,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val wifiOnly by settingsManager.wifiOnly.collectAsStateWithLifecycle(initialValue = false)
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
-    val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
+    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true) // 👈 جدید
 
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
     LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
@@ -64,7 +60,23 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // تم و ظاهر
+        // 🤖 بخش هوش مصنوعی (جدید)
+        item { SettingsHeader("دستیار هوش مصنوعی", Icons.Default.SmartToy, primary) }
+        item {
+            SettingsSwitchRow("نمایش دکتر طاعون در صفحه", Icons.Default.Visibility, showAiAssistant) { checked ->
+                scope.launch { settingsManager.setShowAiAssistant(checked) }
+            }
+        }
+        item {
+            SettingsActionRow("پاک کردن تاریخچه چت", "حذف تمام مکالمات با دکتر طاعون", Icons.Default.DeleteSweep) {
+                scope.launch {
+                    chatHistoryManager.clearHistory()
+                    Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // 🎨 تم و ظاهر
         item { SettingsHeader("ظاهر اپلیکیشن", Icons.Default.Palette, primary) }
         item {
             SettingsSwitchRow("حالت تاریک", Icons.Default.DarkMode, themeState.mode == ThemeMode.DARK) { checked ->
@@ -82,7 +94,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // دانلود
+        // 📥 دانلود
         item { SettingsHeader("دانلود", Icons.Default.Download, primary) }
         item {
             SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Wifi, wifiOnly) { checked ->
@@ -90,7 +102,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // حافظه
+        // 🧹 حافظه
         item { SettingsHeader("حافظه و داده‌ها", Icons.Default.Storage, primary) }
         item {
             SettingsActionRow("پاک کردن حافظه کش", "حجم فعلی: $cacheSize", Icons.Default.Delete) {
@@ -111,7 +123,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // اعلان‌ها
+        // 🔔 اعلان‌ها
         item { SettingsHeader("اعلان‌ها", Icons.Default.Notifications, primary) }
         item {
             SettingsSwitchRow("اعلان وبلاگ", Icons.Default.Article, notifyBlog) { checked ->
@@ -124,7 +136,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // حساب کاربری
+        // 👤 حساب کاربری
         item { SettingsHeader("حساب کاربری", Icons.Default.Person, primary) }
         item {
             SettingsActionRow("خروج از حساب", "پاک کردن اطلاعات ورود", Icons.Default.Logout) {
@@ -132,18 +144,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
         
-        // درباره
-        item { Spacer(Modifier.height(24.dp)); SettingsHeader("درباره اپدونی", Icons.Default.Info, primary) }
-        item {
-            Box(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
-                Column {
-                    Text("اپدونی", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("نسخه 2.9.35", fontSize = 12.sp, color = Color.Gray)
-                    Spacer(Modifier.height(8.dp))
-                    Text("پشتیبانی: @AppdonySupport", fontSize = 12.sp, color = primary)
-                }
-            }
-        }
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
@@ -162,8 +163,6 @@ fun SettingsSwitchRow(title: String, icon: androidx.compose.ui.graphics.vector.I
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(16.dp))
         Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
-        
-        // 👇 این بخش اصلاح شد تا کلیدها استاندارد و قشنگ بشن
         Switch(
             checked = checked, 
             onCheckedChange = onCheckedChange,
