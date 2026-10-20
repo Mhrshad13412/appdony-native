@@ -7,21 +7,18 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.onboardingDataStore by preferencesDataStore(name = "appdony_onboarding")
+private val Context.dataStore by preferencesDataStore(name = "onboarding_prefs")
 
 class OnboardingManager(private val context: Context) {
+    private val HAS_SEEN_ONBOARDING = booleanPreferencesKey("has_seen_onboarding")
 
-    companion object {
-        private val KEY_HAS_SEEN = booleanPreferencesKey("has_seen_onboarding")
-    }
-
-    val hasSeenOnboarding: Flow<Boolean> = context.onboardingDataStore.data.map {
-        it[KEY_HAS_SEEN] ?: false
+    val hasSeenOnboarding: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[HAS_SEEN_ONBOARDING] ?: false
     }
 
     suspend fun setSeen() {
-        context.onboardingDataStore.edit {
-            it[KEY_HAS_SEEN] = true
+        context.dataStore.edit { prefs ->
+            prefs[HAS_SEEN_ONBOARDING] = true
         }
     }
 }
