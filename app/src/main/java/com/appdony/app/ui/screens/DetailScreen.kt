@@ -45,7 +45,6 @@ import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
-import com.appdony.app.util.AppInfo
 import com.appdony.app.util.DownloadHelper
 import kotlinx.coroutines.launch
 
@@ -167,7 +166,7 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // تصویر بزرگ بالای صفحه (مشترک)
+        // ۱. عکس بزرگ
         item {
             Box(
                 modifier = Modifier
@@ -193,7 +192,7 @@ private fun DetailContent(
             }
         }
 
-        // عنوان و اطلاعات (مشترک)
+        // ۲. باکس تایتل (همونی که خالی شده بود)
         item {
             Row(
                 modifier = Modifier
@@ -205,13 +204,35 @@ private fun DetailContent(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ... (اینجا کد اصلی خودت برای نمایش عنوان و آیکون هست، دست نخورده)
+                AsyncImage(
+                    model = post.featuredImageUrl(),
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = post.cleanTitle(),
+                        color = AppdonyTextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = post.primaryCategoryName(),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
 
-        // 🚀 بخش مخصوص بازی و برنامه (غیر وبلاگ)
+        // 🚀 ۳. بخش بازی و برنامه (غیر وبلاگ)
         if (!isBlog) {
-            // سیستم امتیازدهی ستاره‌ای
+            // ستاره‌ها
             item {
                 Column(
                     modifier = Modifier
@@ -232,53 +253,46 @@ private fun DetailContent(
                 }
             }
 
-            // اطلاعات نسخه، حجم و اندروید
+            // نسخه
             item {
-                if (info.version != null || info.size != null || info.androidReq != null) {
+                if (info.version != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        info.version?.let { InfoChip("نسخه", it) }
-                        info.size?.let { InfoChip("حجم", it) }
-                        info.androidReq?.let { InfoChip("اندروید", it.take(10)) }
-                    }
-                }
-            }
-
-            // دکمه‌های دانلود
-            item {
-                if (info.downloadLinks.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        info.downloadLinks.forEachIndexed { index, link ->
-                            Button(
-                                onClick = { onDownload(link.url, post.cleanTitle()) },
-                                modifier = Modifier.fillMaxWidth().height(54.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (index == 0) MaterialTheme.colorScheme.primary else AppdonyCardBg
-                                )
-                            ) {
-                                Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else AppdonyTextPrimary)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    link.title.ifBlank { "دانلود" },
-                                    color = if (index == 0) Color.White else AppdonyTextPrimary,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AppdonyCardBg)
+                                .padding(horizontal = 24.dp, vertical = 12.dp)
+                        ) {
+                            Text("نسخه", color = AppdonyTextMuted, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(info.version, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            // دکمه اشتراک‌گذاری (فقط برای بازی و برنامه)
+            // دکمه دانلود
+            item {
+                val url = info.downloadUrl
+                if (!url.isNullOrBlank()) {
+                    Button(
+                        onClick = { onDownload(url, post.cleanTitle()) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(54.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Download, null, tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("دانلود", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // اشتراک‌گذاری
             item {
                 OutlinedButton(
                     onClick = onShare,
@@ -292,7 +306,7 @@ private fun DetailContent(
             }
         }
 
-        // 📝 متن مقاله / توضیحات (مشترک برای هر دو حالت)
+        // 📝 ۴. متن / توضیحات
         item {
             Spacer(Modifier.height(24.dp))
             Text(
@@ -302,9 +316,9 @@ private fun DetailContent(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = info.cleanDescription.take(5000),
+                text = info.description.ifBlank { "توضیحاتی ثبت نشده است." },
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
@@ -312,12 +326,12 @@ private fun DetailContent(
             )
         }
 
-        // بخش مشابه‌ها (فقط برای بازی و برنامه)
+        // مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    text = "برنامه‌های مشابه",
+                    text = "مشابه‌ها",
                     color = AppdonyTextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -332,16 +346,16 @@ private fun DetailContent(
                 ) {
                     items(similar, key = { it.id }) { p ->
                         AppCard(
-                            title = p.cleanTitle(),
-                            imageUrl = p.featuredImageUrl(),
-                            onClick = { onSimilarClick(p.id) }
+                            post = p,
+                            onClick = { onSimilarClick(p.id) },
+                            modifier = Modifier.width(160.dp)
                         )
                     }
                 }
             }
         }
 
-        // نظرات (مشترک برای هر دو حالت)
+        // نظرات
         item {
             Spacer(Modifier.height(24.dp))
             CommentsSection(
@@ -351,20 +365,5 @@ private fun DetailContent(
                 onNeedLogin = onNeedLogin
             )
         }
-    }
-}
-
-@Composable
-private fun InfoChip(label: String, value: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(AppdonyCardBg)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Text(label, color = AppdonyTextMuted, fontSize = 12.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
