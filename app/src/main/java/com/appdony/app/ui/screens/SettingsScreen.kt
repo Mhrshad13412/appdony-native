@@ -3,25 +3,64 @@ package com.appdony.app.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FontDownload
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.appdony.app.data.preferences.*
+import com.appdony.app.data.preferences.ChatHistoryManager
+import com.appdony.app.data.preferences.FavoritesManager
+import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.SearchHistoryManager
+import com.appdony.app.data.preferences.SettingsManager
+import com.appdony.app.data.preferences.ThemeManager
+import com.appdony.app.data.preferences.ThemeMode
+import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.util.CacheUtils
 import kotlinx.coroutines.launch
@@ -34,20 +73,21 @@ fun SettingsScreen(onBack: () -> Unit) {
     val historyManager = remember { SearchHistoryManager(context) }
     val sessionManager = remember { SessionManager(context) }
     val favoritesManager = remember { FavoritesManager(context) }
-    val chatHistoryManager = remember { ChatHistoryManager(context) } // 👈 جدید
-    
+    val chatHistoryManager = remember { ChatHistoryManager(context) }
     val scope = rememberCoroutineScope()
+    
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val primary = MaterialTheme.colorScheme.primary
 
-    // تنظیمات
     val wifiOnly by settingsManager.wifiOnly.collectAsStateWithLifecycle(initialValue = false)
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
-    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true) // 👈 جدید
+    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
 
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
-    LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
+    LaunchedEffect(Unit) {
+        cacheSize = CacheUtils.getCacheSize(context)
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         item {
@@ -59,159 +99,188 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Text("تنظیمات", color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
-
-        // 🤖 بخش هوش مصنوعی (جدید)
+        
         item { SettingsHeader("دستیار هوش مصنوعی", Icons.Default.SmartToy, primary) }
         item {
             SettingsSwitchRow("نمایش دکتر طاعون در صفحه", Icons.Default.Visibility, showAiAssistant) { checked ->
                 scope.launch { settingsManager.setShowAiAssistant(checked) }
             }
         }
-        item {
-            SettingsActionRow("پاک کردن تاریخچه چت", "حذف تمام مکالمات با دکتر طاعون", Icons.Default.DeleteSweep) {
-                scope.launch {
-                    chatHistoryManager.clearHistory()
-                    Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
 
-        // 🎨 تم و ظاهر
-        item { SettingsHeader("ظاهر اپلیکیشن", Icons.Default.Palette, primary) }
+        item { SettingsHeader("ظاهر برنامه", Icons.Default.Palette, primary) }
         item {
-            SettingsSwitchRow("حالت تاریک", Icons.Default.DarkMode, themeState.mode == ThemeMode.DARK) { checked ->
+            SettingsSwitchRow("حالت تاریک", Icons.Default.Brightness4, themeState.mode == ThemeMode.DARK) { checked ->
                 scope.launch { themeManager.setMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT) }
             }
         }
-        item { ThemeColorsRow(themeState.colorIndex, primary) { index -> scope.launch { themeManager.setColorIndex(index) } } }
         item {
-            SettingsDropdownRow("سایز فونت", Icons.Default.FormatSize, themeState.fontSize.name) { expanded ->
-                Column {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ColorLens, null, tint = primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("رنگ برنامه", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ThemeManager.themeColors.forEachIndexed { index, color ->
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { scope.launch { themeManager.setColorIndex(index) } }
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FontDownload, null, tint = primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("اندازه فونت", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FontSize.values().forEach { size ->
-                        DropdownMenuItem(text = { Text(size.name) }, onClick = { scope.launch { themeManager.setFontSize(size) }; expanded(false) })
+                        val selected = themeState.fontSize == size
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (selected) primary else MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { scope.launch { themeManager.setFontSize(size) } }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = when(size) {
+                                    FontSize.SMALL -> "کوچک"
+                                    FontSize.MEDIUM -> "متوسط"
+                                    FontSize.LARGE -> "بزرگ"
+                                },
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 📥 دانلود
-        item { SettingsHeader("دانلود", Icons.Default.Download, primary) }
+        item { SettingsHeader("دانلود و شبکه", Icons.Default.Download, primary) }
         item {
-            SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Wifi, wifiOnly) { checked ->
+            SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Download, wifiOnly) { checked ->
                 scope.launch { settingsManager.setWifiOnly(checked) }
             }
         }
 
-        // 🧹 حافظه
-        item { SettingsHeader("حافظه و داده‌ها", Icons.Default.Storage, primary) }
-        item {
-            SettingsActionRow("پاک کردن حافظه کش", "حجم فعلی: $cacheSize", Icons.Default.Delete) {
-                scope.launch {
-                    CacheUtils.clearCache(context)
-                    cacheSize = CacheUtils.getCacheSize(context)
-                }
-            }
-        }
-        item {
-            SettingsActionRow("پاک کردن تاریخچه جستجو", "پاک کردن کلمات جستجو شده", Icons.Default.History) {
-                scope.launch { historyManager.clearHistory() }
-            }
-        }
-        item {
-            SettingsActionRow("پاک کردن علاقه‌مندی‌ها", "حذف تمام برنامه‌های ذخیره شده", Icons.Default.FavoriteBorder) {
-                scope.launch { favoritesManager.clear() }
-            }
-        }
-
-        // 🔔 اعلان‌ها
         item { SettingsHeader("اعلان‌ها", Icons.Default.Notifications, primary) }
         item {
-            SettingsSwitchRow("اعلان وبلاگ", Icons.Default.Article, notifyBlog) { checked ->
+            SettingsSwitchRow("اعلان پست‌های وبلاگ", Icons.AutoMirrored.Filled.Article, notifyBlog) { checked ->
                 scope.launch { settingsManager.setNotifyBlog(checked) }
             }
         }
         item {
-            SettingsSwitchRow("اعلان آپدیت برنامه", Icons.Default.Update, notifyUpdates) { checked ->
+            SettingsSwitchRow("اعلان آپدیت برنامه‌ها", Icons.Default.Notifications, notifyUpdates) { checked ->
                 scope.launch { settingsManager.setNotifyUpdates(checked) }
             }
         }
 
-        // 👤 حساب کاربری
-        item { SettingsHeader("حساب کاربری", Icons.Default.Person, primary) }
+        item { SettingsHeader("داده‌ها", Icons.Default.CleaningServices, primary) }
         item {
-            SettingsActionRow("خروج از حساب", "پاک کردن اطلاعات ورود", Icons.Default.Logout) {
-                scope.launch { sessionManager.clearSession() }
+            SettingsActionRow("پاک کردن حافظه کش", "$cacheSize", Icons.Default.CleaningServices) {
+                CacheUtils.clearCache(context)
+                scope.launch {
+                    cacheSize = CacheUtils.getCacheSize(context)
+                    Toast.makeText(context, "کش پاک شد", Toast.LENGTH_SHORT).show()
+                }
             }
         }
-        
-        item { Spacer(Modifier.height(24.dp)) }
+        item {
+            SettingsActionRow("پاک کردن تاریخچه جستجو", "", Icons.Default.Search) {
+                scope.launch {
+                    historyManager.clear()
+                    Toast.makeText(context, "تاریخچه پاک شد", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        item {
+            SettingsActionRow("پاک کردن علاقه‌مندی‌ها", "", Icons.Default.Favorite) {
+                scope.launch {
+                    favoritesManager.clear()
+                    Toast.makeText(context, "علاقه‌مندی‌ها پاک شد", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        item {
+            SettingsActionRow("پاک کردن تاریخچه چت", "", Icons.AutoMirrored.Filled.Chat) {
+                scope.launch {
+                    chatHistoryManager.clear()
+                    Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        item { SettingsHeader("حساب کاربری", Icons.AutoMirrored.Filled.Logout, primary) }
+        item {
+            SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.Logout, color = Color.Red) {
+                scope.launch {
+                    sessionManager.clearSession()
+                    Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        item { Spacer(Modifier.height(32.dp)) }
     }
 }
 
 @Composable
-fun SettingsHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color) {
-    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+private fun SettingsHeader(title: String, icon: ImageVector, tint: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(title, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(title, color = tint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun SettingsSwitchRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(16.dp))
-        Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
+private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(title, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Switch(
-            checked = checked, 
+            checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MaterialTheme.colorScheme.primary
             )
         )
     }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
 
 @Composable
-fun SettingsActionRow(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(16.dp))
-        Column {
-            Text(title, fontSize = 14.sp)
-            Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+private fun SettingsActionRow(title: String, subtitle: String, icon: ImageVector, color: Color = MaterialTheme.colorScheme.onBackground, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(title, color = color, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
     }
-}
-
-@Composable
-fun ThemeColorsRow(selectedIndex: Int, primary: Color, onColorSelected: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        ThemeManager.themeColors.forEachIndexed { index, color ->
-            Box(Modifier.size(32.dp).clip(CircleShape).background(Color(color)).clickable { onColorSelected(index) }, contentAlignment = Alignment.Center) {
-                if (selectedIndex == index) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsDropdownRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, currentValue: String, items: @Composable (expanded: (Boolean) -> Unit) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(Modifier.fillMaxWidth().clickable { expanded = true }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp)
-            Text(currentValue, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            items { expanded = it }
-        }
-    }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
