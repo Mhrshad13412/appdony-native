@@ -183,17 +183,19 @@ private fun CommentItem(comment: Comment) {
         }
         Spacer(modifier = Modifier.width(8.dp))
         Column {
-            // 👈 اصلاح شد: استفاده از فیلد استاندارد وردپرس
+            // 👈 هندل کردن مقادیر نال‌پذیر برای جلوگیری از خطای کامپایلر
             val name = comment.author_name ?: "کاربر ناشناس"
+            val textContent = comment.content ?: "بدون متن"
+
             Text(
-                text = name.toString(),
+                text = name,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = comment.content,
+                text = textContent,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
