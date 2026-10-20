@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
@@ -57,19 +58,29 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // مختصات تقریبی بخش‌هایی که می‌خواهیم هایلایت شوند
+    // مختصات ۵ بخش مختلف
     val targetRect = when (currentStep) {
-        0 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.02f), Size(screenWidthPx * 0.8f, 60.dp.toPx())) // نوار جستجو
-        1 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.85f), Size(screenWidthPx * 0.8f, 80.dp.toPx())) // نوار پایین
-        2 -> Rect(Offset(screenWidthPx * 0.75f, screenHeightPx * 0.75f), Size(70.dp.toPx(), 70.dp.toPx())) // دستیار دکتر طاعون
-        else -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.1f), Size(screenWidthPx * 0.8f, 200.dp.toPx()))
+        0 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.02f), Size(screenWidthPx * 0.9f, 60.dp.toPx())) // نوار جستجو
+        1 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.2f), Size(screenWidthPx * 0.8f, 200.dp.toPx())) // بنرها
+        2 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.88f), Size(screenWidthPx * 0.9f, 60.dp.toPx())) // منوی پایین
+        3 -> Rect(Offset(screenWidthPx * 0.75f, screenHeightPx * 0.75f), Size(64.dp.toPx(), 64.dp.toPx())) // دستیار
+        else -> Rect(Offset(screenWidthPx * 0.7f, screenHeightPx * 0.02f), Size(60.dp.toPx(), 60.dp.toPx())) // پروفایل
+    }
+
+    val stepTitle = when (currentStep) {
+        0 -> "جستجو"
+        1 -> "ویژه و اپدونی پلاس"
+        2 -> "دسته‌بندی‌ها"
+        3 -> "دستیار دکتر طاعون"
+        else -> "حساب کاربری"
     }
 
     val stepText = when (currentStep) {
-        0 -> "از این نوار برای جستجوی سریع بازی‌ها و برنامه‌ها استفاده کنید."
-        1 -> "با این منو می‌توانید بین بخش‌های مختلف مثل بازی‌ها، برنامه‌ها و وبلاگ جابه‌جا شوید."
-        2 -> "دستیار هوشمند دکتر طاعون همیشه آماده است تا به شما کمک کند!"
-        else -> "برای دسترسی به تنظیمات، دانلودها و پروفایل خود، روی آیکون کاربر کلیک کنید."
+        0 -> "از این نوار می‌تونید هر بازی یا برنامه‌ای رو سریع پیدا کنید!"
+        1 -> "جدیدترین بازی‌ها و برنامه‌های ویژه رو از اینجا ببینید."
+        2 -> "با این منو بین بخش‌های مختلف مثل بازی‌ها، برنامه‌ها و وبلاگ جابه‌جا بشید."
+        3 -> "دستیار هوشمند ما همیشه آماده است تا در پیدا کردن برنامه‌ها کمکتون کنه."
+        else -> "با کلیک روی این آیکون وارد حساب کاربری خود بشید."
     }
 
     val spotlightAlpha by animateFloatAsState(
@@ -82,112 +93,116 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .clickable(enabled = false) {} // جلوگیری از کلیک به پشت
+            .clickable(enabled = false) {} 
     ) {
         // لایه تیره با سوراخ نورافکن
         Canvas(modifier = Modifier.fillMaxSize()) {
             val path = Path().apply {
-                // کل صفحه رو پر کن
                 addRect(Rect(Offset.Zero, size))
-                // بخش هدف رو خالی کن (سوراخ)
                 addRoundRect(
                     RoundRect(
                         rect = targetRect,
                         cornerRadius = CornerRadius(16.dp.toPx())
                     )
                 )
-                // قانون EvenOdd باعث میشه بخش دوم از بخش اول کم بشه (سوراخ بشه)
                 fillType = PathFillType.EvenOdd
             }
             
-            // رنگ تیره برای کل صفحه به جز سوراخ
+            // 👈 شفافیت رو کم کردم (0.2f) تا پشت صفحه بلور دیده بشه
             drawPath(
                 path = path,
-                color = Color.Black.copy(alpha = 0.85f * spotlightAlpha)
+                color = Color.Black.copy(alpha = 0.2f * spotlightAlpha)
             )
 
-            // کشیدن بوردر دور بخش هدف
+            // خط‌چین دور بخش هدف
             drawRoundRect(
                 color = MaterialTheme.colorScheme.primary,
                 topLeft = targetRect.topLeft,
                 size = targetRect.size,
                 cornerRadius = CornerRadius(16.dp.toPx()),
-                style = Stroke(width = 4.dp.toPx())
+                style = Stroke(
+                    width = 2.dp.toPx(), 
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 15f), 0f)
+                )
             )
         }
 
-        // باکس متن و دکمه (با توجه به موقعیت هدف، جای متن رو تنظیم می‌کنیم)
-        val cardOffsetY = if (targetRect.center.y > screenHeightPx / 2) {
-            screenHeightPx * 0.3f // اگر هدف پایین بود، متن بالاتر بره
-        } else {
-            targetRect.bottom + 32.dp.toPx() // اگر هدف بالا بود، متن پایین‌تر بره
-        }
-
+        // کادر متن (کوچیک، وسط‌چین و با دکمه وسط)
         Column(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = with(density) { cardOffsetY.toDp() })
+                .align(Alignment.Center) // 👈 کادر دقیقاً وسط صفحه قرار می‌گیره
                 .padding(horizontal = 24.dp)
-                .fillMaxWidth()
+                .widthIn(max = 320.dp) // 👈 حداکثر عرض کادر 320 دی پی
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(20.dp)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally // 👈 همه چی وسط‌چین
         ) {
             Text(
-                text = "راهنمای اپدونی (${currentStep + 1}/4)",
+                text = "مرحله ${currentStep + 1} از 5",
                 color = MaterialTheme.colorScheme.primary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stepTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stepText,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
-                textAlign = TextAlign.Right
+                textAlign = TextAlign.Center,
+                lineHeight = 24.sp
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // دکمه بعدی (دقیقاً وسط)
+            Button(
+                onClick = {
+                    if (currentStep < 4) {
+                        currentStep++
+                    } else {
+                        onFinish()
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text(
-                    text = "رد کردن",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    text = if (currentStep == 4) "پایان" else "بعدی",
+                    color = Color.White,
                     fontSize = 14.sp,
-                    modifier = Modifier.clickable { onFinish() }
+                    fontWeight = FontWeight.Bold
                 )
-                
-                Button(
-                    onClick = {
-                        if (currentStep < 3) {
-                            currentStep++
-                        } else {
-                            onFinish()
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(
-                        text = if (currentStep == 3) "متوجه شدم" else "بعدی",
-                        color = Color.White,
-                        fontSize = 14.sp
+                if (currentStep < 4) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .padding(start = 4.dp)
                     )
-                    if (currentStep < 3) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .padding(start = 4.dp)
-                        )
-                    }
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // دکمه رد کردن (زیر دکمه بعدی)
+            Text(
+                text = "رد کردن آموزش",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                fontSize = 12.sp,
+                modifier = Modifier.clickable { onFinish() }
+            )
         }
     }
 }
