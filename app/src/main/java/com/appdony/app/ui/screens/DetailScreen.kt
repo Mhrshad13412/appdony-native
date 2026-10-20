@@ -346,7 +346,7 @@ private fun DetailContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = info.description.orEmpty().ifBlank { "توضیحاتی ثبت نشده است." }, // 👈 اصلاح شد
+                text = post.content.ifBlank { "توضیحاتی ثبت نشده است." },
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
@@ -356,7 +356,7 @@ private fun DetailContent(
 
         if (!isBlog && similar.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "مشابه‌ها",
                     color = AppdonyTextPrimary,
