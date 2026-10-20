@@ -176,7 +176,9 @@ fun MainScreen(incomingIntent: Intent?) {
         val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
         val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
         val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
-        val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = false)
+        
+        // مقدار اولیه null است تا تا زمانی که دیتابیس لود نشده، تیکتوریال نمایش داده نشود
+        val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = null)
 
         var showLoginSheet by remember { mutableStateOf(false) }
         var showAccountSheet by remember { mutableStateOf(false) }
@@ -184,8 +186,14 @@ fun MainScreen(incomingIntent: Intent?) {
         var updateInfo by remember { mutableStateOf<UpdateHelper.UpdateInfo?>(null) }
         var showUpdateBanner by remember { mutableStateOf(false) }
 
+        // فقط اگر کاربر قبلا تیکتوریال را ندیده باشد نمایش داده می‌شود
+        LaunchedEffect(hasSeenOnboarding) {
+            if (hasSeenOnboarding == false) {
+                showTutorial = true
+            }
+        }
+
         LaunchedEffect(Unit) {
-            if (!hasSeenOnboarding) showTutorial = true
             val currentVersion = BuildConfig.VERSION_NAME
             val info = UpdateHelper.checkForUpdate()
             if (info != null && info.latestVersion != currentVersion) {
@@ -291,7 +299,7 @@ fun MainScreen(incomingIntent: Intent?) {
                     onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
                     onLogout = {
                         scope.launch {
-                            sessionManager.clearSession() // 👈 اصلاح شد به clearSession
+                            sessionManager.clearSession()
                             showAccountSheet = false
                             snackbarHostState.showSnackbar("از حساب خود خارج شدید")
                         }
