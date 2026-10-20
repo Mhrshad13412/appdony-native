@@ -15,11 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,7 +52,6 @@ fun AccountSheet(
     onLogout: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -82,9 +81,7 @@ fun AccountSheet(
                     )
                 }
             }
-
             Spacer(Modifier.height(8.dp))
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -108,107 +105,43 @@ fun AccountSheet(
                     )
                 }
                 Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
-                        text = displayName.ifBlank { "کاربر اپدونی" },
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = displayName,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = "@$username",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 12.sp
                     )
                 }
             }
-
-            Spacer(Modifier.height(20.dp))
-
-            AccountMenuItem(
-                icon = Icons.Default.Download,
-                title = "دانلودهای من",
-                onClick = { onDownloads(); onDismiss() }
-            )
-            AccountMenuItem(
-                icon = Icons.Default.Star,
-                title = "علاقه‌مندی‌ها",
-                onClick = { onFavorites(); onDismiss() }
-            )
-            AccountMenuItem(
-                icon = Icons.Default.Settings,
-                title = "تنظیمات",
-                onClick = { onSettings(); onDismiss() }
-            )
-            AccountMenuItem(
-                icon = Icons.Default.Help,
-                title = "راهنمای اپلیکیشن",
-                onClick = { onHelp(); onDismiss() }
-            )
-            AccountMenuItem(
-                icon = Icons.Default.Info,
-                title = "درباره اپدونی",
-                onClick = { onAbout(); onDismiss() }
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { onLogout() }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Logout,
-                    contentDescription = null,
-                    tint = Color(0xFFFF5252),
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(14.dp))
-                Text(
-                    text = "خروج از حساب",
-                    color = Color(0xFFFF5252),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            AccountRow(Icons.Default.Download, "دانلودها", onDownloads)
+            AccountRow(Icons.AutoMirrored.Filled.Help, "راهنما", onHelp)
+            AccountRow(Icons.Default.Settings, "تنظیمات", onSettings)
+            AccountRow(Icons.Default.Star, "علاقه‌مندی‌ها", onFavorites)
+            AccountRow(Icons.Default.Info, "درباره اپدونی", onAbout)
+            AccountRow(Icons.AutoMirrored.Filled.Logout, "خروج از حساب", onLogout)
         }
     }
 }
 
 @Composable
-private fun AccountMenuItem(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit
-) {
+private fun AccountRow(icon: ImageVector, title: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 14.dp),
+            .padding(vertical = 14.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
+        Spacer(Modifier.width(12.dp))
+        Text(text = title, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
     }
 }
