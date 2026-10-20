@@ -10,9 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class BlogViewModel : ViewModel() {
-
     private val repo = AppRepository()
-
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts.asStateFlow()
 
@@ -38,11 +36,9 @@ class BlogViewModel : ViewModel() {
         isLoadingData = true
         currentPage = 1
         isEndReached = false
-        
         viewModelScope.launch {
             _isLoading.value = true
             _errorMsg.value = null
-            
             repo.getBlogPosts(page = currentPage, perPage = 10)
                 .onSuccess { newPosts ->
                     _posts.value = newPosts
@@ -51,7 +47,6 @@ class BlogViewModel : ViewModel() {
                 .onFailure { err ->
                     _errorMsg.value = err.message ?: "خطا در دریافت اطلاعات"
                 }
-            
             _isLoading.value = false
             isLoadingData = false
         }
@@ -60,11 +55,9 @@ class BlogViewModel : ViewModel() {
     fun loadMore() {
         if (isLoadingData || isEndReached) return
         isLoadingData = true
-        
         viewModelScope.launch {
             _isLoadingMore.value = true
             currentPage++
-            
             repo.getBlogPosts(page = currentPage, perPage = 10)
                 .onSuccess { newPosts ->
                     if (newPosts.isEmpty()) {
@@ -77,7 +70,6 @@ class BlogViewModel : ViewModel() {
                 .onFailure {
                     currentPage-- // برگرداندن شماره صفحه در صورت خطا
                 }
-            
             _isLoadingMore.value = false
             isLoadingData = false
         }
