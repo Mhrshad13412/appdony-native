@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -176,8 +177,6 @@ fun MainScreen(incomingIntent: Intent?) {
         val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
         val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
         val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
-        
-        // مقدار اولیه null است تا تا زمانی که دیتابیس لود نشده، تیکتوریال نمایش داده نشود
         val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = null)
 
         var showLoginSheet by remember { mutableStateOf(false) }
@@ -186,7 +185,6 @@ fun MainScreen(incomingIntent: Intent?) {
         var updateInfo by remember { mutableStateOf<UpdateHelper.UpdateInfo?>(null) }
         var showUpdateBanner by remember { mutableStateOf(false) }
 
-        // فقط اگر کاربر قبلا تیکتوریال را ندیده باشد نمایش داده می‌شود
         LaunchedEffect(hasSeenOnboarding) {
             if (hasSeenOnboarding == false) {
                 showTutorial = true
@@ -205,6 +203,8 @@ fun MainScreen(incomingIntent: Intent?) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
+                // 👈 اعمال افکت بلور به کل صفحه وقتی تیکتوریال بازه
+                modifier = if (showTutorial) Modifier.blur(16.dp) else Modifier,
                 topBar = {
                     if (showChrome) {
                         Column {
