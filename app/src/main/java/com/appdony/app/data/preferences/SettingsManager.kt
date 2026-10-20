@@ -17,12 +17,14 @@ class SettingsManager(private val context: Context) {
         private val KEY_NOTIFY_BLOG = booleanPreferencesKey("notify_blog")
         private val KEY_NOTIFY_UPDATES = booleanPreferencesKey("notify_updates")
         private val KEY_START_PAGE = stringPreferencesKey("start_page")
+        private val KEY_SHOW_AI = booleanPreferencesKey("show_ai_assistant") // 👈 جدید
     }
 
     val wifiOnly: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_WIFI_ONLY] ?: false }
     val notifyBlog: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_BLOG] ?: true }
     val notifyUpdates: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_UPDATES] ?: true }
     val startPage: Flow<String> = context.settingsDataStore.data.map { it[KEY_START_PAGE] ?: "games" }
+    val showAiAssistant: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_SHOW_AI] ?: true } // 👈 جدید
 
     suspend fun setWifiOnly(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_WIFI_ONLY] = enabled }
@@ -38,5 +40,9 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setStartPage(page: String) {
         context.settingsDataStore.edit { it[KEY_START_PAGE] = page }
+    }
+
+    suspend fun setShowAiAssistant(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_SHOW_AI] = enabled }
     }
 }
