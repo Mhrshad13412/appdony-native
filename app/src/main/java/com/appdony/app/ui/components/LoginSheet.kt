@@ -66,6 +66,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
+import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -158,8 +159,8 @@ fun LoginSheet(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
                 modifier = Modifier.fillMaxWidth(),
-                // 👇 راهنمای فیلد تغییر کرد
-                placeholder = { Text("نام کاربری (نه ایمیل)", color = AppdonyTextMuted) },
+                // 👇 برگشت به حالت نام کاربری یا ایمیل
+                placeholder = { Text("نام کاربری یا ایمیل", color = AppdonyTextMuted) },
                 leadingIcon = { Icon(Icons.Default.Person, null, tint = AppdonyTextMuted) },
                 singleLine = true,
                 enabled = !loading,
@@ -231,7 +232,7 @@ fun LoginSheet(
                                             loading = false; errorMsg = "خطا: ${it.message}"
                                         }
                                     } else {
-                                        loading = false; errorMsg = "نام کاربری یا رمز عبور اشتباه است"
+                                        loading = false; errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
                                     }
                                 }
                             }
@@ -287,7 +288,7 @@ fun LoginSheet(
                                     } else errorMsg = "خطا در دریافت اطلاعات"
                                 }.onFailure { loading = false; errorMsg = "خطا: ${it.message}" }
                             } else {
-                                loading = false; errorMsg = "نام کاربری یا رمز عبور اشتباه است"
+                                loading = false; errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
                             }
                         }
                     }
