@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.InitialData
@@ -10,62 +11,88 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class HomeViewModel : ViewModel() {
-    private val repo = AppRepository()
+sealed class SectionState {
+    object NotLoaded : SectionState()
+    object Loading : SectionState()
+    data class Loaded(val posts: List<Post>) : SectionState()
+    object Error : SectionState()
+}
 
-    private val _initialData = MutableStateFlow<InitialData?>(null)
-    val initialData: StateFlow<InitialData?> = _initialData.asStateFlow()
+class HomeViewModel(
+    private val feedType: String,
+    private val context: Context
+) : ViewModel() {
+
+    private val repo = AppRepository(context)
+
+    private val _initialLoading = MutableStateFlow(true)
+    val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _plusPosts = MutableStateFlow<List<Post>>(emptyList())
     val plusPosts: StateFlow<List<Post>> = _plusPosts.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private val _featured = MutableStateFlow<List<Post>>(emptyList())
+    val featured: StateFlow<List<Post>> = _featured.asStateFlow()
 
-    private val _isLoadingMore = MutableStateFlow(false)
-    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+    private val _categories = MutableStateFlow<List<com.appdony.app.data.model.Category>>(emptyList())
+    val categories: StateFlow<List<com.appdony.app.data.model.Category>> = _categories.asStateFlow()
 
-    private var currentPage = 1
-    private var isEndReached = false
-    private var isLoadingData = false
+    private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
+    val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
 
     init {
         loadInitial()
     }
 
     fun loadInitial() {
-        if (isLoadingData) return
-        isLoadingData = true
         viewModelScope.launch {
-            _isLoading.value = true
-            repo.loadInitial("home").onSuccess { data ->
-                _initialData.value = data
-            }.onFailure {
-                // Handle error
+            _initialLoading.value = true
+            _error.value = null
+            repo.loadInitial(feedType).onSuccess { data ->
+                _featured.value = data.featured
+                _categories.value = data.categories
+                _initialLoading.value = false
+            }.onFailure { e ->
+                _error.value = e.message
+                _initialLoading.value = false
             }
-            _isLoading.value = false
-            isLoadingData = false
         }
     }
 
-    fun loadMore() {
-        if (isLoadingData || isEndReached) return
-        isLoadingData = true
+    fun refresh() {
         viewModelScope.launch {
-            _isLoadingMore.value = true
-            currentPage++
-            repo.loadPlusPosts(page = currentPage, perPage = 10).onSuccess { newPosts ->
-                if (newPosts.isEmpty()) {
-                    isEndReached = true
-                } else {
-                    _plusPosts.value = _plusPosts.value + newPosts
-                    if (newPosts.size < 10) isEndReached = true
-                }
+            _isRefreshing.value = true
+            repo.loadInitial(feedType).onSuccess { data ->
+                _featured.value = data.featured
+                _categories.value = data.categories
+                _isRefreshing.value = false
             }.onFailure {
-                currentPage--
+                _isRefreshing.value = false
             }
-            _isLoadingMore.value = false
-            isLoadingData = false
+        }
+    }
+
+    fun loadSection(categoryId: Int) {
+        viewModelScope.launch {
+            val current = _sections.value.toMutableMap()
+            current[categoryId] = SectionState.Loading
+            _sections.value = current
+
+            repo.getPostsByCategory(categoryId, 6).onSuccess { posts ->
+                val updated = _sections.value.toMutableMap()
+                updated[categoryId] = SectionState.Loaded(posts)
+                _sections.value = updated
+            }.onFailure {
+                val updated = _sections.value.toMutableMap()
+                updated[categoryId] = SectionState.Error
+                _sections.value = updated
+            }
         }
     }
 }
