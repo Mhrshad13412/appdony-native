@@ -45,6 +45,7 @@ import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
+import com.appdony.app.util.AppInfo
 import com.appdony.app.util.DownloadHelper
 import kotlinx.coroutines.launch
 
@@ -80,7 +81,7 @@ fun DetailScreen(
             onDismiss = { showLoginSheet = false },
             onLoginSuccess = { user ->
                 scope.launch {
-                    sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
+                    sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl, user.nonce)
                     showLoginSheet = false
                 }
             }
@@ -123,7 +124,6 @@ fun DetailScreen(
             }
         }
 
-        // دکمه بازگشت
         Box(
             modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape)
                 .background(Color(0xCC000000)).clickable { onBack() },
@@ -132,7 +132,6 @@ fun DetailScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
-        // دکمه علاقه‌مندی
         Box(
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(40.dp).clip(CircleShape)
                 .background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } },
@@ -166,7 +165,6 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // ۱. عکس بزرگ
         item {
             Box(
                 modifier = Modifier
@@ -192,7 +190,6 @@ private fun DetailContent(
             }
         }
 
-        // ۲. باکس تایتل (همونی که خالی شده بود)
         item {
             Row(
                 modifier = Modifier
@@ -230,9 +227,8 @@ private fun DetailContent(
             }
         }
 
-        // 🚀 ۳. بخش بازی و برنامه (غیر وبلاگ)
+        // 🚀 بخش بازی و برنامه (غیر وبلاگ)
         if (!isBlog) {
-            // ستاره‌ها
             item {
                 Column(
                     modifier = Modifier
@@ -253,7 +249,6 @@ private fun DetailContent(
                 }
             }
 
-            // نسخه
             item {
                 if (info.version != null) {
                     Row(
@@ -275,7 +270,6 @@ private fun DetailContent(
                 }
             }
 
-            // دکمه دانلود
             item {
                 val url = info.downloadUrl
                 if (!url.isNullOrBlank()) {
@@ -292,7 +286,6 @@ private fun DetailContent(
                 }
             }
 
-            // اشتراک‌گذاری
             item {
                 OutlinedButton(
                     onClick = onShare,
@@ -306,7 +299,6 @@ private fun DetailContent(
             }
         }
 
-        // 📝 ۴. متن / توضیحات
         item {
             Spacer(Modifier.height(24.dp))
             Text(
@@ -326,7 +318,6 @@ private fun DetailContent(
             )
         }
 
-        // مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(24.dp))
@@ -337,7 +328,7 @@ private fun DetailContent(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
             }
             item {
                 LazyRow(
@@ -355,7 +346,6 @@ private fun DetailContent(
             }
         }
 
-        // نظرات
         item {
             Spacer(Modifier.height(24.dp))
             CommentsSection(
