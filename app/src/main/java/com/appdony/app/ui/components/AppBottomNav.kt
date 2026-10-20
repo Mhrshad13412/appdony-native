@@ -71,7 +71,7 @@ fun AppBottomNav(
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = Color.Transparent // 👈 دایره آبی حذف شد
+                    indicatorColor = Color.Transparent // 👈 حذف دایره آبی
                 )
             )
         }
