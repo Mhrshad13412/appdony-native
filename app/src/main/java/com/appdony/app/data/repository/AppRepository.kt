@@ -16,6 +16,7 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class AppRepository(private val context: Context? = null) {
@@ -29,39 +30,80 @@ class AppRepository(private val context: Context? = null) {
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
     private val gson = Gson()
 
-    // 👈 پارامتر forceRefresh اضافه شد تا با HomeViewModel هماهنگ باشه
-    suspend fun loadInitial(page: String, forceRefresh: Boolean = false): Result<InitialData> = withContext(Dispatchers.IO) {
+    private suspend fun getCategoryId(slug: String): Int? = withContext(Dispatchers.IO) {
         try {
-            val postsReq = Request.Builder().url("${baseUrl}posts?per_page=10&_embed").build()
-            val postsBody = client.newCall(postsReq).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext Result.failure(Exception("HTTP ${resp.code}"))
-                resp.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+            val request = Request.Builder().url("${baseUrl}categories?slug=$slug").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val body = response.body?.string() ?: return@withContext null
+                val type = object : TypeToken<List<Category>>() {}.type
+                val categories: List<Category> = gson.fromJson(body, type)
+                categories.firstOrNull()?.id
             }
-            val postsType = object : TypeToken<List<Post>>() {}.type
-            val posts: List<Post> = gson.fromJson(postsBody, postsType)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
-            val catsReq = Request.Builder().url("${baseUrl}categories?per_page=20").build()
-            val catsBody = client.newCall(catsReq).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext Result.failure(Exception("HTTP ${resp.code}"))
-                resp.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+    suspend fun loadInitial(page: String): Result<InitialData> = withContext(Dispatchers.IO) {
+        try {
+            val categorySlug = if (page == "games") "game" else "app"
+            val catId = getCategoryId(categorySlug)
+            
+            val url = if (catId != null) {
+                "${baseUrl}posts?categories=$catId&per_page=10&_embed"
+            } else {
+                "${baseUrl}posts?per_page=10&_embed"
             }
-            val catsType = object : TypeToken<List<Category>>() {}.type
-            val categories: List<Category> = gson.fromJson(catsBody, catsType)
 
-            Result.success(
-                InitialData(
-                    banner = posts.firstOrNull(),
-                    singleFeature = posts.getOrNull(1),
-                    featured = posts.drop(2),
-                    categories = categories
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                
+                val catsReq = Request.Builder().url("${baseUrl}categories?per_page=20").build()
+                val catsBody = client.newCall(catsReq).execute().use { resp -> resp.body?.string() ?: "" }
+                val catsType = object : TypeToken<List<Category>>() {}.type
+                val categories: List<Category> = gson.fromJson(catsBody, catsType)
+
+                Result.success(
+                    InitialData(
+                        banner = posts.firstOrNull(),
+                        singleFeature = posts.getOrNull(1),
+                        featured = posts.drop(2),
+                        categories = categories
+                    )
                 )
-            )
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    // 👈 متدهای گم‌شده که ViewModelها نیاز داشتن
+    suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val blogId = getCategoryId("blog")
+            val url = if (blogId != null) {
+                "${baseUrl}posts?categories=$blogId&page=$page&per_page=$perPage&_embed"
+            } else {
+                "${baseUrl}posts?page=$page&per_page=$perPage&_embed"
+            }
+            
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun loadPlusPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage&_embed").build()
@@ -114,22 +156,6 @@ class AppRepository(private val context: Context? = null) {
             client.cache?.evictAll()
         } catch (e: Exception) {
             // ignore
-        }
-    }
-
-    // ... (بقیه متدهای getBlogPosts, getPostsByCategory, getPost, getComments, postComment, autoLogin, getCurrentUser دقیقاً مثل قبل اینجا قرار می‌گیرن)
-    suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage&_embed").build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
-                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
-                val type = object : TypeToken<List<Post>>() {}.type
-                val posts: List<Post> = gson.fromJson(body, type)
-                Result.success(posts)
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
