@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -93,6 +92,7 @@ fun LoginSheet(
     var rememberMe by remember { mutableStateOf(true) }
     var loading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
     var hiddenWebView by remember { mutableStateOf<WebView?>(null) }
     var webViewReady by remember { mutableStateOf(false) }
 
@@ -101,6 +101,7 @@ fun LoginSheet(
         credentialsManager.getPassword()?.let { password = it }
     }
 
+    // وب‌ویو مخفی برای لاگین
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
@@ -113,7 +114,10 @@ fun LoginSheet(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        webViewReady = true
+                        // فقط زمانی که صفحه لاگین کامل لود شد، آماده می‌شویم
+                        if (url?.contains("wp-login.php") == true) {
+                            webViewReady = true
+                        }
                     }
                 }
                 loadUrl("https://appdony.ir/wp-login.php")
@@ -136,6 +140,7 @@ fun LoginSheet(
                 .padding(top = 16.dp, bottom = 24.dp)
                 .imePadding()
         ) {
+            // هدر
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -152,18 +157,16 @@ fun LoginSheet(
                     Icon(Icons.Default.Close, contentDescription = "بستن", tint = AppdonyTextPrimary)
                 }
             }
-
             Spacer(Modifier.height(24.dp))
 
+            // فیلد نام کاربری
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
                 modifier = Modifier.fillMaxWidth(),
-                // 👇 برگشت به حالت نام کاربری یا ایمیل
                 placeholder = { Text("نام کاربری یا ایمیل", color = AppdonyTextMuted) },
                 leadingIcon = { Icon(Icons.Default.Person, null, tint = AppdonyTextMuted) },
                 singleLine = true,
-                enabled = !loading,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -175,29 +178,65 @@ fun LoginSheet(
                     disabledContainerColor = AppdonyCardBg,
                     disabledTextColor = AppdonyTextMuted
                 ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                enabled = !loading
             )
-
             Spacer(Modifier.height(12.dp))
 
+            // فیلد رمز عبور
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMsg = null },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("رمز عبور", color = AppdonyTextMuted) },
-                leadingIcon = { Icon(Icons.Default.Lock, null, tint = AppdonyTextMuted) },
-                trailingIcon = {
+                leadingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                             contentDescription = null, tint = AppdonyTextMuted
                         )
                     }
                 },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { Icon(Icons.Default.Lock, null, tint = AppdonyTextMuted) },
                 singleLine = true,
-                enabled = !loading,
                 shape = RoundedCornerShape(14.dp),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (!loading && webViewReady) {
+                        loading = true
+                        errorMsg = null
+                        hiddenWebView?.evaluateJavascript(buildLoginJs(username, password)) {
+                            scope.launch {
+                                delay(3000) // زمان برای ریدایرکت و دریافت کوکی
+                                val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+                                if (cookies.contains("wordpress_logged_in")) {
+                                    val repo = AppRepository(context)
+                                    val result = withContext(Dispatchers.IO) { repo.getCurrentUser() }
+                                    result.onSuccess { user ->
+                                        if (user.id > 0) {
+                                            if (rememberMe) {
+                                                credentialsManager.saveCredentials(username, password)
+                                            } else {
+                                                credentialsManager.clearCredentials()
+                                            }
+                                            onLoginSuccess(user)
+                                            onDismiss()
+                                        } else {
+                                            errorMsg = "خطا در دریافت اطلاعات"
+                                        }
+                                    }.onFailure {
+                                        errorMsg = "خطا: ${it.message}"
+                                    }
+                                } else {
+                                    errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
+                                }
+                                loading = false
+                            }
+                        }
+                    } else if (!webViewReady) {
+                        errorMsg = "لطفاً چند لحظه صبر کنید تا صفحه آماده شود..."
+                    }
+                }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = AppdonyCardBg,
@@ -208,39 +247,11 @@ fun LoginSheet(
                     disabledContainerColor = AppdonyCardBg,
                     disabledTextColor = AppdonyTextMuted
                 ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        if (webViewReady && !loading && username.isNotBlank() && password.isNotBlank()) {
-                            val wv = hiddenWebView ?: return@KeyboardActions
-                            loading = true; errorMsg = null
-                            wv.evaluateJavascript(buildLoginJs(username, password)) {
-                                scope.launch {
-                                    delay(2500)
-                                    val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
-                                    if (cookies.contains("wordpress_logged_in")) {
-                                        val repo = AppRepository(context)
-                                        val result = withContext(Dispatchers.IO) { repo.getCurrentUser() }
-                                        result.onSuccess { user ->
-                                            loading = false
-                                            if (user.id > 0) {
-                                                if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                                else credentialsManager.clearCredentials()
-                                                onLoginSuccess(user)
-                                            } else errorMsg = "خطا در دریافت اطلاعات"
-                                        }.onFailure {
-                                            loading = false; errorMsg = "خطا: ${it.message}"
-                                        }
-                                    } else {
-                                        loading = false; errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                )
+                enabled = !loading
             )
 
+            // چک‌باکس مرا به خاطر بسپار
+            Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -258,73 +269,87 @@ fun LoginSheet(
                 )
             }
 
+            // نمایش خطا
             if (errorMsg != null) {
                 Spacer(Modifier.height(10.dp))
-                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x33FF5252)).padding(12.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0x33FF5252))
+                        .padding(12.dp)
+                ) {
                     Text(errorMsg!!, color = Color(0xFFFF8A80), fontSize = 13.sp)
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
+            // دکمه ورود
             Button(
                 onClick = {
-                    if (!webViewReady) { errorMsg = "لطفاً چند لحظه صبر کن..."; return@Button }
-                    val wv = hiddenWebView ?: return@Button
-                    loading = true; errorMsg = null
-                    wv.evaluateJavascript(buildLoginJs(username, password)) {
+                    if (!webViewReady) {
+                        errorMsg = "لطفاً چند لحظه صبر کنید..."
+                        return@Button
+                    }
+                    loading = true
+                    errorMsg = null
+                    hiddenWebView?.evaluateJavascript(buildLoginJs(username, password)) {
                         scope.launch {
-                            delay(2500)
+                            delay(3000)
                             val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
                             if (cookies.contains("wordpress_logged_in")) {
                                 val repo = AppRepository(context)
                                 val result = withContext(Dispatchers.IO) { repo.getCurrentUser() }
                                 result.onSuccess { user ->
-                                    loading = false
                                     if (user.id > 0) {
-                                        if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                        else credentialsManager.clearCredentials()
+                                        if (rememberMe) {
+                                            credentialsManager.saveCredentials(username, password)
+                                        } else {
+                                            credentialsManager.clearCredentials()
+                                        }
                                         onLoginSuccess(user)
-                                    } else errorMsg = "خطا در دریافت اطلاعات"
-                                }.onFailure { loading = false; errorMsg = "خطا: ${it.message}" }
+                                        onDismiss()
+                                    } else {
+                                        errorMsg = "خطا در دریافت اطلاعات"
+                                    }
+                                }.onFailure {
+                                    errorMsg = "خطا: ${it.message}"
+                                }
                             } else {
-                                loading = false; errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
+                                errorMsg = "نام کاربری/ایمیل یا رمز عبور اشتباه است"
                             }
+                            loading = false
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = !loading && username.isNotBlank() && password.isNotBlank(),
+                enabled = !loading && username.isNotBlank() && password.isNotBlank() && webViewReady,
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, disabledContainerColor = AppdonyCardBg)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = AppdonyCardBg
+                )
             ) {
-                if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
-                else Text("ورود", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (loading) {
+                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                } else {
+                    Text("ورود", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
 
+// تابع ساخت جاوااسکریپت برای پر کردن فرم
 private fun buildLoginJs(username: String, password: String): String {
     val safeUser = username.replace("'", "\\'").replace("\n", "")
     val safePass = password.replace("'", "\\'").replace("\n", "")
     return """
-        javascript:(function() {
-            var userField = document.getElementById('user_login');
-            var passField = document.getElementById('user_pass');
-            var submitBtn = document.getElementById('wp-submit');
-            var remember = document.getElementById('rememberme');
-            if (remember) { remember.checked = true; }
-            if (userField && passField && submitBtn) {
-                userField.value = '$safeUser';
-                passField.value = '$safePass';
-                var event = new Event('input', { bubbles: true });
-                userField.dispatchEvent(event);
-                passField.dispatchEvent(event);
-                submitBtn.click();
-                return 'ok';
-            }
-            return 'error';
-        })();
+        javascript:(function(){
+            document.getElementById('user_login').value = '$safeUser';
+            document.getElementById('user_pass').value = '$safePass';
+            document.getElementById('wp-submit').click();
+        })()
     """.trimIndent()
 }
