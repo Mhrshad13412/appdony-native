@@ -183,19 +183,16 @@ private fun CommentItem(comment: Comment) {
         }
         Spacer(modifier = Modifier.width(8.dp))
         Column {
-            // 👈 هندل کردن مقادیر نال‌پذیر برای جلوگیری از خطای کامپایلر
-            val name = comment.author_name ?: "کاربر ناشناس"
-            val textContent = comment.content ?: "بدون متن"
-
             Text(
-                text = name,
+                text = comment.author_name,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = textContent,
+                // 👈 استفاده از cleanContent() به جای content خام
+                text = comment.cleanContent(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
