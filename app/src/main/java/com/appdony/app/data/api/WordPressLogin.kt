@@ -10,13 +10,9 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 object WordPressLogin {
-
     private const val LOGIN_URL = "https://appdony.ir/wp-login.php"
     private const val ADMIN_URL = "https://appdony.ir/wp-admin/"
     private const val API_USER_URL = "https://appdony.ir/wp-json/wp/v2/users/me?context=edit"
-    private const val USER_AGENT =
-        "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
     suspend fun login(username: String, password: String): Result<UserData> =
         withContext(Dispatchers.IO) {
@@ -30,21 +26,19 @@ object WordPressLogin {
                     .cookieJar(jar)
                     .connectTimeout(60, TimeUnit.SECONDS)
                     .readTimeout(60, TimeUnit.SECONDS)
-                    .writeTimeout(60, TimeUnit.SECONDS)
                     .followRedirects(true)
-                    .retryOnConnectionFailure(true)
                     .build()
 
-                // ۱. دریافت کوکی اولیه
+                // ۱. اول یه درخواست GET بزنیم تا کوکی‌های اولیه ست بشن
                 client.newCall(
                     Request.Builder()
                         .url(LOGIN_URL)
-                        .header("User-Agent", USER_AGENT)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
                         .get()
                         .build()
                 ).execute().use { it.body?.close() }
 
-                // ۲. ارسال اطلاعات ورود
+                // ۲. حالا فرم لاگین رو با اطلاعات کاربر پر می‌کنیم
                 val form = FormBody.Builder()
                     .add("log", username)
                     .add("pwd", password)
@@ -53,44 +47,36 @@ object WordPressLogin {
                     .add("testcookie", "1")
                     .build()
 
-                client.newCall(
+                val postResponse = client.newCall(
                     Request.Builder()
                         .url(LOGIN_URL)
-                        .header("User-Agent", USER_AGENT)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
                         .header("Referer", LOGIN_URL)
                         .header("Origin", "https://appdony.ir")
-                        .header("Content-Type", "application/x-www-form-urlencoded")
                         .post(form)
                         .build()
-                ).execute().use { it.body?.close() }
+                ).execute()
 
-                // ۳. بررسی وجود کوکی لاگین (اصلاح شد)
                 val cookies = jar.loadForRequest(LOGIN_URL.toHttpUrl())
                 val loggedIn = cookies.any { it.name.startsWith("wordpress_logged_in") }
 
                 if (!loggedIn) {
-                    return@withContext Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است"))
+                    return@withContext Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است. (توجه: وردپرس به طور پیش‌فرض ورود با ایمیل را قبول نمی‌کند، لطفاً نام کاربری خود را وارد کنید)"))
                 }
 
-                // ۴. دریافت اطلاعات کاربر
-                val userJson = try {
-                    client.newCall(
-                        Request.Builder()
-                            .url(API_USER_URL)
-                            .header("User-Agent", USER_AGENT)
-                            .header("Accept", "application/json")
-                            .get()
-                            .build()
-                    ).execute().use { resp ->
-                        if (resp.isSuccessful) resp.body?.string() else null
-                    }
-                } catch (e: Exception) {
-                    null
+                // ۳. حالا اطلاعات کاربر رو از API بگیریم
+                val userJson = client.newCall(
+                    Request.Builder()
+                        .url(API_USER_URL)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
+                        .get()
+                        .build()
+                ).execute().use { resp ->
+                    if (resp.isSuccessful) resp.body?.string() else null
                 }
 
                 if (userJson.isNullOrBlank()) {
-                    val fallback = UserData(username = username, name = username)
-                    return@withContext Result.success(fallback)
+                    return@withContext Result.success(UserData(username = username, name = username))
                 }
 
                 val user = parseUser(userJson)
