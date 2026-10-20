@@ -14,13 +14,12 @@ import java.util.concurrent.TimeUnit
 
 class AppRepository(private val context: Context? = null) {
 
-    // 👈 این بخش خطای Required SETTINGS preface not received رو رفع می‌کنه
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1)) // اجبار به استفاده از HTTP/1.1
+            .protocols(listOf(Protocol.HTTP_1_1))
             .build()
     }
 
@@ -37,7 +36,7 @@ class AppRepository(private val context: Context? = null) {
                 val posts = mutableListOf<Post>()
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
-                    posts.add(Post.fromJson(obj))
+                    posts.add(Post.fromJson(obj)) // 👈 فرض بر این است که این متد در دیتاکلاس Post وجود دارد
                 }
                 posts
             }
@@ -46,15 +45,14 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // 👈 این متد اصلاح شد تا کوکی‌ها و توکن رو دریافت کنه و ارور 401 رفع بشه
     suspend fun getCurrentUser(cookies: String = "", nonce: String = ""): Result<UserData> = withContext(Dispatchers.IO) {
         try {
             val requestBuilder = Request.Builder()
                 .url("${baseUrl}users/me")
-                .addHeader("Cookie", cookies) // پاس دادن کوکی‌های وب‌ویو
+                .addHeader("Cookie", cookies)
                 
             if (nonce.isNotBlank()) {
-                requestBuilder.addHeader("X-WP-Nonce", nonce) // پاس دادن توکن امنیتی
+                requestBuilder.addHeader("X-WP-Nonce", nonce)
             }
 
             val request = requestBuilder.build()
@@ -65,13 +63,14 @@ class AppRepository(private val context: Context? = null) {
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val obj = JSONObject(body)
                 
+                // 👈 سازگار با دیتاکلاس UserData شما
                 val user = UserData(
                     id = obj.optInt("id"),
                     username = obj.optString("slug"),
                     name = obj.optString("name"),
                     email = obj.optString("email"),
                     avatarUrl = obj.optJSONObject("avatar_urls")?.optString("96") ?: "",
-                    nonce = nonce // ذخیره توکن برای کامنت‌ها
+                    nonce = nonce
                 )
                 Result.success(user)
             }
