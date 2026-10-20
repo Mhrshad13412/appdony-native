@@ -345,9 +345,11 @@ private fun DetailContent(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
+            
+            // 👈 اصلاح نهایی: تبدیل امن به رشته و جلوگیری از خطای تایپ
+            val contentString = post.content?.toString() ?: ""
             Text(
-                // 👈 خط اصلاح شده (حذف orEmpty)
-                text = post.content.ifBlank { "توضیحاتی ثبت نشده است." }, 
+                text = contentString.ifBlank { "توضیحاتی ثبت نشده است." },
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
