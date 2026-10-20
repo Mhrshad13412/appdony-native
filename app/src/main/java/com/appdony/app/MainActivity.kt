@@ -271,7 +271,7 @@ fun MainScreen(incomingIntent: Intent?) {
                     onDismiss = { showLoginSheet = false },
                     onLoginSuccess = { user ->
                         scope.launch {
-                            sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
+                            sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl, user.nonce)
                             showLoginSheet = false
                             snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} ")
                         }
