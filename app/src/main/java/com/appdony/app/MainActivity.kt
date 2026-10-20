@@ -52,7 +52,6 @@ import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
-import com.appdony.app.ui.components.CircularRevealAnimation
 import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
@@ -115,12 +114,10 @@ fun MainScreen(incomingIntent: Intent?) {
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
 
-    // 👇 دریافت تنظیمات از SettingsManager
     val settingsManager = remember { SettingsManager(context) }
     val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
 
-    // 👇 درخواست اجازه نوتیفیکیشن و راه‌اندازی WorkManager
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -135,7 +132,6 @@ fun MainScreen(incomingIntent: Intent?) {
         )
     }
 
-    // 👇 پردازش لینک‌های ورودی (Deep Link و Shortcuts)
     LaunchedEffect(incomingIntent) {
         incomingIntent?.data?.let { uri ->
             val postId = uri.getQueryParameter("p")
@@ -146,7 +142,6 @@ fun MainScreen(incomingIntent: Intent?) {
         }
     }
 
-    // 👇 پیش‌بارگذاری دیتا و عکس‌ها برای اسپلش اسکرین
     LaunchedEffect(Unit) {
         val repo = AppRepository(context)
         val result = repo.loadInitial("games")
@@ -187,7 +182,6 @@ fun MainScreen(incomingIntent: Intent?) {
         var showTutorial by remember { mutableStateOf(false) }
         var updateInfo by remember { mutableStateOf<UpdateHelper.UpdateInfo?>(null) }
         var showUpdateBanner by remember { mutableStateOf(false) }
-        var transitionTarget by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             if (!hasSeenOnboarding) showTutorial = true
@@ -232,7 +226,14 @@ fun MainScreen(incomingIntent: Intent?) {
                     if (showChrome) {
                         AppBottomNav(
                             currentRoute = currentRoute,
-                            onTabSelected = { route -> transitionTarget = route }
+                            onTabSelected = { route -> 
+                                // 👇 ناوبری مستقیم بدون انیمیشن دایره‌ای رنگی
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
                         )
                     }
                 },
@@ -241,7 +242,6 @@ fun MainScreen(incomingIntent: Intent?) {
                 Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     AppNavGraph(navController = navController, startDestination = startPage)
                     
-                    // 👇 اعمال شرط showAiAssistant
                     if (showChrome && !showTutorial && showAiAssistant) {
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
                             FloatingAssistant(
@@ -253,20 +253,6 @@ fun MainScreen(incomingIntent: Intent?) {
                         }
                     }
                 }
-            }
-
-            transitionTarget?.let { target ->
-                CircularRevealAnimation(
-                    targetRoute = target,
-                    onAnimationEnd = {
-                        navController.navigate(target) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        transitionTarget = null
-                    }
-                )
             }
 
             if (showTutorial) {
