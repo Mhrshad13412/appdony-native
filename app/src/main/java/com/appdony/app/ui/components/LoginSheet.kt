@@ -64,18 +64,15 @@ fun LoginSheet(
     var hiddenWebView by remember { mutableStateOf<WebView?>(null) }
     var isLoginSubmitted by remember { mutableStateOf(false) }
 
-    // پر کردن خودکار فیلدها در صورت وجود
     LaunchedEffect(Unit) {
         credentialsManager.getUsername()?.let { username = it }
         credentialsManager.getPassword()?.let { password = it }
         
-        // اگر اطلاعات ذخیره شده بود، به صورت خودکار لاگین کن
         if (username.isNotBlank() && password.isNotBlank()) {
             isLoginSubmitted = true
         }
     }
 
-    // وب‌ویو مخفی
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
@@ -88,10 +85,8 @@ fun LoginSheet(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        
                         if (url == null) return
 
-                        // ۱. اگر در صفحه لاگین هستیم و قبلا سابمیت کردیم
                         if (url.contains("wp-login.php") && isLoginSubmitted) {
                             loading = true
                             val safeUser = username.replace("'", "\\'").replace("\n", "")
@@ -105,9 +100,7 @@ fun LoginSheet(
                             """.trimIndent(), null)
                             isLoginSubmitted = false 
                         } 
-                        // ۲. اگر از صفحه لاگین خارج شدیم یعنی موفق بودیم
                         else if (!url.contains("wp-login.php") && loading) {
-                            // استخراج Nonce از صفحه
                             view?.evaluateJavascript("""
                                 (function() {
                                     var nonce = '';
@@ -131,7 +124,7 @@ fun LoginSheet(
                                         if (user.id > 0) {
                                             if (rememberMe) credentialsManager.saveCredentials(username, password)
                                             else credentialsManager.clearCredentials()
-                                            onLoginSuccess(user.copy(nonce = cleanNonce))
+                                            onLoginSuccess(user)
                                             onDismiss()
                                         } else {
                                             errorMsg = "اطلاعات کاربری یافت نشد."
@@ -157,14 +150,13 @@ fun LoginSheet(
         loading = true
         errorMsg = null
         isLoginSubmitted = true
-        // ریلود صفحه لاگین برای شروع پروسه
         hiddenWebView?.loadUrl("https://appdony.ir/wp-login.php")
     }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface, // 👈 پس‌زمینه تیره شد
         dragHandle = null
     ) {
         Column(
@@ -174,7 +166,6 @@ fun LoginSheet(
                 .padding(top = 16.dp, bottom = 24.dp)
                 .imePadding()
         ) {
-            // هدر
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -193,7 +184,6 @@ fun LoginSheet(
             }
             Spacer(Modifier.height(24.dp))
 
-            // نام کاربری
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
@@ -214,7 +204,6 @@ fun LoginSheet(
             )
             Spacer(Modifier.height(12.dp))
 
-            // رمز عبور
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMsg = null },
@@ -245,7 +234,6 @@ fun LoginSheet(
                 enabled = !loading
             )
 
-            // مرا به خاطر بسپار
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { rememberMe = !rememberMe },
@@ -259,7 +247,6 @@ fun LoginSheet(
                 Text("مرا به خاطر بسپار (ورود خودکار)", color = AppdonyTextMuted, fontSize = 13.sp)
             }
 
-            // نمایش خطا
             if (errorMsg != null) {
                 Spacer(Modifier.height(10.dp))
                 Box(
@@ -271,7 +258,6 @@ fun LoginSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            // دکمه ورود
             Button(
                 onClick = { submitLogin() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
