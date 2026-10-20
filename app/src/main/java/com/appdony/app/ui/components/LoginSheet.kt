@@ -62,6 +62,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView // 👈 این خط جا افتاده بود
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
@@ -95,7 +96,6 @@ fun LoginSheet(
     var hiddenWebView by remember { mutableStateOf<WebView?>(null) }
     var webViewReady by remember { mutableStateOf(false) }
 
-    // پر کردن خودکار فیلدها اگر قبلا ذخیره شده باشد
     LaunchedEffect(Unit) {
         credentialsManager.getUsername()?.let { username = it }
         credentialsManager.getPassword()?.let { password = it }
@@ -223,7 +223,6 @@ fun LoginSheet(
                                         result.onSuccess { user ->
                                             loading = false
                                             if (user.id > 0) {
-                                                // 👇 ذخیره رمز عبور
                                                 if (rememberMe) credentialsManager.saveCredentials(username, password)
                                                 else credentialsManager.clearCredentials()
                                                 onLoginSuccess(user)
@@ -241,7 +240,6 @@ fun LoginSheet(
                 )
             )
 
-            // 👇 چک‌باکس ذخیره رمز
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -283,7 +281,6 @@ fun LoginSheet(
                                 result.onSuccess { user ->
                                     loading = false
                                     if (user.id > 0) {
-                                        // 👇 ذخیره رمز عبور
                                         if (rememberMe) credentialsManager.saveCredentials(username, password)
                                         else credentialsManager.clearCredentials()
                                         onLoginSuccess(user)
@@ -316,7 +313,7 @@ private fun buildLoginJs(username: String, password: String): String {
             var passField = document.getElementById('user_pass');
             var submitBtn = document.getElementById('wp-submit');
             var remember = document.getElementById('rememberme');
-            if (remember) { remember.checked = true; } // 👈 به زور تیک می‌زنیم
+            if (remember) { remember.checked = true; }
             if (userField && passField && submitBtn) {
                 userField.value = '$safeUser';
                 passField.value = '$safePass';
