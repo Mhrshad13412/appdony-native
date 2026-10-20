@@ -47,7 +47,7 @@ object WordPressLogin {
                     .add("testcookie", "1")
                     .build()
 
-                val postResponse = client.newCall(
+                client.newCall(
                     Request.Builder()
                         .url(LOGIN_URL)
                         .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
@@ -55,7 +55,7 @@ object WordPressLogin {
                         .header("Origin", "https://appdony.ir")
                         .post(form)
                         .build()
-                ).execute()
+                ).execute().use { it.body?.close() }
 
                 val cookies = jar.loadForRequest(LOGIN_URL.toHttpUrl())
                 val loggedIn = cookies.any { it.name.startsWith("wordpress_logged_in") }
@@ -80,9 +80,7 @@ object WordPressLogin {
                 }
 
                 val user = parseUser(userJson)
-                if (user != null) Result.success(user)
-                else Result.success(UserData(username = username, name = username))
-
+                if (user != null) Result.success(user) else Result.success(UserData(username = username, name = username))
             } catch (e: Exception) {
                 Result.failure(Exception("خطا در اتصال: ${e.message}"))
             }
@@ -93,15 +91,8 @@ object WordPressLogin {
         val username = Regex(""""username"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
         val name = Regex(""""name"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
         val email = Regex(""""email"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-        val nonce = Regex(""""nonce"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-        val avatar = Regex(""""96"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-
-        return if (id > 0 && username.isNotBlank())
-            UserData(
-                id = id, username = username, name = name, email = email,
-                nonce = nonce,
-                avatarUrls = if (avatar.isNotBlank()) mapOf("96" to avatar) else null
-            )
-        else null
+        return if (id > 0 || username.isNotBlank()) {
+            UserData(id = id, username = username, name = name, email = email, nonce = "")
+        } else null
     }
-                           }
+                          }
