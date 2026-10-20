@@ -62,11 +62,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView // 👈 این خط جا افتاده بود
+import androidx.compose.ui.viewinterop.AndroidView
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
-import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -159,7 +158,8 @@ fun LoginSheet(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("نام کاربری یا ایمیل", color = AppdonyTextMuted) },
+                // 👇 راهنمای فیلد تغییر کرد
+                placeholder = { Text("نام کاربری (نه ایمیل)", color = AppdonyTextMuted) },
                 leadingIcon = { Icon(Icons.Default.Person, null, tint = AppdonyTextMuted) },
                 singleLine = true,
                 enabled = !loading,
