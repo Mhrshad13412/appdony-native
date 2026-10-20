@@ -13,7 +13,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-// 👈 دیتاکلاس HomeData که در MainActivity استفاده شده بود
 data class HomeData(
     val banner: Post? = null,
     val singleFeature: Post? = null,
@@ -27,14 +26,13 @@ class AppRepository(private val context: Context? = null) {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1)) // اجبار به HTTP/1.1 برای رفع خطای وبلاگ
+            .protocols(listOf(Protocol.HTTP_1_1)) // 👈 رفع خطای Required SETTINGS preface در وبلاگ
             .build()
     }
 
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
     private val gson = Gson()
 
-    // 👈 متد loadInitial که MainActivity به آن نیاز داشت
     suspend fun loadInitial(page: String): Result<HomeData> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}posts?per_page=10").build()
@@ -56,7 +54,6 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // 👈 متد getBlogPosts که BlogViewModel به آن نیاز داشت
     suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}posts?page=$page&per_page=$perPage").build()
@@ -72,7 +69,6 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // 👈 متد getCurrentUser برای لاگین (با پاس دادن کوکی و توکن)
     suspend fun getCurrentUser(cookies: String = "", nonce: String = ""): Result<UserData> = withContext(Dispatchers.IO) {
         try {
             val requestBuilder = Request.Builder()
@@ -89,10 +85,17 @@ class AppRepository(private val context: Context? = null) {
                     return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 }
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val obj = JSONObject(body)
                 
-                // استفاده از Gson برای تبدیل خودکار (چون UserData فیلدهای @SerializedName دارد)
-                val user: UserData = gson.fromJson(body, UserData::class.java)
-                Result.success(user.copy(nonce = nonce))
+                val user = UserData(
+                    id = obj.optInt("id"),
+                    username = obj.optString("slug"),
+                    name = obj.optString("name"),
+                    email = obj.optString("email"),
+                    avatarUrl = obj.optJSONObject("avatar_urls")?.optString("96") ?: "",
+                    nonce = nonce
+                )
+                Result.success(user)
             }
         } catch (e: Exception) {
             Result.failure(e)
