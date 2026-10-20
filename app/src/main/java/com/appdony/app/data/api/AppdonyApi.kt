@@ -23,7 +23,6 @@ data class CommentRequest(
 private const val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_links,_embedded"
 
 interface AppdonyApi {
-
     @GET("wp-json/wp/v2/users/me?context=edit")
     suspend fun getCurrentUser(): UserData
 
@@ -57,7 +56,6 @@ interface AppdonyApi {
         @Query("_embed") embed: Int = 1
     ): Post
 
-    // 👇 پارامترهای مرتب‌سازی اضافه شدن
     @GET("wp-json/wp/v2/posts")
     suspend fun getPostsByCategory(
         @Query("categories") categoryId: Int,
@@ -104,9 +102,7 @@ interface AppdonyApi {
     @GET("wp-json/wp/v2/comments")
     suspend fun getComments(
         @Query("post") postId: Int,
-        @Query("per_page") perPage: Int = 50,
-        @Query("orderby") orderBy: String = "date",
-        @Query("order") order: String = "desc"
+        @Query("per_page") perPage: Int = 50
     ): List<Comment>
 
     @POST("wp-json/wp/v2/comments")
