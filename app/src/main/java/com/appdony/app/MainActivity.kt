@@ -288,7 +288,14 @@ fun MainScreen(incomingIntent: Intent?) {
                     onSettings = { navController.navigate("settings") },
                     onFavorites = { navController.navigate("favorites") },
                     onHelp = { showTutorial = true },
-                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } }
+                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
+                    onLogout = {
+                        scope.launch {
+                            sessionManager.logout() // 👈 پارامتر لاگ‌اوت اضافه شد
+                            showAccountSheet = false
+                            snackbarHostState.showSnackbar("از حساب خود خارج شدید")
+                        }
+                    }
                 )
             }
         }
