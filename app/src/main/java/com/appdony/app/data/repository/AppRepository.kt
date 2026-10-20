@@ -3,13 +3,14 @@ package com.appdony.app.data.repository
 import android.content.Context
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.UserData
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -20,18 +21,14 @@ data class HomeData(
 )
 
 class AppRepository(private val context: Context? = null) {
-
-    private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1)) // 👈 رفع خطای Required SETTINGS preface در وبلاگ
-            .build()
-    }
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .protocols(listOf(Protocol.HTTP_1_1)) // رفع خطای شبکه وبلاگ
+        .build()
 
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
-    private val gson = Gson()
 
     suspend fun loadInitial(page: String): Result<HomeData> = withContext(Dispatchers.IO) {
         try {
@@ -39,15 +36,12 @@ class AppRepository(private val context: Context? = null) {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
-                val type = object : TypeToken<List<Post>>() {}.type
-                val posts: List<Post> = gson.fromJson(body, type)
-                
-                val homeData = HomeData(
-                    banner = posts.firstOrNull(),
-                    singleFeature = posts.getOrNull(1),
-                    featured = posts.drop(2)
-                )
-                Result.success(homeData)
+                val jsonArray = JSONArray(body)
+                val posts = mutableListOf<Post>()
+                for (i in 0 until jsonArray.length()) {
+                    posts.add(Post.fromJson(jsonArray.getJSONObject(i)))
+                }
+                Result.success(HomeData(posts.getOrNull(0), posts.getOrNull(1), posts.drop(2)))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -60,9 +54,81 @@ class AppRepository(private val context: Context? = null) {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
-                val type = object : TypeToken<List<Post>>() {}.type
-                val posts: List<Post> = gson.fromJson(body, type)
+                val jsonArray = JSONArray(body)
+                val posts = mutableListOf<Post>()
+                for (i in 0 until jsonArray.length()) {
+                    posts.add(Post.fromJson(jsonArray.getJSONObject(i)))
+                }
                 Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCategoryPosts(categoryId: Int, page: Int = 1): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?categories=$categoryId&page=$page&per_page=20").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val jsonArray = JSONArray(body)
+                val posts = mutableListOf<Post>()
+                for (i in 0 until jsonArray.length()) {
+                    posts.add(Post.fromJson(jsonArray.getJSONObject(i)))
+                }
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPostDetails(postId: Int): Result<Post> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts/$postId").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                Result.success(Post.fromJson(JSONObject(body)))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getComments(postId: Int): Result<List<JSONObject>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}comments?post=$postId&per_page=50").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val jsonArray = JSONArray(body)
+                val comments = mutableListOf<JSONObject>()
+                for (i in 0 until jsonArray.length()) {
+                    comments.add(jsonArray.getJSONObject(i))
+                }
+                Result.success(comments)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addComment(postId: Int, content: String, nonce: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                put("post", postId)
+                put("content", content)
+            }
+            val requestBody = json.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url("${baseUrl}comments")
+                .addHeader("X-WP-Nonce", nonce)
+                .post(requestBody)
+                .build()
+            client.newCall(request).execute().use { response ->
+                Result.success(response.isSuccessful)
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -74,19 +140,12 @@ class AppRepository(private val context: Context? = null) {
             val requestBuilder = Request.Builder()
                 .url("${baseUrl}users/me")
                 .addHeader("Cookie", cookies)
-                
-            if (nonce.isNotBlank()) {
-                requestBuilder.addHeader("X-WP-Nonce", nonce)
-            }
-
+            if (nonce.isNotBlank()) requestBuilder.addHeader("X-WP-Nonce", nonce)
             val request = requestBuilder.build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("HTTP ${response.code}"))
-                }
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val obj = JSONObject(body)
-                
                 val user = UserData(
                     id = obj.optInt("id"),
                     username = obj.optString("slug"),
