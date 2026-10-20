@@ -23,13 +23,12 @@ class AppRepository(private val context: Context? = null) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
-        .protocols(listOf(Protocol.HTTP_1_1)) // رفع خطای Required SETTINGS preface
+        .protocols(listOf(Protocol.HTTP_1_1))
         .build()
 
     private val baseUrl = "https://appdony.ir/wp-json/wp/v2/"
     private val gson = Gson()
 
-    // پیدا کردن ID دسته‌بندی با استفاده از اسلاگ (مثلاً "game" یا "app")
     private suspend fun getCategoryId(slug: String): Int? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}categories?slug=$slug").build()
@@ -45,29 +44,23 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // لود اولیه صفحه اصلی (بازی‌ها یا برنامه‌ها) با فیلتر دسته‌بندی دقیق
     suspend fun loadInitial(page: String): Result<InitialData> = withContext(Dispatchers.IO) {
         try {
-            // اسلاگ دسته‌بندی رو بر اساس نوع صفحه انتخاب می‌کنیم
             val categorySlug = if (page == "games") "game" else "app"
             val catId = getCategoryId(categorySlug)
+            val plusCatId = getCategoryId("appdony-plus")
 
-            // اگر ID دسته‌بندی پیدا شد، فقط پست‌های همون دسته رو می‌گیریم
-            val url = if (catId != null) {
-                "${baseUrl}posts?categories=$catId&per_page=10&_embed"
-            } else {
-                // اگر پیدا نشد، همه پست‌ها رو می‌گیریم (برای اطمینان)
-                "${baseUrl}posts?per_page=10&_embed"
-            }
+            val urlBuilder = StringBuilder("${baseUrl}posts?per_page=10&_embed")
+            if (catId != null) urlBuilder.append("&categories=$catId")
+            if (plusCatId != null) urlBuilder.append("&categories_exclude=$plusCatId")
 
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder().url(urlBuilder.toString()).build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
                 val posts: List<Post> = gson.fromJson(body, type)
-
-                // همچنین لیست دسته‌بندی‌ها رو برای نمایش در صفحه اصلی می‌گیریم
+                
                 val catsReq = Request.Builder().url("${baseUrl}categories?per_page=20").build()
                 val catsBody = client.newCall(catsReq).execute().use { resp -> resp.body?.string() ?: "" }
                 val catsType = object : TypeToken<List<Category>>() {}.type
@@ -87,10 +80,31 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // دریافت پست‌های وبلاگ از نوع پست سفارشی (Custom Post Type) "blog"
+    suspend fun loadPlusPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val plusCatId = getCategoryId("appdony-plus")
+            if (plusCatId == null) {
+                return@withContext Result.success(emptyList())
+            }
+            
+            val request = Request.Builder()
+                .url("${baseUrl}posts?categories=$plusCatId&page=$page&per_page=$perPage&_embed")
+                .build()
+                
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
-            // آدرس اختصاصی API وبلاگ
             val request = Request.Builder()
                 .url("${baseUrl}blog?page=$page&per_page=$perPage&_embed")
                 .build()
@@ -106,7 +120,6 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // دریافت یک پست وبلاگ خاص با ID
     suspend fun getBlogPost(postId: Int): Result<Post> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("${baseUrl}blog/$postId?_embed").build()
@@ -121,10 +134,135 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    // بقیه متدها (getPostsByCategory, getPost, getComments, postComment و ...) بدون تغییر باقی می‌مونن
-    // ...
+    suspend fun searchPosts(query: String): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?search=$query&per_page=20&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
-    // لاگین خودکار (اصلاح شده برای برگرداندن Nonce)
+    suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            if (ids.isEmpty()) return@withContext Result.success(emptyList())
+            val idsString = ids.joinToString(",")
+            val request = Request.Builder().url("${baseUrl}posts?include=$idsString&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun clearCache() {
+        try {
+            client.cache?.evictAll()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    suspend fun getPostsByCategory(categoryId: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts?categories=$categoryId&per_page=$perPage&_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPostsByCategoryPaged(
+        categoryId: Int,
+        page: Int,
+        perPage: Int,
+        orderBy: String = "date",
+        order: String = "desc"
+    ): Result<List<Post>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("${baseUrl}posts?categories=$categoryId&page=$page&per_page=$perPage&orderby=$orderBy&order=$order&_embed")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Post>>() {}.type
+                val posts: List<Post> = gson.fromJson(body, type)
+                Result.success(posts)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPost(postId: Int): Result<Post> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}posts/$postId?_embed").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val post: Post = gson.fromJson(body, Post::class.java)
+                Result.success(post)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getComments(postId: Int): Result<List<Comment>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("${baseUrl}comments?post=$postId&per_page=50").build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val type = object : TypeToken<List<Comment>>() {}.type
+                val comments: List<Comment> = gson.fromJson(body, type)
+                Result.success(comments)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun postComment(postId: Int, content: String, nonce: String): Result<Comment> = withContext(Dispatchers.IO) {
+        try {
+            val formBody = FormBody.Builder()
+                .add("post", postId.toString())
+                .add("content", content)
+                .build()
+            val request = Request.Builder()
+                .url("${baseUrl}comments")
+                .addHeader("X-WP-Nonce", nonce)
+                .post(formBody)
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val comment: Comment = gson.fromJson(body, Comment::class.java)
+                Result.success(comment)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun autoLogin(): Result<String> = withContext(Dispatchers.IO) {
         val ctx = context ?: return@withContext Result.failure(Exception("Context is null"))
         val credentials = CredentialsManager(ctx)
@@ -151,7 +289,6 @@ class AppRepository(private val context: Context? = null) {
                         cookieManager.setCookie("https://appdony.ir", cookie)
                     }
                     cookieManager.flush()
-                    // یه مقدار موقت برمی‌گردونیم، چون Nonce واقعی باید از صفحه لاگین شده استخراج بشه
                     Result.success("logged_in")
                 } else {
                     Result.failure(Exception("No cookies received from login"))
