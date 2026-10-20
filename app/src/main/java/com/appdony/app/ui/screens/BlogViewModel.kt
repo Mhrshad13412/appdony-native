@@ -68,7 +68,7 @@ class BlogViewModel : ViewModel() {
                     }
                 }
                 .onFailure {
-                    currentPage-- // برگرداندن شماره صفحه در صورت خطا
+                    currentPage-- 
                 }
             _isLoadingMore.value = false
             isLoadingData = false
