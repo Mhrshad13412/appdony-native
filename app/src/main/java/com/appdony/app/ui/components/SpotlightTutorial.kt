@@ -5,10 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,13 +56,13 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // مختصات ۵ بخش مختلف
+    // محاسبه مختصات با استفاده از with(density) برای جلوگیری از خطا
     val targetRect = when (currentStep) {
-        0 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.02f), Size(screenWidthPx * 0.9f, 60.dp.toPx())) // نوار جستجو
-        1 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.2f), Size(screenWidthPx * 0.8f, 200.dp.toPx())) // بنرها
-        2 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.88f), Size(screenWidthPx * 0.9f, 60.dp.toPx())) // منوی پایین
-        3 -> Rect(Offset(screenWidthPx * 0.75f, screenHeightPx * 0.75f), Size(64.dp.toPx(), 64.dp.toPx())) // دستیار
-        else -> Rect(Offset(screenWidthPx * 0.7f, screenHeightPx * 0.02f), Size(60.dp.toPx(), 60.dp.toPx())) // پروفایل
+        0 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.02f), Size(screenWidthPx * 0.9f, with(density) { 60.dp.toPx() }))
+        1 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.2f), Size(screenWidthPx * 0.8f, with(density) { 200.dp.toPx() }))
+        2 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.88f), Size(screenWidthPx * 0.9f, with(density) { 60.dp.toPx() }))
+        3 -> Rect(Offset(screenWidthPx * 0.75f, screenHeightPx * 0.75f), Size(with(density) { 64.dp.toPx() }, with(density) { 64.dp.toPx() }))
+        else -> Rect(Offset(screenWidthPx * 0.7f, screenHeightPx * 0.02f), Size(with(density) { 60.dp.toPx() }, with(density) { 60.dp.toPx() }))
     }
 
     val stepTitle = when (currentStep) {
@@ -95,7 +93,6 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
             .background(Color.Transparent)
             .clickable(enabled = false) {} 
     ) {
-        // لایه تیره با سوراخ نورافکن
         Canvas(modifier = Modifier.fillMaxSize()) {
             val path = Path().apply {
                 addRect(Rect(Offset.Zero, size))
@@ -108,13 +105,11 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
                 fillType = PathFillType.EvenOdd
             }
             
-            // 👈 شفافیت رو کم کردم (0.2f) تا پشت صفحه بلور دیده بشه
             drawPath(
                 path = path,
                 color = Color.Black.copy(alpha = 0.2f * spotlightAlpha)
             )
 
-            // خط‌چین دور بخش هدف
             drawRoundRect(
                 color = MaterialTheme.colorScheme.primary,
                 topLeft = targetRect.topLeft,
@@ -127,16 +122,15 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
             )
         }
 
-        // کادر متن (کوچیک، وسط‌چین و با دکمه وسط)
         Column(
             modifier = Modifier
-                .align(Alignment.Center) // 👈 کادر دقیقاً وسط صفحه قرار می‌گیره
+                .align(Alignment.Center)
                 .padding(horizontal = 24.dp)
-                .widthIn(max = 320.dp) // 👈 حداکثر عرض کادر 320 دی پی
+                .widthIn(max = 320.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally // 👈 همه چی وسط‌چین
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "مرحله ${currentStep + 1} از 5",
@@ -164,7 +158,6 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             
-            // دکمه بعدی (دقیقاً وسط)
             Button(
                 onClick = {
                     if (currentStep < 4) {
@@ -196,7 +189,6 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
             
-            // دکمه رد کردن (زیر دکمه بعدی)
             Text(
                 text = "رد کردن آموزش",
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
