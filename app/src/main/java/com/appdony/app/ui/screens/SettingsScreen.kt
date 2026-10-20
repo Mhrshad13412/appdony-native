@@ -20,14 +20,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.HorizontalDivider
@@ -95,7 +98,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("تنظیمات", color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -117,10 +120,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ColorLens, null, tint = primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("رنگ برنامه", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ThemeManager.themeColors.forEachIndexed { index, color ->
                         Box(
@@ -138,10 +141,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.FontDownload, null, tint = primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("اندازه فونت", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FontSize.values().forEach { size ->
                         val selected = themeState.fontSize == size
@@ -191,8 +194,9 @@ fun SettingsScreen(onBack: () -> Unit) {
         item { SettingsHeader("داده‌ها", Icons.Default.CleaningServices, primary) }
         item {
             SettingsActionRow("پاک کردن حافظه کش", "$cacheSize", Icons.Default.CleaningServices) {
-                CacheUtils.clearCache(context)
+                // 👈 اصلاح شد: فراخوانی تابع suspend داخل scope.launch
                 scope.launch {
+                    CacheUtils.clearCache(context)
                     cacheSize = CacheUtils.getCacheSize(context)
                     Toast.makeText(context, "کش پاک شد", Toast.LENGTH_SHORT).show()
                 }
@@ -243,7 +247,7 @@ private fun SettingsHeader(title: String, icon: ImageVector, tint: Color) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Text(title, color = tint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -255,7 +259,7 @@ private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Text(title, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
@@ -276,7 +280,7 @@ private fun SettingsActionRow(title: String, subtitle: String, icon: ImageVector
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Text(title, color = color, fontSize = 14.sp, modifier = Modifier.weight(1f))
         if (subtitle.isNotBlank()) {
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
