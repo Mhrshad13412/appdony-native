@@ -103,7 +103,7 @@ fun DetailScreen(
             onDismiss = { showLoginSheet = false },
             onLoginSuccess = { user ->
                 scope.launch {
-                    sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
+                    sessionManager.saveSession(user.id, user.username, user.name, user.email, user.avatarUrl() ?: "", user.nonce)
                     showLoginSheet = false
                 }
             }
@@ -146,7 +146,6 @@ fun DetailScreen(
             }
         }
 
-        // دکمه بازگشت
         Box(
             modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape)
                 .background(Color(0xCC000000)).clickable { onBack() },
@@ -155,7 +154,6 @@ fun DetailScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
-        // دکمه علاقه‌مندی
         Box(
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(40.dp).clip(CircleShape)
                 .background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } },
@@ -189,7 +187,6 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // ۱. عکس بزرگ بالای صفحه
         item {
             Box(
                 modifier = Modifier
@@ -215,7 +212,6 @@ private fun DetailContent(
             }
         }
 
-        // ۲. باکس عنوان و دسته‌بندی
         item {
             Row(
                 modifier = Modifier
@@ -253,9 +249,8 @@ private fun DetailContent(
             }
         }
 
-        // 🚀 ۳. بخش مخصوص بازی و برنامه (غیر وبلاگ)
+        // 🚀 بخش بازی و برنامه (غیر وبلاگ)
         if (!isBlog) {
-            // سیستم امتیازدهی ستاره‌ای
             item {
                 Column(
                     modifier = Modifier
@@ -276,7 +271,6 @@ private fun DetailContent(
                 }
             }
 
-            // اطلاعات نسخه
             item {
                 if (info.version != null) {
                     Row(
@@ -298,7 +292,6 @@ private fun DetailContent(
                 }
             }
 
-            // دکمه‌های دانلود (بر اساس لیست لینک‌های استخراج‌شده)
             item {
                 if (info.downloadLinks.isNotEmpty()) {
                     Column(
@@ -330,7 +323,6 @@ private fun DetailContent(
                 }
             }
 
-            // دکمه اشتراک‌گذاری
             item {
                 OutlinedButton(
                     onClick = onShare,
@@ -344,7 +336,6 @@ private fun DetailContent(
             }
         }
 
-        // 📝 ۴. متن مقاله / توضیحات
         item {
             Spacer(Modifier.height(24.dp))
             Text(
@@ -356,7 +347,8 @@ private fun DetailContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = info.description.ifBlank { "توضیحاتی ثبت نشده است." },
+                // 👈 به جای info.description از post.content استفاده شد
+                text = post.content.ifBlank { "توضیحاتی ثبت نشده است." },
                 color = AppdonyTextMuted,
                 fontSize = 14.sp,
                 lineHeight = 28.sp,
@@ -364,10 +356,9 @@ private fun DetailContent(
             )
         }
 
-        // بخش مشابه‌ها (فقط برای بازی و برنامه)
         if (!isBlog && similar.isNotEmpty()) {
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
                 Text(
                     text = "مشابه‌ها",
                     color = AppdonyTextPrimary,
@@ -383,8 +374,10 @@ private fun DetailContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(similar, key = { it.id }) { p ->
+                        // 👈 پارامترهای AppCard اصلاح شدن
                         AppCard(
-                            post = p,
+                            title = p.cleanTitle(),
+                            imageUrl = p.featuredImageUrl() ?: "",
                             onClick = { onSimilarClick(p.id) },
                             modifier = Modifier.width(160.dp)
                         )
@@ -393,7 +386,6 @@ private fun DetailContent(
             }
         }
 
-        // نظرات (برای هر دو حالت)
         item {
             Spacer(Modifier.height(24.dp))
             CommentsSection(
