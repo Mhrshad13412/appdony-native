@@ -71,7 +71,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AppRoot(intent) }
+        setContent {
+            AppRoot(intent)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -85,17 +87,17 @@ fun AppRoot(intent: Intent?) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
-    
-    val fontScale = when (themeState.fontSize) { 
+
+    val fontScale = when (themeState.fontSize) {
         FontSize.SMALL -> 0.85f
         FontSize.MEDIUM -> 1.0f
-        FontSize.LARGE -> 1.2f 
+        FontSize.LARGE -> 1.2f
     }
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
         AppdonyTheme(
-            darkTheme = themeState.mode == ThemeMode.DARK, 
+            darkTheme = themeState.mode == ThemeMode.DARK,
             primaryColor = ThemeManager.themeColors[themeState.colorIndex]
         ) {
             MainScreen(incomingIntent = intent)
@@ -113,12 +115,12 @@ fun MainScreen(incomingIntent: Intent?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
-
     val settingsManager = remember { SettingsManager(context) }
     val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -145,7 +147,6 @@ fun MainScreen(incomingIntent: Intent?) {
     LaunchedEffect(Unit) {
         val repo = AppRepository(context)
         val result = repo.loadInitial("games")
-        
         result.onSuccess { data ->
             val imageUrls = listOfNotNull(
                 data.banner?.featuredImageUrl(),
@@ -161,7 +162,7 @@ fun MainScreen(incomingIntent: Intent?) {
                 context.imageLoader.enqueue(request)
             }
         }
-        delay(1500) 
+        delay(1500)
         isLoading = false
     }
 
@@ -185,7 +186,6 @@ fun MainScreen(incomingIntent: Intent?) {
 
         LaunchedEffect(Unit) {
             if (!hasSeenOnboarding) showTutorial = true
-            
             val currentVersion = BuildConfig.VERSION_NAME
             val info = UpdateHelper.checkForUpdate()
             if (info != null && info.latestVersion != currentVersion) {
@@ -201,10 +201,12 @@ fun MainScreen(incomingIntent: Intent?) {
                     if (showChrome) {
                         Column {
                             AppTopBar(
-                                isLoggedIn = isLoggedIn, 
-                                userInitial = displayName, 
-                                onSearchClick = { navController.navigate("search") }, 
-                                onLoginClick = { if (isLoggedIn) showAccountSheet = true else showLoginSheet = true }
+                                isLoggedIn = isLoggedIn,
+                                userInitial = displayName,
+                                onSearchClick = { navController.navigate("search") },
+                                onLoginClick = {
+                                    if (isLoggedIn) showAccountSheet = true else showLoginSheet = true
+                                }
                             )
                             UpdateBanner(
                                 isVisible = showUpdateBanner,
@@ -213,7 +215,11 @@ fun MainScreen(incomingIntent: Intent?) {
                                     showUpdateBanner = false
                                     updateInfo?.let { info ->
                                         scope.launch(Dispatchers.Main) {
-                                            DownloadHelper.startDownload(context, info.downloadUrl, "Appdony-Update-${info.latestVersion}.apk")
+                                            DownloadHelper.startDownload(
+                                                context,
+                                                info.downloadUrl,
+                                                "Appdony-Update-${info.latestVersion}.apk"
+                                            )
                                         }
                                     }
                                 },
@@ -226,8 +232,7 @@ fun MainScreen(incomingIntent: Intent?) {
                     if (showChrome) {
                         AppBottomNav(
                             currentRoute = currentRoute,
-                            onTabSelected = { route -> 
-                                // 👇 ناوبری مستقیم بدون انیمیشن دایره‌ای رنگی
+                            onTabSelected = { route ->
                                 navController.navigate(route) {
                                     popUpTo(navController.graph.startDestinationId) { saveState = true }
                                     launchSingleTop = true
@@ -241,7 +246,6 @@ fun MainScreen(incomingIntent: Intent?) {
             ) { padding ->
                 Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     AppNavGraph(navController = navController, startDestination = startPage)
-                    
                     if (showChrome && !showTutorial && showAiAssistant) {
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
                             FloatingAssistant(
@@ -256,29 +260,35 @@ fun MainScreen(incomingIntent: Intent?) {
             }
 
             if (showTutorial) {
-                SpotlightTutorial(onFinish = { scope.launch { onboardingManager.setSeen() }; showTutorial = false })
+                SpotlightTutorial(onFinish = {
+                    scope.launch { onboardingManager.setSeen() }
+                    showTutorial = false
+                })
             }
 
             if (showLoginSheet) {
-                LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
-                    scope.launch {
-                        sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
-                        showLoginSheet = false
-                        snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} 👋")
+                LoginSheet(
+                    onDismiss = { showLoginSheet = false },
+                    onLoginSuccess = { user ->
+                        scope.launch {
+                            sessionManager.saveSession(user.id, user.username, user.displayName(), user.email, user.avatarUrl() ?: "", user.nonce)
+                            showLoginSheet = false
+                            snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} ")
+                        }
                     }
-                })
+                )
             }
 
             if (showAccountSheet) {
                 AccountSheet(
-                    displayName = displayName.ifBlank { username }, username = username,
+                    displayName = displayName.ifBlank { username },
+                    username = username,
                     onDismiss = { showAccountSheet = false },
                     onDownloads = { navController.navigate("updates") },
                     onSettings = { navController.navigate("settings") },
                     onFavorites = { navController.navigate("favorites") },
                     onHelp = { showTutorial = true },
-                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
-                    onLogout = { scope.launch { sessionManager.clearSession(); showAccountSheet = false; snackbarHostState.showSnackbar("از حساب خارج شدی") } }
+                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } }
                 )
             }
         }
