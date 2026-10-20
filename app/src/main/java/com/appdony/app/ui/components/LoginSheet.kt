@@ -6,7 +6,17 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -17,8 +27,27 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +67,7 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -101,39 +131,25 @@ fun LoginSheet(
                             isLoginSubmitted = false 
                         } 
                         else if (!url.contains("wp-login.php") && loading) {
-                            view?.evaluateJavascript("""
-                                (function() {
-                                    var nonce = '';
-                                    var scripts = document.getElementsByTagName('script');
-                                    for (var i = 0; i < scripts.length; i++) {
-                                        var text = scripts[i].innerHTML;
-                                        var match = text.match(/"nonce":"([^"]+)"/);
-                                        if (match) { nonce = match[1]; break; }
-                                    }
-                                    return nonce;
-                                })();
-                            """.trimIndent()) { nonceResult ->
-                                val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
+                            scope.launch {
+                                delay(1000)
                                 val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
-                                
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) { 
-                                        repository.getCurrentUser(cookies, cleanNonce) 
-                                    }
-                                    result.onSuccess { user ->
-                                        if (user.id > 0) {
-                                            if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                            else credentialsManager.clearCredentials()
-                                            onLoginSuccess(user)
-                                            onDismiss()
-                                        } else {
-                                            errorMsg = "اطلاعات کاربری یافت نشد."
-                                            loading = false
-                                        }
-                                    }.onFailure {
-                                        errorMsg = "خطا: نام کاربری یا رمز عبور اشتباه است."
+                                val result = withContext(Dispatchers.IO) { 
+                                    repository.getCurrentUser(cookies, "") 
+                                }
+                                result.onSuccess { user ->
+                                    if (user.id > 0) {
+                                        if (rememberMe) credentialsManager.saveCredentials(username, password)
+                                        else credentialsManager.clearCredentials()
+                                        onLoginSuccess(user)
+                                        onDismiss()
+                                    } else {
+                                        errorMsg = "اطلاعات کاربری یافت نشد."
                                         loading = false
                                     }
+                                }.onFailure {
+                                    errorMsg = "خطا: نام کاربری یا رمز عبور اشتباه است."
+                                    loading = false
                                 }
                             }
                         }
@@ -156,7 +172,7 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface, // 👈 پس‌زمینه تیره شد
+        containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = null
     ) {
         Column(
