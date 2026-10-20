@@ -31,7 +31,7 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.BannerSkeleton // 👈 این حتما باید باشه
+import com.appdony.app.ui.components.BannerSkeleton
 import com.appdony.app.ui.components.EmptyState
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
@@ -45,7 +45,6 @@ fun FeedScreen(
     onCategoryClick: (Int, String) -> Unit
 ) {
     val context = LocalContext.current
-    
     val vm: HomeViewModel = viewModel(
         key = "feed_$feedType",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -96,7 +95,11 @@ fun FeedScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(topPosts, key = { "top_${it.id}" }) { p ->
-                                    BannerCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
+                                    BannerCard(
+                                        title = p.cleanTitle(),
+                                        imageUrl = p.featuredImageUrl(),
+                                        onClick = { onPostClick(p.id) }
+                                    )
                                 }
                             }
                             Spacer(Modifier.height(16.dp))
@@ -105,14 +108,17 @@ fun FeedScreen(
 
                     items(categoriesList, key = { "cat_${it.id}" }) { cat ->
                         val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
-
                         LaunchedEffect(cat.id) {
                             if (sectionState is SectionState.NotLoaded) {
                                 vm.loadSection(cat.id)
                             }
                         }
-
-                        SectionBlock(title = cat.name, state = sectionState, onPostClick = onPostClick, onMoreClick = { onCategoryClick(cat.id, cat.name) })
+                        SectionBlock(
+                            title = cat.name,
+                            state = sectionState,
+                            onPostClick = onPostClick,
+                            onMoreClick = { onCategoryClick(cat.id, cat.name) }
+                        )
                     }
                 }
             }
@@ -149,7 +155,12 @@ private fun HomeSkeleton() {
 }
 
 @Composable
-private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) -> Unit, onMoreClick: () -> Unit) {
+private fun SectionBlock(
+    title: String,
+    state: SectionState,
+    onPostClick: (Int) -> Unit,
+    onMoreClick: () -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         SectionHeader(title = title, onMoreClick = onMoreClick)
         when (state) {
@@ -158,14 +169,28 @@ private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) 
                 Spacer(Modifier.height(12.dp))
             }
             is SectionState.Error -> {
-                Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                    Text("خطا در دریافت این بخش", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Box(
+                    Modifier.fillMaxWidth().height(80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "خطا در دریافت این بخش",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 }
             }
             is SectionState.Loaded -> {
                 if (state.posts.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
-                        Text("محتوایی نیست", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Box(
+                        Modifier.fillMaxWidth().height(60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "محتوایی نیست",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     }
                 } else {
                     LazyRow(
@@ -173,7 +198,11 @@ private fun SectionBlock(title: String, state: SectionState, onPostClick: (Int) 
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(state.posts, key = { it.id }) { p ->
-                            AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl(), onClick = { onPostClick(p.id) })
+                            AppCard(
+                                title = p.cleanTitle(),
+                                imageUrl = p.featuredImageUrl(),
+                                onClick = { onPostClick(p.id) }
+                            )
                         }
                     }
                 }
