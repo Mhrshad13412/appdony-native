@@ -113,7 +113,7 @@ fun CommentsSection(
                         unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -183,10 +183,10 @@ private fun CommentItem(comment: Comment) {
         }
         Spacer(modifier = Modifier.width(8.dp))
         Column {
-            // 👈 اصلاح شد: استفاده از authorName به صورت امن
-            val name = comment.authorName ?: "کاربر ناشناس"
+            // 👈 اصلاح شد: استفاده از فیلد استاندارد وردپرس
+            val name = comment.author_name ?: "کاربر ناشناس"
             Text(
-                text = name,
+                text = name.toString(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
