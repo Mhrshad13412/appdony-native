@@ -56,7 +56,9 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // محاسبه مختصات با استفاده از with(density) برای جلوگیری از خطا
+    // 👈 استخراج رنگ قبل از Canvas برای جلوگیری از خطای Composable
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val targetRect = when (currentStep) {
         0 -> Rect(Offset(screenWidthPx * 0.05f, screenHeightPx * 0.02f), Size(screenWidthPx * 0.9f, with(density) { 60.dp.toPx() }))
         1 -> Rect(Offset(screenWidthPx * 0.1f, screenHeightPx * 0.2f), Size(screenWidthPx * 0.8f, with(density) { 200.dp.toPx() }))
@@ -111,7 +113,7 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
             )
 
             drawRoundRect(
-                color = MaterialTheme.colorScheme.primary,
+                color = primaryColor, // 👈 استفاده از رنگ استخراج شده
                 topLeft = targetRect.topLeft,
                 size = targetRect.size,
                 cornerRadius = CornerRadius(16.dp.toPx()),
@@ -134,7 +136,7 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
         ) {
             Text(
                 text = "مرحله ${currentStep + 1} از 5",
-                color = MaterialTheme.colorScheme.primary,
+                color = primaryColor,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -167,7 +169,7 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
             ) {
                 Text(
                     text = if (currentStep == 4) "پایان" else "بعدی",
