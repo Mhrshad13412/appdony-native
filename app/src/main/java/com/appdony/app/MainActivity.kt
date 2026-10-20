@@ -291,7 +291,7 @@ fun MainScreen(incomingIntent: Intent?) {
                     onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
                     onLogout = {
                         scope.launch {
-                            sessionManager.logout() // 👈 پارامتر لاگ‌اوت اضافه شد
+                            sessionManager.clearSession() // 👈 اصلاح شد به clearSession
                             showAccountSheet = false
                             snackbarHostState.showSnackbar("از حساب خود خارج شدید")
                         }
