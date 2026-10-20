@@ -130,7 +130,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(color)
+                                .background(Color(color)) // 👈 اصلاح شد
                                 .clickable { scope.launch { themeManager.setColorIndex(index) } }
                         )
                     }
@@ -194,7 +194,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         item { SettingsHeader("داده‌ها", Icons.Default.CleaningServices, primary) }
         item {
             SettingsActionRow("پاک کردن حافظه کش", "$cacheSize", Icons.Default.CleaningServices) {
-                // 👈 اصلاح شد: فراخوانی تابع suspend داخل scope.launch
                 scope.launch {
                     CacheUtils.clearCache(context)
                     cacheSize = CacheUtils.getCacheSize(context)
@@ -205,7 +204,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             SettingsActionRow("پاک کردن تاریخچه جستجو", "", Icons.Default.Search) {
                 scope.launch {
-                    historyManager.clear()
+                    historyManager.clearHistory() // 👈 اصلاح شد
                     Toast.makeText(context, "تاریخچه پاک شد", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -221,7 +220,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             SettingsActionRow("پاک کردن تاریخچه چت", "", Icons.AutoMirrored.Filled.Chat) {
                 scope.launch {
-                    chatHistoryManager.clear()
+                    chatHistoryManager.clearHistory() // 👈 اصلاح شد
                     Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
                 }
             }
