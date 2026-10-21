@@ -2,6 +2,7 @@ package com.appdony.app.data.repository
 
 import android.content.Context
 import android.webkit.CookieManager
+import com.appdony.app.data.api.WordPressLogin
 import com.appdony.app.data.model.Category
 import com.appdony.app.data.model.Comment
 import com.appdony.app.data.model.InitialData
@@ -263,39 +264,19 @@ class AppRepository(private val context: Context? = null) {
         }
     }
 
-    suspend fun autoLogin(): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun autoLogin(): Result<UserData> = withContext(Dispatchers.IO) {
         val ctx = context ?: return@withContext Result.failure(Exception("Context is null"))
         val credentials = CredentialsManager(ctx)
         val username = credentials.getUsername() ?: return@withContext Result.failure(Exception("No saved credentials"))
         val password = credentials.getPassword() ?: return@withContext Result.failure(Exception("No saved credentials"))
 
-        try {
-            val formBody = FormBody.Builder()
-                .add("log", username)
-                .add("pwd", password)
-                .add("wp-submit", "Log In")
-                .add("redirect_to", "https://appdony.ir/wp-admin/")
-                .add("testcookie", "1")
-                .build()
-            val request = Request.Builder()
-                .url("https://appdony.ir/wp-login.php")
-                .post(formBody)
-                .build()
-            client.newCall(request).execute().use { response ->
-                val setCookies = response.headers("Set-Cookie")
-                if (setCookies.isNotEmpty()) {
-                    val cookieManager = CookieManager.getInstance()
-                    setCookies.forEach { cookie ->
-                        cookieManager.setCookie("https://appdony.ir", cookie)
-                    }
-                    cookieManager.flush()
-                    Result.success("logged_in")
-                } else {
-                    Result.failure(Exception("No cookies received from login"))
-                }
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+        // استفاده از WordPressLogin برای همگام‌سازی درست کوکی‌ها
+        val loginResult = WordPressLogin.login(username, password)
+        loginResult.onSuccess { user ->
+            // بعد از لاگین موفق، کوکی‌ها از قبل در CookieManager ذخیره شدن
+            // حالا کاربر رو با همون کوکی‌ها می‌گیریم
+            val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+            getCurrentUser(cookies, user.nonce).getOrThrow()
         }
     }
 
@@ -305,7 +286,7 @@ class AppRepository(private val context: Context? = null) {
                 CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
             }
             val requestBuilder = Request.Builder()
-                .url("${baseUrl}users/me")
+                .url("${baseUrl}users/me?context=edit") // context=edit برای گرفتن nonce جدید
                 .addHeader("Cookie", cookieHeader)
             if (nonce.isNotBlank()) {
                 requestBuilder.addHeader("X-WP-Nonce", nonce)
