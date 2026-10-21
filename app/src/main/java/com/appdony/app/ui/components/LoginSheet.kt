@@ -6,17 +6,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -27,27 +17,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +34,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
+import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -82,6 +54,7 @@ fun LoginSheet(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val credentialsManager = remember { CredentialsManager(context) }
+    val sessionManager = remember { SessionManager(context) }
     val repository = remember { AppRepository(context) }
 
     var username by remember { mutableStateOf("") }
@@ -97,7 +70,6 @@ fun LoginSheet(
     LaunchedEffect(Unit) {
         credentialsManager.getUsername()?.let { username = it }
         credentialsManager.getPassword()?.let { password = it }
-        
         if (username.isNotBlank() && password.isNotBlank()) {
             isLoginSubmitted = true
         }
@@ -131,25 +103,44 @@ fun LoginSheet(
                             isLoginSubmitted = false 
                         } 
                         else if (!url.contains("wp-login.php") && loading) {
-                            scope.launch {
-                                delay(1000)
+                            // ۱. استخراج Nonce از صفحه لاگین شده
+                            view?.evaluateJavascript("""
+                                (function() {
+                                    var nonce = '';
+                                    var scripts = document.getElementsByTagName('script');
+                                    for (var i = 0; i < scripts.length; i++) {
+                                        var text = scripts[i].innerHTML;
+                                        var match = text.match(/"nonce":"([^"]+)"/);
+                                        if (match) { nonce = match[1]; break; }
+                                    }
+                                    return nonce;
+                                })();
+                            """.trimIndent()) { nonceResult ->
+                                val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
                                 val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
-                                val result = withContext(Dispatchers.IO) { 
-                                    repository.getCurrentUser(cookies, "") 
-                                }
-                                result.onSuccess { user ->
-                                    if (user.id > 0) {
-                                        if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                        else credentialsManager.clearCredentials()
-                                        onLoginSuccess(user)
-                                        onDismiss()
-                                    } else {
-                                        errorMsg = "اطلاعات کاربری یافت نشد."
+                                
+                                scope.launch {
+                                    // ۲. پاس دادن کوکی‌ها و توکن به ریپازیتوری
+                                    val result = withContext(Dispatchers.IO) { 
+                                        repository.getCurrentUser(cookies, cleanNonce) 
+                                    }
+                                    result.onSuccess { user ->
+                                        if (user.id > 0) {
+                                            if (rememberMe) credentialsManager.saveCredentials(username, password)
+                                            else credentialsManager.clearCredentials()
+                                            
+                                            // ۳. ذخیره توکن در SessionManager
+                                            sessionManager.updateNonce(cleanNonce)
+                                            onLoginSuccess(user.copy(nonce = cleanNonce))
+                                            onDismiss()
+                                        } else {
+                                            errorMsg = "اطلاعات کاربری یافت نشد."
+                                            loading = false
+                                        }
+                                    }.onFailure {
+                                        errorMsg = "خطا: نام کاربری یا رمز عبور اشتباه است."
                                         loading = false
                                     }
-                                }.onFailure {
-                                    errorMsg = "خطا: نام کاربری یا رمز عبور اشتباه است."
-                                    loading = false
                                 }
                             }
                         }
@@ -172,7 +163,7 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent, // 👈 سفیدی پس‌زمینه حذف شد
         dragHandle = null
     ) {
         Column(
@@ -182,6 +173,7 @@ fun LoginSheet(
                 .padding(top = 16.dp, bottom = 24.dp)
                 .imePadding()
         ) {
+            // هدر
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -200,6 +192,7 @@ fun LoginSheet(
             }
             Spacer(Modifier.height(24.dp))
 
+            // فیلد نام کاربری
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
@@ -220,6 +213,7 @@ fun LoginSheet(
             )
             Spacer(Modifier.height(12.dp))
 
+            // فیلد رمز عبور
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMsg = null },
@@ -250,6 +244,7 @@ fun LoginSheet(
                 enabled = !loading
             )
 
+            // مرا به خاطر بسپار
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { rememberMe = !rememberMe },
@@ -263,6 +258,7 @@ fun LoginSheet(
                 Text("مرا به خاطر بسپار (ورود خودکار)", color = AppdonyTextMuted, fontSize = 13.sp)
             }
 
+            // خطا
             if (errorMsg != null) {
                 Spacer(Modifier.height(10.dp))
                 Box(
@@ -274,6 +270,7 @@ fun LoginSheet(
 
             Spacer(Modifier.height(20.dp))
 
+            // دکمه ورود
             Button(
                 onClick = { submitLogin() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
