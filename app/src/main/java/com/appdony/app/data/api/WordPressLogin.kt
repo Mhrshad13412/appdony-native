@@ -1,10 +1,11 @@
 package com.appdony.app.data.api
 
+import android.webkit.CookieManager
 import com.appdony.app.data.model.UserData
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -17,19 +18,33 @@ object WordPressLogin {
     suspend fun login(username: String, password: String): Result<UserData> =
         withContext(Dispatchers.IO) {
             try {
-                val jar = ApiClient.cookieJarInstance
-                    ?: return@withContext Result.failure(Exception("ApiClient.init() صدا زده نشده!"))
-
-                jar.clear()
+                // 👈 همگام‌سازی مستقیم با CookieManager اندروید
+                val cookieManager = CookieManager.getInstance()
+                val cookies = cookieManager.getCookie("https://appdony.ir") ?: ""
 
                 val client = OkHttpClient.Builder()
-                    .cookieJar(jar)
+                    .cookieJar(object : okhttp3.CookieJar {
+                        override fun loadForRequest(url: okhttp3.HttpUrl): List<okhttp3.Cookie> {
+                            return cookies.split("; ").mapNotNull { pair ->
+                                val parts = pair.split("=", limit = 2)
+                                if (parts.size == 2) {
+                                    okhttp3.Cookie.Builder()
+                                        .domain(url.host)
+                                        .path("/")
+                                        .name(parts[0])
+                                        .value(parts[1])
+                                        .build()
+                                } else null
+                            }
+                        }
+                        override fun saveFromResponse(url: okhttp3.HttpUrl, cookies: List<okhttp3.Cookie>) {}
+                    })
                     .connectTimeout(60, TimeUnit.SECONDS)
                     .readTimeout(60, TimeUnit.SECONDS)
                     .followRedirects(true)
                     .build()
 
-                // ۱. اول یه درخواست GET بزنیم تا کوکی‌های اولیه ست بشن
+                // ۱. درخواست GET اولیه برای ست کردن کوکی‌ها
                 client.newCall(
                     Request.Builder()
                         .url(LOGIN_URL)
@@ -38,7 +53,7 @@ object WordPressLogin {
                         .build()
                 ).execute().use { it.body?.close() }
 
-                // ۲. حالا فرم لاگین رو با اطلاعات کاربر پر می‌کنیم
+                // ۲. ارسال فرم لاگین
                 val form = FormBody.Builder()
                     .add("log", username)
                     .add("pwd", password)
@@ -57,17 +72,19 @@ object WordPressLogin {
                         .build()
                 ).execute().use { it.body?.close() }
 
-                val cookies = jar.loadForRequest(LOGIN_URL.toHttpUrl())
-                val loggedIn = cookies.any { it.name.startsWith("wordpress_logged_in") }
+                // ۳. بررسی موفقیت‌آمیز بودن لاگین با کوکی جدید
+                val newCookies = cookieManager.getCookie("https://appdony.ir") ?: ""
+                val loggedIn = newCookies.contains("wordpress_logged_in")
 
                 if (!loggedIn) {
                     return@withContext Result.failure(Exception("نام کاربری یا رمز عبور اشتباه است. (توجه: وردپرس به طور پیش‌فرض ورود با ایمیل را قبول نمی‌کند، لطفاً نام کاربری خود را وارد کنید)"))
                 }
 
-                // ۳. حالا اطلاعات کاربر رو از API بگیریم
+                // ۴. گرفتن اطلاعات کاربر
                 val userJson = client.newCall(
                     Request.Builder()
                         .url(API_USER_URL)
+                        .header("Cookie", newCookies)
                         .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
                         .get()
                         .build()
@@ -79,20 +96,10 @@ object WordPressLogin {
                     return@withContext Result.success(UserData(username = username, name = username))
                 }
 
-                val user = parseUser(userJson)
+                val user = Gson().fromJson(userJson, UserData::class.java)
                 if (user != null) Result.success(user) else Result.success(UserData(username = username, name = username))
             } catch (e: Exception) {
                 Result.failure(Exception("خطا در اتصال: ${e.message}"))
             }
         }
-
-    private fun parseUser(json: String): UserData? {
-        val id = Regex(""""id"\s*:\s*(\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-        val username = Regex(""""username"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-        val name = Regex(""""name"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-        val email = Regex(""""email"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-        return if (id > 0 || username.isNotBlank()) {
-            UserData(id = id, username = username, name = name, email = email, nonce = "")
-        } else null
-    }
-                          }
+}
