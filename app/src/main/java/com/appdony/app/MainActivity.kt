@@ -163,7 +163,8 @@ fun MainScreen(incomingIntent: Intent?) {
                 context.imageLoader.enqueue(request)
             }
         }
-        delay(1500)
+        // 👈 زمان تاخیر رو از ۱۵۰۰ به ۳۰۰ میلی‌ثانیه کاهش دادم که سریعتر بره تو اپ
+        delay(300) 
         isLoading = false
     }
 
@@ -203,7 +204,6 @@ fun MainScreen(incomingIntent: Intent?) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
-                // 👈 اعمال افکت بلور به کل صفحه وقتی تیکتوریال بازه
                 modifier = if (showTutorial) Modifier.blur(16.dp) else Modifier,
                 topBar = {
                     if (showChrome) {
