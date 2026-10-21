@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,12 +21,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
@@ -38,21 +39,28 @@ fun BannerCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    // 👈 درخواست عکس بنر با سایز کوچیک‌تر (۵۰۰ در ۳۰۰) برای دانلود سریع‌تر
+    val imageRequest = ImageRequest.Builder(context)
+        .data(imageUrl)
+        .size(500, 300)
+        .crossfade(true)
+        .build()
+
     Box(
         modifier = modifier
-            .width(280.dp)
-            .height(160.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .width(220.dp) // 👈 عرض بنر از ۲۸۰ به ۲۲۰ کاهش یافت
+            .height(130.dp) // 👈 ارتفاع از ۱۶۰ به ۱۳۰ کاهش یافت
+            .clip(RoundedCornerShape(16.dp))
             .background(AppdonyCardBg)
             .clickable { onClick() }
     ) {
         SubcomposeAsyncImage(
-            model = imageUrl,
+            model = imageRequest,
             contentDescription = title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
             loading = {
-                // لودینگ برای بنر
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -68,7 +76,7 @@ fun BannerCard(
                         imageVector = Icons.Default.BrokenImage,
                         contentDescription = "خطا",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             },
@@ -77,29 +85,27 @@ fun BannerCard(
             }
         )
 
-        // گرادیانت برای خوانایی متن روی عکس
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                        startY = 100f
+                        startY = 80f
                     )
                 )
         )
 
-        // 👈 متن بلافاصله نمایش داده می‌شود
         Text(
             text = title,
             color = AppdonyTextPrimary,
-            fontSize = 14.sp,
+            fontSize = 12.sp, // 👈 فونت کمی کوچیک‌تر شد
             fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(16.dp)
+                .padding(12.dp)
         )
     }
 }
