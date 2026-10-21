@@ -163,10 +163,12 @@ private fun SectionBlock(
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         SectionHeader(title = title, onMoreClick = onMoreClick)
+        
         when (state) {
             is SectionState.NotLoaded, is SectionState.Loading -> {
+                // اینجا فقط تا وقتی که دیتا نیومده اسکلت نشون میدیم
                 SectionRowSkeleton()
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
             is SectionState.Error -> {
                 Box(
@@ -181,6 +183,8 @@ private fun SectionBlock(
                 }
             }
             is SectionState.Loaded -> {
+                // به محض اینکه دیتا اومد (حتی اگه عکسا لود نشده باشن)،
+                // کارت‌ها ساخته میشن و اسم بازی نمایش داده میشه.
                 if (state.posts.isEmpty()) {
                     Box(
                         Modifier.fillMaxWidth().height(60.dp),
@@ -208,6 +212,6 @@ private fun SectionBlock(
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
