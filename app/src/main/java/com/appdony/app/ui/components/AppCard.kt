@@ -11,12 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,102 +30,91 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
-import coil.request.ImageRequest
-import coil.request.CachePolicy
+import com.appdony.app.ui.theme.AppdonyCardBg
+import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun AppCard(
     title: String,
     imageUrl: String?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isFavorite: Boolean = false,
-    showFavorite: Boolean = false,
-    onFavoriteClick: (() -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     Column(
         modifier = modifier
-            .width(110.dp)
-            .clickable { onClick() },
+            .width(120.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(120.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
+                .background(AppdonyCardBg)
         ) {
-            if (!imageUrl.isNullOrBlank()) {
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(imageUrl)
-                        .crossfade(true)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .size(200)
-                        .build(),
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    loading = {
-                        // وقتی عکس در حال لود شدنه، یه لودینگ ساده نشون بده
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    },
-                    error = {
-                        // اگه عکس لود نشد، آیکون اندروید رو نشون بده
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Android, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
-                        }
-                    },
-                    success = {
-                        SubcomposeAsyncImageContent()
+            SubcomposeAsyncImage(
+                model = imageUrl,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    // 👈 اسکلت لودینگ فقط برای عکس
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        // یک افکت ساده برای نمایش لودینگ
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.White.copy(alpha = 0.1f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
                     }
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Android,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
-            if (showFavorite && onFavoriteClick != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xAA000000))
-                        .clickable { onFavoriteClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "علاقه‌مندی",
-                        tint = if (isFavorite) Color(0xFFFF5252) else Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
+                },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AppdonyCardBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BrokenImage,
+                            contentDescription = "خطا در بارگذاری",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                },
+                success = {
+                    SubcomposeAsyncImageContent()
                 }
-            }
+            )
         }
+        
         Spacer(modifier = Modifier.height(8.dp))
+        
+        // 👈 متن عنوان بلافاصله نمایش داده می‌شود
         Text(
             text = title,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = AppdonyTextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
+            lineHeight = 18.sp,
             modifier = Modifier.fillMaxWidth()
         )
     }
