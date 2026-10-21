@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
@@ -40,9 +42,17 @@ fun AppCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    // 👈 درخواست عکس با سایز کوچیک‌تر (۲۵۰ پیکسل) برای دانلود سریع‌تر
+    val imageRequest = ImageRequest.Builder(context)
+        .data(imageUrl)
+        .size(250)
+        .crossfade(true)
+        .build()
+
     Column(
         modifier = modifier
-            .width(120.dp)
+            .width(100.dp) // 👈 عرض کارت از ۱۲۰ به ۱۰۰ کاهش یافت
             .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(bottom = 4.dp),
@@ -50,37 +60,21 @@ fun AppCard(
     ) {
         Box(
             modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .size(100.dp) // 👈 سایز عکس از ۱۲۰ به ۱۰۰ کاهش یافت
+                .clip(RoundedCornerShape(16.dp))
                 .background(AppdonyCardBg)
         ) {
             SubcomposeAsyncImage(
-                model = imageUrl,
+                model = imageRequest,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 loading = {
-                    // 👈 اسکلت لودینگ فقط برای عکس
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        // یک افکت ساده برای نمایش لودینگ
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            Color.White.copy(alpha = 0.1f),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
-                    }
+                    )
                 },
                 error = {
                     Box(
@@ -93,7 +87,7 @@ fun AppCard(
                             imageVector = Icons.Default.BrokenImage,
                             contentDescription = "خطا در بارگذاری",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
@@ -103,18 +97,17 @@ fun AppCard(
             )
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         
-        // 👈 متن عنوان بلافاصله نمایش داده می‌شود
         Text(
             text = title,
             color = AppdonyTextPrimary,
-            fontSize = 12.sp,
+            fontSize = 11.sp, // 👈 فونت هم کمی کوچیک‌تر شد که با کارت هماهنگ باشه
             fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            lineHeight = 18.sp,
+            lineHeight = 16.sp,
             modifier = Modifier.fillMaxWidth()
         )
     }
