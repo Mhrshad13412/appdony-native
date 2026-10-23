@@ -1,6 +1,7 @@
 package com.appdony.app.ui.components
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -35,6 +36,7 @@ import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
 import com.appdony.app.data.session.SessionManager
+import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -68,6 +70,10 @@ fun LoginSheet(
     var isLoginSubmitted by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        // پاک کردن کوکی‌های مزاحم قبلی
+        CookieManager.getInstance().removeAllCookies(null)
+        CookieManager.getInstance().flush()
+
         credentialsManager.getUsername()?.let { username = it }
         credentialsManager.getPassword()?.let { password = it }
         if (username.isNotBlank() && password.isNotBlank()) {
@@ -80,67 +86,97 @@ fun LoginSheet(
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                // 👈 جلوگیری از باز شدن پنجره ذخیره رمز گوگل
+                settings.saveFormData = false
+                settings.savePassword = false
                 settings.userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                
                 CookieManager.getInstance().setAcceptCookie(true)
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                 webViewClient = object : WebViewClient() {
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                        super.onPageStarted(view, url, favicon)
+                        // هر بار که صفحه جدید لود شد، اگر در حال لاگین بودیم، خطا را پاک کن
+                        if (loading) errorMsg = null
+                    }
+
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         if (url == null) return
 
+                        // اگر در صفحه لاگین هستیم و دکمه لاگین زده شده
                         if (url.contains("wp-login.php") && isLoginSubmitted) {
                             loading = true
                             val safeUser = username.replace("'", "\\'").replace("\n", "")
                             val safePass = password.replace("'", "\\'").replace("\n", "")
+                            
+                            // تزریق جاوااسکریپت برای پر کردن فرم و کلیک روی دکمه ورود
                             view?.evaluateJavascript("""
                                 javascript:(function(){
-                                    document.getElementById('user_login').value = '$safeUser';
-                                    document.getElementById('user_pass').value = '$safePass';
-                                    document.getElementById('wp-submit').click();
+                                    var userField = document.getElementById('user_login');
+                                    var passField = document.getElementById('user_pass');
+                                    var submitBtn = document.getElementById('wp-submit');
+                                    if (userField && passField && submitBtn) {
+                                        userField.value = '$safeUser';
+                                        passField.value = '$safePass';
+                                        submitBtn.click();
+                                    }
                                 })()
                             """.trimIndent(), null)
                             isLoginSubmitted = false 
                         } 
+                        // اگر از صفحه لاگین خارج شدیم (یعنی لاگین موفق بوده)
                         else if (!url.contains("wp-login.php") && loading) {
-                            // ۱. استخراج Nonce از صفحه لاگین شده
-                            view?.evaluateJavascript("""
-                                (function() {
-                                    var nonce = '';
-                                    var scripts = document.getElementsByTagName('script');
-                                    for (var i = 0; i < scripts.length; i++) {
-                                        var text = scripts[i].innerHTML;
-                                        var match = text.match(/"nonce":"([^"]+)"/);
-                                        if (match) { nonce = match[1]; break; }
-                                    }
-                                    return nonce;
-                                })();
-                            """.trimIndent()) { nonceResult ->
-                                val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
-                                val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+                            // کمی صبر می‌کنیم تا کوکی‌ها کاملاً تنظیم شوند
+                            scope.launch {
+                                delay(1500)
                                 
-                                scope.launch {
-                                    // ۲. پاس دادن کوکی‌ها و توکن به ریپازیتوری
-                                    val result = withContext(Dispatchers.IO) { 
-                                        repository.getCurrentUser(cookies, cleanNonce) 
-                                    }
-                                    result.onSuccess { user ->
-                                        if (user.id > 0) {
-                                            if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                            else credentialsManager.clearCredentials()
-                                            
-                                            // ۳. ذخیره توکن در SessionManager
-                                            sessionManager.updateNonce(cleanNonce)
-                                            onLoginSuccess(user.copy(nonce = cleanNonce))
-                                            onDismiss()
-                                        } else {
-                                            errorMsg = "اطلاعات کاربری یافت نشد."
-                                            loading = false
+                                // بررسی می‌کنیم آیا کوکی لاگین واقعاً ست شده است یا خیر
+                                val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+                                if (cookies.contains("wordpress_logged_in")) {
+                                    
+                                    // استخراج توکن (Nonce) از داخل صفحه
+                                    view?.evaluateJavascript("""
+                                        (function() {
+                                            var nonce = '';
+                                            var scripts = document.getElementsByTagName('script');
+                                            for (var i = 0; i < scripts.length; i++) {
+                                                var text = scripts[i].innerHTML;
+                                                var match = text.match(/"nonce":"([^"]+)"/);
+                                                if (match) { nonce = match[1]; break; }
+                                            }
+                                            return nonce;
+                                        })();
+                                    """.trimIndent()) { nonceResult ->
+                                        val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
+                                        
+                                        scope.launch {
+                                            val result = withContext(Dispatchers.IO) { 
+                                                repository.getCurrentUser(cookies, cleanNonce) 
+                                            }
+                                            result.onSuccess { user ->
+                                                if (user.id > 0) {
+                                                    if (rememberMe) credentialsManager.saveCredentials(username, password)
+                                                    else credentialsManager.clearCredentials()
+                                                    
+                                                    sessionManager.updateNonce(cleanNonce)
+                                                    onLoginSuccess(user.copy(nonce = cleanNonce))
+                                                    onDismiss()
+                                                } else {
+                                                    errorMsg = "اطلاعات کاربری یافت نشد."
+                                                    loading = false
+                                                }
+                                            }.onFailure {
+                                                errorMsg = "خطا در دریافت اطلاعات کاربر."
+                                                loading = false
+                                            }
                                         }
-                                    }.onFailure {
-                                        errorMsg = "خطا: نام کاربری یا رمز عبور اشتباه است."
-                                        loading = false
                                     }
+                                } else {
+                                    // اگر کوکی ست نشده بود یعنی رمز یا ایمیل اشتباه است
+                                    errorMsg = "ایمیل/نام کاربری یا رمز عبور اشتباه است."
+                                    loading = false
                                 }
                             }
                         }
@@ -163,7 +199,9 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.Transparent, // 👈 سفیدی پس‌زمینه حذف شد
+        // 👈 تنظیمات ظاهری برای رفع مشکل پس‌زمینه و سفیدی
+        containerColor = AppdonyBg, // رنگ تیره اپ
+        scrimColor = Color.Black.copy(alpha = 0.6f), // سایه تیره پشت پنجره
         dragHandle = null
     ) {
         Column(
@@ -180,7 +218,7 @@ fun LoginSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("ورود به اپدونی", color = AppdonyTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text("با حساب کاربری سایت وارد شو", color = AppdonyTextMuted, fontSize = 13.sp)
                 }
                 Box(
@@ -190,9 +228,9 @@ fun LoginSheet(
                     Icon(Icons.Default.Close, contentDescription = "بستن", tint = AppdonyTextPrimary)
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // فیلد نام کاربری
+            // فیلد نام کاربری / ایمیل
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
@@ -211,7 +249,7 @@ fun LoginSheet(
                 ),
                 enabled = !loading
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // فیلد رمز عبور
             OutlinedTextField(
@@ -245,7 +283,7 @@ fun LoginSheet(
             )
 
             // مرا به خاطر بسپار
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { rememberMe = !rememberMe },
                 verticalAlignment = Alignment.CenterVertically
@@ -258,9 +296,9 @@ fun LoginSheet(
                 Text("مرا به خاطر بسپار (ورود خودکار)", color = AppdonyTextMuted, fontSize = 13.sp)
             }
 
-            // خطا
+            // پیام خطا (بدون هیچ ترفند اضافه‌ای)
             if (errorMsg != null) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Box(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x33FF5252)).padding(12.dp)
                 ) {
@@ -268,7 +306,7 @@ fun LoginSheet(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // دکمه ورود
             Button(
