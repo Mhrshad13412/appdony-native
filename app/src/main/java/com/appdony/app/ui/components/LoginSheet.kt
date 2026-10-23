@@ -1,13 +1,22 @@
 package com.appdony.app.ui.components
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -18,8 +27,25 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +62,6 @@ import com.appdony.app.data.model.UserData
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.CredentialsManager
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -62,7 +87,6 @@ fun LoginSheet(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(true) }
     var loading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
@@ -70,7 +94,6 @@ fun LoginSheet(
     var isLoginSubmitted by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        // پاک کردن کوکی‌های مزاحم قبلی
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
 
@@ -86,7 +109,6 @@ fun LoginSheet(
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                // 👈 جلوگیری از باز شدن پنجره ذخیره رمز گوگل
                 settings.saveFormData = false
                 settings.savePassword = false
                 settings.userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -95,55 +117,37 @@ fun LoginSheet(
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                 webViewClient = object : WebViewClient() {
-                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                        super.onPageStarted(view, url, favicon)
-                        // هر بار که صفحه جدید لود شد، اگر در حال لاگین بودیم، خطا را پاک کن
-                        if (loading) errorMsg = null
-                    }
-
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         if (url == null) return
 
-                        // اگر در صفحه لاگین هستیم و دکمه لاگین زده شده
                         if (url.contains("wp-login.php") && isLoginSubmitted) {
                             loading = true
                             val safeUser = username.replace("'", "\\'").replace("\n", "")
                             val safePass = password.replace("'", "\\'").replace("\n", "")
                             
-                            // تزریق جاوااسکریپت برای پر کردن فرم و کلیک روی دکمه ورود
                             view?.evaluateJavascript("""
                                 javascript:(function(){
-                                    var userField = document.getElementById('user_login');
-                                    var passField = document.getElementById('user_pass');
-                                    var submitBtn = document.getElementById('wp-submit');
-                                    if (userField && passField && submitBtn) {
-                                        userField.value = '$safeUser';
-                                        passField.value = '$safePass';
-                                        submitBtn.click();
-                                    }
+                                    var u = document.getElementById('user_login');
+                                    var p = document.getElementById('user_pass');
+                                    var b = document.getElementById('wp-submit');
+                                    if(u && p && b) { u.value = '$safeUser'; p.value = '$safePass'; b.click(); }
                                 })()
                             """.trimIndent(), null)
                             isLoginSubmitted = false 
                         } 
-                        // اگر از صفحه لاگین خارج شدیم (یعنی لاگین موفق بوده)
                         else if (!url.contains("wp-login.php") && loading) {
-                            // کمی صبر می‌کنیم تا کوکی‌ها کاملاً تنظیم شوند
                             scope.launch {
-                                delay(1500)
-                                
-                                // بررسی می‌کنیم آیا کوکی لاگین واقعاً ست شده است یا خیر
+                                delay(2000) // زمان برای ست شدن کوکی‌ها
                                 val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
+                                
                                 if (cookies.contains("wordpress_logged_in")) {
-                                    
-                                    // استخراج توکن (Nonce) از داخل صفحه
                                     view?.evaluateJavascript("""
                                         (function() {
                                             var nonce = '';
                                             var scripts = document.getElementsByTagName('script');
                                             for (var i = 0; i < scripts.length; i++) {
-                                                var text = scripts[i].innerHTML;
-                                                var match = text.match(/"nonce":"([^"]+)"/);
+                                                var match = scripts[i].innerHTML.match(/"nonce":"([^"]+)"/);
                                                 if (match) { nonce = match[1]; break; }
                                             }
                                             return nonce;
@@ -157,9 +161,8 @@ fun LoginSheet(
                                             }
                                             result.onSuccess { user ->
                                                 if (user.id > 0) {
-                                                    if (rememberMe) credentialsManager.saveCredentials(username, password)
-                                                    else credentialsManager.clearCredentials()
-                                                    
+                                                    // 👈 همیشه ذخیره میکنیم
+                                                    credentialsManager.saveCredentials(username, password)
                                                     sessionManager.updateNonce(cleanNonce)
                                                     onLoginSuccess(user.copy(nonce = cleanNonce))
                                                     onDismiss()
@@ -168,13 +171,12 @@ fun LoginSheet(
                                                     loading = false
                                                 }
                                             }.onFailure {
-                                                errorMsg = "خطا در دریافت اطلاعات کاربر."
+                                                errorMsg = "خطا در ارتباط با سرور."
                                                 loading = false
                                             }
                                         }
                                     }
                                 } else {
-                                    // اگر کوکی ست نشده بود یعنی رمز یا ایمیل اشتباه است
                                     errorMsg = "ایمیل/نام کاربری یا رمز عبور اشتباه است."
                                     loading = false
                                 }
@@ -199,9 +201,8 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // 👈 تنظیمات ظاهری برای رفع مشکل پس‌زمینه و سفیدی
-        containerColor = AppdonyBg, // رنگ تیره اپ
-        scrimColor = Color.Black.copy(alpha = 0.6f), // سایه تیره پشت پنجره
+        containerColor = MaterialTheme.colorScheme.surface, // 👈 رنگ سطح (خاکستری تیره)
+        scrimColor = Color.Black.copy(alpha = 0.6f), // 👈 سایه تیره پشت
         dragHandle = null
     ) {
         Column(
@@ -211,7 +212,6 @@ fun LoginSheet(
                 .padding(top = 16.dp, bottom = 24.dp)
                 .imePadding()
         ) {
-            // هدر
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -230,7 +230,6 @@ fun LoginSheet(
             }
             Spacer(modifier = Modifier.height(24.dp))
 
-            // فیلد نام کاربری / ایمیل
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it; errorMsg = null },
@@ -242,7 +241,7 @@ fun LoginSheet(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = AppdonyCardBg,
-                    focusedContainerColor = AppdonyCardBg,
+                    focusedContainerColor = AppdonyCardBg, // 👈 رنگ داخل باکس
                     unfocusedContainerColor = AppdonyCardBg,
                     focusedTextColor = AppdonyTextPrimary,
                     unfocusedTextColor = AppdonyTextPrimary
@@ -251,7 +250,6 @@ fun LoginSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // فیلد رمز عبور
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMsg = null },
@@ -282,23 +280,10 @@ fun LoginSheet(
                 enabled = !loading
             )
 
-            // مرا به خاطر بسپار
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { rememberMe = !rememberMe },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = rememberMe,
-                    onCheckedChange = { rememberMe = it },
-                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                )
-                Text("مرا به خاطر بسپار (ورود خودکار)", color = AppdonyTextMuted, fontSize = 13.sp)
-            }
+            // 👈 تیک مرا به خاطر بسپار حذف شد
 
-            // پیام خطا (بدون هیچ ترفند اضافه‌ای)
             if (errorMsg != null) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Box(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x33FF5252)).padding(12.dp)
                 ) {
@@ -306,9 +291,8 @@ fun LoginSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // دکمه ورود
             Button(
                 onClick = { submitLogin() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
