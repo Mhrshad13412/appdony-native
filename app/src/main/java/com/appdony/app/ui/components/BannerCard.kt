@@ -40,7 +40,6 @@ fun BannerCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    // 👈 درخواست عکس بنر با سایز کوچیک‌تر (۵۰۰ در ۳۰۰) برای دانلود سریع‌تر
     val imageRequest = ImageRequest.Builder(context)
         .data(imageUrl)
         .size(500, 300)
@@ -49,8 +48,8 @@ fun BannerCard(
 
     Box(
         modifier = modifier
-            .width(220.dp) // 👈 عرض بنر از ۲۸۰ به ۲۲۰ کاهش یافت
-            .height(130.dp) // 👈 ارتفاع از ۱۶۰ به ۱۳۰ کاهش یافت
+            .width(220.dp)
+            .height(130.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(AppdonyCardBg)
             .clickable { onClick() }
@@ -84,7 +83,6 @@ fun BannerCard(
                 SubcomposeAsyncImageContent()
             }
         )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,11 +93,10 @@ fun BannerCard(
                     )
                 )
         )
-
         Text(
             text = title,
             color = AppdonyTextPrimary,
-            fontSize = 12.sp, // 👈 فونت کمی کوچیک‌تر شد
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
