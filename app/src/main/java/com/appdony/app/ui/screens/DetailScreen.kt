@@ -82,6 +82,7 @@ fun DetailScreen(
     val scope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager(context) }
     val favoritesManager = remember { FavoritesManager(context) }
+
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val nonce by sessionManager.nonce.collectAsStateWithLifecycle(initialValue = "")
     val favorites by favoritesManager.favoriteIds.collectAsStateWithLifecycle(initialValue = emptySet())
@@ -93,7 +94,10 @@ fun DetailScreen(
             onDismiss = { showLoginSheet = false },
             onLoginSuccess = { user ->
                 scope.launch {
-                    sessionManager.saveSession(user.id, user.username, user.name, user.email, user.avatarUrl() ?: "", user.nonce)
+                    sessionManager.saveSession(
+                        user.id, user.username, user.name,
+                        user.email, user.avatarUrl() ?: "", user.nonce
+                    )
                     showLoginSheet = false
                 }
             }
@@ -128,37 +132,46 @@ fun DetailScreen(
                     nonce = nonce,
                     isBlog = isBlog,
                     userRating = userRating,
-                    onRatingChanged = { rating -> if (isLoggedIn) userRating = rating else showLoginSheet = true },
+                    onRatingChanged = { rating ->
+                        if (isLoggedIn) userRating = rating else showLoginSheet = true
+                    },
                     onSimilarClick = onSimilarClick,
                     onDownload = { url, title ->
-                        scope.launch { DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url)) }
+                        scope.launch {
+                            DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url))
+                        }
                     },
                     onNeedLogin = { showLoginSheet = true }
                 )
             }
         }
 
-        // 👈 دکمه بازگشت (چپ)
+        // دکمه بازگشت (چپ)
         Box(
-            modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { onBack() },
+            modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape)
+                .background(Color(0xCC000000)).clickable { onBack() },
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
-        // 👈 دکمه‌های اشتراک‌گذاری و علاقه‌مندی (راست)
+        // دکمه‌های اشتراک‌گذاری و علاقه‌مندی (راست)
         Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() },
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(Color(0xCC000000)).clickable { shareAction() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری", tint = Color.White)
             }
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } },
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(Color(0xCC000000)).clickable {
+                        scope.launch { favoritesManager.toggle(postId) }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -190,7 +203,6 @@ private fun DetailContent(
     val scope = rememberCoroutineScope()
     val primaryColor = MaterialTheme.colorScheme.primary
     val textColor = AppdonyTextPrimary
-
     val tocItems = contentBlocks.filterIsInstance<ContentBlock.Header>().filter { it.level == 2 }
 
     LazyColumn(
@@ -200,8 +212,16 @@ private fun DetailContent(
     ) {
         // ۱. عکس شاخص
         item {
-            Box(modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp).clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
-                AsyncImage(model = post.featuredImageUrl(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(
+                modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+            ) {
+                AsyncImage(
+                    model = post.featuredImageUrl(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))))
             }
         }
@@ -215,10 +235,18 @@ private fun DetailContent(
                     Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                 } else {
-                    // 👈 استایل جدید و جمع‌وجور برای بازی/برنامه
-                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
+                    // استایل جدید و جمع‌وجور برای بازی/برنامه
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                            .background(AppdonyCardBg).padding(16.dp)
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(model = post.featuredImageUrl(), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
+                            AsyncImage(
+                                model = post.featuredImageUrl(),
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -234,7 +262,11 @@ private fun DetailContent(
                         Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
                         // بخش امتیازدهی داخل همین کادر
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
                             Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
@@ -262,7 +294,6 @@ private fun DetailContent(
                         Text("فهرست مطالب", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    
                     tocItems.forEach { header ->
                         Text(
                             text = "• ${header.text}",
@@ -284,20 +315,41 @@ private fun DetailContent(
         // ۴. بخش دانلود (فقط برای بازی/برنامه)
         if (!isBlog) {
             item {
-                // 👈 اگر لینکی پیدا شد، دکمه‌ها نمایش داده می‌شوند.
+                // اگر لینکی پیدا شد، دکمه‌ها نمایش داده می‌شوند.
                 if (info.downloadLinks.isNotEmpty()) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         info.downloadLinks.forEachIndexed { index, link ->
-                            Button(onClick = { onDownload(link.url, post.cleanTitle()) }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if (index == 0) primaryColor else AppdonyCardBg)) {
+                            Button(
+                                onClick = { onDownload(link.url, post.cleanTitle()) },
+                                modifier = Modifier.fillMaxWidth().height(54.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (index == 0) primaryColor else AppdonyCardBg
+                                )
+                            ) {
                                 Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else textColor)
                                 Spacer(Modifier.width(8.dp))
-                                Text(link.title.ifBlank { "دانلود" }, color = if (index == 0) Color.White else textColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    link.title.ifBlank { "دانلود" },
+                                    color = if (index == 0) Color.White else textColor,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
                 } else {
-                    // 👈 اگر هیچ لینکی پیدا نشد، این متن نمایش داده میشه
-                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp), contentAlignment = Alignment.Center) {
+                    // اگر هیچ لینکی پیدا نشد، این متن نمایش داده میشه
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text("لینک دانلودی یافت نشد", color = AppdonyTextMuted, fontSize = 14.sp)
                     }
                 }
@@ -319,11 +371,20 @@ private fun DetailContent(
                     }
                     is ContentBlock.Image -> {
                         Spacer(modifier = Modifier.height(8.dp))
-                        AsyncImage(model = block.url, contentDescription = null, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.FillWidth)
+                        AsyncImage(
+                            model = block.url,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
+                            contentScale = ContentScale.FillWidth
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                     is ContentBlock.Quote -> {
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(8.dp)).background(primaryColor.copy(alpha = 0.1f))) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(primaryColor.copy(alpha = 0.1f))
+                        ) {
                             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.FormatQuote, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
@@ -359,7 +420,12 @@ private fun DetailContent(
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(similar, key = { it.id }) { p ->
-                        AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl() ?: "", onClick = { onSimilarClick(p.id) }, modifier = Modifier.width(160.dp))
+                        AppCard(
+                            title = p.cleanTitle(),
+                            imageUrl = p.featuredImageUrl() ?: "",
+                            onClick = { onSimilarClick(p.id) },
+                            modifier = Modifier.width(160.dp)
+                        )
                     }
                 }
             }
@@ -373,7 +439,7 @@ private fun DetailContent(
     }
 }
 
-// 👈 اسکلت لودینگ اختصاصی وبلاگ (شبیه یوتیوب)
+// اسکلت لودینگ اختصاصی وبلاگ (شبیه یوتیوب)
 @Composable
 fun BlogDetailSkeleton() {
     val transition = rememberInfiniteTransition(label = "shimmer")
@@ -383,19 +449,14 @@ fun BlogDetailSkeleton() {
         animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
         label = "alpha"
     )
-
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(modifier = Modifier.fillMaxWidth().height(220.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
-        
         Spacer(modifier = Modifier.height(16.dp))
-        
         Column(modifier = Modifier.padding(16.dp)) {
             Box(modifier = Modifier.fillMaxWidth(0.8f).height(24.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
             Spacer(modifier = Modifier.height(8.dp))
             Box(modifier = Modifier.fillMaxWidth(0.5f).height(24.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
-            
             Spacer(modifier = Modifier.height(24.dp))
-            
             repeat(3) {
                 Box(modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
                 Spacer(modifier = Modifier.height(8.dp))
