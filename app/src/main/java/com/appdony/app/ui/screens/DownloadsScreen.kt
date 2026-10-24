@@ -1,6 +1,5 @@
 package com.appdony.app.ui.screens
 
-import android.app.DownloadManager
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -44,20 +43,14 @@ import java.io.File
 @Composable
 fun DownloadsScreen() {
     val context = LocalContext.current
-    val vm: DownloadsViewModel = viewModel(
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return DownloadsViewModel(context) as T
-            }
-        }
-    )
+    // استفاده از viewModel() استاندارد؛ AndroidViewModel خودکار Application را دریافت می‌کند
+    val vm: DownloadsViewModel = viewModel()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("دانلودها", color = AppdonyTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        
+
         if (downloads.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("هیچ فایلی دانلود نشده است.", color = AppdonyTextMuted)
@@ -67,7 +60,7 @@ fun DownloadsScreen() {
                 items(downloads) { item ->
                     DownloadCard(
                         item = item,
-                        onDelete = { 
+                        onDelete = {
                             try {
                                 val file = File(item.filePath)
                                 if (file.exists()) file.delete()
@@ -80,33 +73,19 @@ fun DownloadsScreen() {
                             try {
                                 val file = File(item.filePath)
                                 if (file.exists()) {
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        file
+                                    )
                                     val intent = Intent(Intent.ACTION_VIEW).apply {
                                         setDataAndType(uri, "application/vnd.android.package-archive")
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
                                     context.startActivity(intent)
-                                } else {
-                                    Toast.makeText(context, "فایل یافت نشد", Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: Exception) {
-                                Toast.makeText(context, "امکان نصب وجود ندارد", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        onShare = {
-                            try {
-                                val file = File(item.filePath)
-                                if (file.exists()) {
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/vnd.android.package-archive"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "خطا در اشتراک‌گذاری", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "خطا در نصب", Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
@@ -117,30 +96,56 @@ fun DownloadsScreen() {
 }
 
 @Composable
-fun DownloadCard(item: DownloadItem, onDelete: () -> Unit, onInstall: () -> Unit, onShare: () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = AppdonyCardBg), modifier = Modifier.fillMaxWidth()) {
+private fun DownloadCard(
+    item: DownloadItem,
+    onDelete: () -> Unit,
+    onInstall: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppdonyCardBg)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(item.title, color = AppdonyTextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
-            Spacer(Modifier.height(4.dp))
+            Text(
+                text = item.title,
+                color = AppdonyTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text("حجم: ${item.size}", color = AppdonyTextMuted, fontSize = 12.sp)
-            
-            if (item.status == DownloadManager.STATUS_RUNNING) {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(progress = { item.progress / 100f }, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+
+            when (item.status) {
+                android.app.DownloadManager.STATUS_RUNNING -> {
+                    LinearProgressIndicator(
+                        progress = item.progress / 100f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("در حال دانلود: ${item.progress}%", color = AppdonyTextMuted, fontSize = 12.sp)
+                }
+                android.app.DownloadManager.STATUS_SUCCESSFUL -> {
+                    Text("دانلود کامل شد", color = AppdonyTextMuted, fontSize = 12.sp)
+                }
+                android.app.DownloadManager.STATUS_FAILED -> {
+                    Text("دانلود ناموفق", color = AppdonyTextMuted, fontSize = 12.sp)
+                }
             }
-            
-            Spacer(Modifier.height(12.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (item.status == DownloadManager.STATUS_SUCCESSFUL) {
-                    Button(onClick = onInstall, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                OutlinedButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
+                    Spacer(Modifier.width(4.dp))
+                    Text("حذف", color = AppdonyTextMuted)
+                }
+                if (item.status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                    Button(onClick = onInstall) {
                         Text("نصب")
                     }
-                    OutlinedButton(onClick = onShare, shape = RoundedCornerShape(8.dp)) {
-                        Icon(Icons.Default.Share, contentDescription = null)
-                    }
-                }
-                OutlinedButton(onClick = onDelete, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
                 }
             }
         }
