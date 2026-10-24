@@ -163,7 +163,6 @@ private fun DetailContent(
     onNeedLogin: () -> Unit
 ) {
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val primaryColor = MaterialTheme.colorScheme.primary
     val textColor = AppdonyTextPrimary
 
@@ -174,7 +173,6 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // ۱. عکس شاخص
         item {
             Box(modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp).clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
                 AsyncImage(model = post.featuredImageUrl(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -182,7 +180,6 @@ private fun DetailContent(
             }
         }
 
-        // ۲. تایتل و اطلاعات
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                 if (isBlog) {
@@ -204,7 +201,6 @@ private fun DetailContent(
             }
         }
 
-        // ۳. فهرست مطالب (فقط برای وبلاگ و اگر تیتر H2 داشته باشه)
         if (isBlog && tocItems.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(16.dp)) {
@@ -222,7 +218,6 @@ private fun DetailContent(
             }
         }
 
-        // ۴. بخش بازی/برنامه (دکمه‌ها)
         if (!isBlog) {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -246,7 +241,6 @@ private fun DetailContent(
             }
         }
 
-        // ۵. محتوای اصلی (داخل یک باکس گرد و تمیز)
         item {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -295,7 +289,6 @@ private fun DetailContent(
             }
         }
 
-        // ۶. اشتراک‌گذاری
         item {
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp), shape = RoundedCornerShape(14.dp)) {
@@ -305,7 +298,6 @@ private fun DetailContent(
             }
         }
 
-        // ۷. مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -321,7 +313,6 @@ private fun DetailContent(
             }
         }
 
-        // ۸. نظرات
         item {
             Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
