@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appdony.app.data.api.AiApi
 import com.appdony.app.data.preferences.ChatHistoryManager
-import com.appdony.app.data.preferences.ChatMessage // 👈 از پکیج جدید ایمپورت شد
+import com.appdony.app.data.preferences.ChatMessage
 import com.appdony.app.ui.components.PlagueDoctorAvatar
 import kotlinx.coroutines.launch
 
@@ -35,18 +36,17 @@ fun AiChatScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val chatHistoryManager = remember { ChatHistoryManager(context) }
-    
+
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
     var isHistoryLoaded by remember { mutableStateOf(false) }
 
-    // 👇 بارگذاری تاریخچه در اولین ورود
+    // بارگذاری تاریخچه در اولین ورود
     LaunchedEffect(Unit) {
         chatHistoryManager.getChatHistory().collect { history ->
             if (history.isEmpty()) {
-                // اگه تاریخچه خالی بود، پیام خوش‌آمدگویی رو بذار
-                val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور می‌تونم کمکت کنم؟", false))
+                val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور میتونم کمکت کنم؟", false))
                 messages = welcomeMsg
                 chatHistoryManager.saveChatHistory(welcomeMsg)
             } else {
@@ -56,28 +56,28 @@ fun AiChatScreen(onBack: () -> Unit) {
         }
     }
 
-    fun sendMessage() {
-        if (inputText.isBlank() || isLoading) return
-        
-        val userMsg = inputText.trim()
+    fun sendMessage(customText: String? = null) {
+        val textToSend = customText ?: inputText
+        if (textToSend.isBlank() || isLoading) return
+
+        val userMsg = textToSend.trim()
         val updatedMessages = messages + ChatMessage(userMsg, true)
         messages = updatedMessages
-        inputText = ""
+        if (customText == null) inputText = ""
         isLoading = true
-        
+
         // ذخیره پیام کاربر
-        scope.launch { chatHistoryManager.saveChatHistory(updatedMessages) }
+        scope.launch {
+            chatHistoryManager.saveChatHistory(updatedMessages)
+        }
 
         scope.launch {
-            val history = messages.dropLast(1).map { 
-                (if (it.isUser) "user" else "assistant") to it.text 
-            }
-            
+            val history = messages.dropLast(1).map { (if (it.isUser) "user" else "assistant") to it.text }
             val result = AiApi.sendMessage(userMsg, history)
+            
             result.onSuccess { response ->
                 val finalMessages = messages + ChatMessage(response, false)
                 messages = finalMessages
-                // ذخیره پاسخ هوش مصنوعی
                 chatHistoryManager.saveChatHistory(finalMessages)
             }.onFailure { error ->
                 val errorMsg = ChatMessage("خطا: ${error.message ?: "مشکل در اتصال"}", false)
@@ -92,8 +92,7 @@ fun AiChatScreen(onBack: () -> Unit) {
     fun clearChat() {
         scope.launch {
             chatHistoryManager.clearHistory()
-            // بعد از پاک کردن، دوباره پیام خوش‌آمدگویی رو می‌ذاریم
-            val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور می‌تونم کمکت کنم؟", false))
+            val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور میتونم کمکت کنم؟", false))
             messages = welcomeMsg
             chatHistoryManager.saveChatHistory(welcomeMsg)
         }
@@ -115,7 +114,6 @@ fun AiChatScreen(onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    // 👇 دکمه پاک کردن تاریخچه
                     IconButton(onClick = { clearChat() }) {
                         Icon(Icons.Default.Delete, contentDescription = "پاک کردن چت", tint = MaterialTheme.colorScheme.error)
                     }
@@ -151,14 +149,16 @@ fun AiChatScreen(onBack: () -> Unit) {
                                 PlagueDoctorAvatar(sizeDp = 40)
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
-                            
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(
-                                        topStart = 16.dp, topEnd = 16.dp,
-                                        bottomStart = if (msg.isUser) 16.dp else 4.dp,
-                                        bottomEnd = if (msg.isUser) 4.dp else 16.dp
-                                    ))
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 16.dp,
+                                            topEnd = 16.dp,
+                                            bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                                            bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                                        )
+                                    )
                                     .background(if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(12.dp)
                             ) {
@@ -171,7 +171,6 @@ fun AiChatScreen(onBack: () -> Unit) {
                             }
                         }
                     }
-                    
                     if (isLoading) {
                         item {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -190,6 +189,24 @@ fun AiChatScreen(onBack: () -> Unit) {
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 👈 دکمه پیشنهاد هوشمند (ارسال پیام از پیش تعریف شده)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { sendMessage("یه بازی یا برنامه خوب برام پیشنهاد بده") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SmartToy,
+                            contentDescription = "پیشنهاد هوشمند",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
@@ -205,6 +222,7 @@ fun AiChatScreen(onBack: () -> Unit) {
                         )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    
                     Box(
                         modifier = Modifier
                             .size(48.dp)
