@@ -14,12 +14,9 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 object DownloadHelper {
-
     suspend fun startDownload(context: Context, url: String, fileName: String, wifiOnly: Boolean = false) {
         Toast.makeText(context, "در حال آماده‌سازی لینک دانلود...", Toast.LENGTH_SHORT).show()
-        
         val finalUrl = resolveDirectUrl(url)
-        
         if (finalUrl == null) {
             Toast.makeText(context, "لینک دانلود مستقیم پیدا نشد!", Toast.LENGTH_LONG).show()
             return
@@ -32,9 +29,7 @@ object DownloadHelper {
                     setDescription("در حال دانلود از اپدونی...")
                     setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                    
-                    // 👇 اعمال محدودیت وای‌فای
-                    setAllowedOverMetered(!wifiOnly) 
+                    setAllowedOverMetered(!wifiOnly)
                     setAllowedOverRoaming(false)
 
                     val ext = MimeTypeMap.getFileExtensionFromUrl(finalUrl).lowercase()
@@ -65,9 +60,15 @@ object DownloadHelper {
 
     private suspend fun resolveDirectUrl(url: String): String? = withContext(Dispatchers.IO) {
         try {
-            val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).followRedirects(true).build()
-            val request = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 10)").get().build()
-
+            val client = OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10)")
+                .get()
+                .build()
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val finalUrl = response.request.url.toString()
@@ -86,7 +87,7 @@ object DownloadHelper {
     fun buildFileName(title: String, url: String): String {
         val clean = title.replace(Regex("[^\\w\\u0600-\\u06FF\\s.]"), "").trim().take(50).ifBlank { "appdony_file" }
         val ext = url.substringAfterLast(".", "").substringBefore("?").lowercase()
-        val safeExt = if (ext in listOf("apk", "zip", "rar", "pdf") && ext.isNotBlank()) ".$ext" else ".apk"
-        return "$clean$safeExt"
+        val safeExt = if (ext.length in 2..5 && ext.all { it.isLetterOrDigit() }) ext else "apk"
+        return "$clean.$safeExt"
     }
 }
