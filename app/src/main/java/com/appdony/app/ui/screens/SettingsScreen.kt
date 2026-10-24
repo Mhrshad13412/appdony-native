@@ -3,42 +3,16 @@ package com.appdony.app.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,14 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.appdony.app.data.preferences.ChatHistoryManager
-import com.appdony.app.data.preferences.FavoritesManager
-import com.appdony.app.data.preferences.FontSize
-import com.appdony.app.data.preferences.SearchHistoryManager
-import com.appdony.app.data.preferences.SettingsManager
-import com.appdony.app.data.preferences.ThemeManager
-import com.appdony.app.data.preferences.ThemeMode
-import com.appdony.app.data.preferences.ThemeState
+import com.appdony.app.data.preferences.*
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.util.CacheUtils
 import kotlinx.coroutines.launch
@@ -79,35 +46,22 @@ fun SettingsScreen(onBack: () -> Unit) {
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
 
-    LaunchedEffect(Unit) {
-        cacheSize = CacheUtils.getCacheSize(context)
-    }
+    LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("تنظیمات", color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
-
         item { SettingsHeader("دستیار هوش مصنوعی", Icons.Default.Email, primary) }
         item { SettingsSwitchRow("نمایش دکتر طاعون", Icons.Default.Visibility, showAiAssistant) { scope.launch { settingsManager.setShowAiAssistant(it) } } }
-
         item { SettingsHeader("ظاهر برنامه", Icons.Default.Star, primary) }
         item { SettingsSwitchRow("حالت تاریک", Icons.Default.Settings, themeState.mode == ThemeMode.DARK) { scope.launch { themeManager.setMode(if (it) ThemeMode.DARK else ThemeMode.LIGHT) } } }
-        
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -123,7 +77,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
         }
-
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,44 +88,25 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FontSize.values().forEach { size ->
                         val selected = themeState.fontSize == size
-                        Box(
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                                .background(if (selected) primary else MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable { scope.launch { themeManager.setFontSize(size) } }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = when (size) {
-                                    FontSize.SMALL -> "کوچک"
-                                    FontSize.MEDIUM -> "متوسط"
-                                    FontSize.LARGE -> "بزرگ"
-                                },
-                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
-                            )
+                        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (selected) primary else MaterialTheme.colorScheme.surfaceVariant).clickable { scope.launch { themeManager.setFontSize(size) } }.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                            Text(text = when (size) { FontSize.SMALL -> "کوچک"; FontSize.MEDIUM -> "متوسط"; FontSize.LARGE -> "بزرگ" }, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         }
                     }
                 }
             }
         }
-
         item { SettingsHeader("دانلود و شبکه", Icons.Default.Download, primary) }
         item { SettingsSwitchRow("دانلود فقط با وای‌فای", Icons.Default.Download, wifiOnly) { scope.launch { settingsManager.setWifiOnly(it) } } }
-
         item { SettingsHeader("اعلان‌ها", Icons.Default.Notifications, primary) }
         item { SettingsSwitchRow("اعلان وبلاگ", Icons.Default.Info, notifyBlog) { scope.launch { settingsManager.setNotifyBlog(it) } } }
         item { SettingsSwitchRow("اعلان آپدیت", Icons.Default.Refresh, notifyUpdates) { scope.launch { settingsManager.setNotifyUpdates(it) } } }
-
         item { SettingsHeader("داده‌ها", Icons.Default.Delete, primary) }
         item { SettingsActionRow("پاک کردن حافظه کش", cacheSize, Icons.Default.Delete) { scope.launch { CacheUtils.clearCache(context); cacheSize = CacheUtils.getCacheSize(context); Toast.makeText(context, "کش پاک شد", Toast.LENGTH_SHORT).show() } } }
         item { SettingsActionRow("پاک کردن تاریخچه جستجو", "", Icons.Default.Search) { scope.launch { historyManager.clearHistory(); Toast.makeText(context, "تاریخچه پاک شد", Toast.LENGTH_SHORT).show() } } }
         item { SettingsActionRow("پاک کردن علاقه‌مندی‌ها", "", Icons.Default.Favorite) { scope.launch { favoritesManager.clear(); Toast.makeText(context, "علاقه‌مندی‌ها پاک شد", Toast.LENGTH_SHORT).show() } } }
         item { SettingsActionRow("پاک کردن تاریخچه چت", "", Icons.Default.Email) { scope.launch { chatHistoryManager.clearHistory(); Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show() } } }
-
         item { SettingsHeader("حساب کاربری", Icons.AutoMirrored.Filled.ExitToApp, primary) }
         item { SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.ExitToApp, color = Color.Red) { scope.launch { sessionManager.clearSession(); Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show() } } }
-
         item { Spacer(Modifier.height(32.dp)) }
     }
 }
