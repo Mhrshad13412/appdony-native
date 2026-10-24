@@ -2,6 +2,7 @@ package com.appdony.app.ui.screens
 
 import android.app.DownloadManager
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,31 +68,45 @@ fun DownloadsScreen() {
                     DownloadCard(
                         item = item,
                         onDelete = { 
-                            val file = File(item.filePath)
-                            if (file.exists()) file.delete()
-                            vm.loadDownloads() 
+                            try {
+                                val file = File(item.filePath)
+                                if (file.exists()) file.delete()
+                                vm.loadDownloads()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "خطا در حذف فایل", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         onInstall = {
-                            val file = File(item.filePath)
-                            if (file.exists()) {
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(uri, "application/vnd.android.package-archive")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            try {
+                                val file = File(item.filePath)
+                                if (file.exists()) {
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, "application/vnd.android.package-archive")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    Toast.makeText(context, "فایل یافت نشد", Toast.LENGTH_SHORT).show()
                                 }
-                                try { context.startActivity(intent) } catch (e: Exception) {}
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "امکان نصب وجود ندارد", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onShare = {
-                            val file = File(item.filePath)
-                            if (file.exists()) {
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/vnd.android.package-archive"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            try {
+                                val file = File(item.filePath)
+                                if (file.exists()) {
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/vnd.android.package-archive"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
                                 }
-                                context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "خطا در اشتراک‌گذاری", Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
