@@ -56,7 +56,7 @@ fun FloatingAssistant(
     onChatClick: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    
+
     Column(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.Bottom
@@ -78,7 +78,7 @@ fun FloatingAssistant(
                 )
             }
         }
-        
+
         AnimatedVisibility(
             visible = isExpanded,
             enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.5f),
@@ -95,7 +95,7 @@ fun FloatingAssistant(
                 Spacer(modifier = Modifier.padding(bottom = 4.dp))
             }
         }
-        
+
         Box(
             modifier = Modifier
                 .size(64.dp)
@@ -113,7 +113,6 @@ fun FloatingAssistant(
                     modifier = Modifier.size(28.dp)
                 )
             } else {
-                // 👈 استفاده از عکس اختصاصی دکتر طاعون از پوشه drawable
                 Image(
                     painter = painterResource(id = R.drawable.plague_doctor),
                     contentDescription = "دستیار هوشمند",
