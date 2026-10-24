@@ -24,7 +24,6 @@ data class DownloadItem(
 class DownloadsViewModel(private val context: Context) : ViewModel() {
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
-
     private val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
 
     init {
@@ -37,7 +36,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // 👈 استفاده مستقیم از متد اندروید بدون reflection (چون minSdk 24 هست)
+    // استفاده مستقیم از متد اندروید بدون reflection (چون minSdk 24 هست)
     fun pauseDownload(id: Long) {
         try {
             downloadManager?.pauseDownload(id)
@@ -47,7 +46,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // 👈 استفاده مستقیم از متد اندروید
+    // استفاده مستقیم از متد اندروید
     fun resumeDownload(id: Long) {
         try {
             downloadManager?.resumeDownload(id)
@@ -64,11 +63,13 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         var cursor: Cursor? = null
         try {
             val query = DownloadManager.Query().setFilterByStatus(
-                DownloadManager.STATUS_SUCCESSFUL or DownloadManager.STATUS_FAILED or 
-                DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PAUSED
+                DownloadManager.STATUS_SUCCESSFUL or
+                DownloadManager.STATUS_FAILED or
+                DownloadManager.STATUS_RUNNING or
+                DownloadManager.STATUS_PAUSED
             )
             cursor = downloadManager.query(query)
-            
+
             if (cursor != null && cursor.moveToFirst()) {
                 val idIdx = cursor.getColumnIndex(DownloadManager.COLUMN_ID)
                 val titleIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
@@ -84,9 +85,11 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
                     val localUri = if (localUriIdx >= 0) cursor.getString(localUriIdx) else null
                     val totalSize = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
                     val bytesDownloaded = if (bytesDownloadedIdx >= 0) cursor.getLong(bytesDownloadedIdx) else 0L
-                    
+
                     var progress = 0
-                    if (totalSize > 0) progress = ((bytesDownloaded * 100) / totalSize).toInt()
+                    if (totalSize > 0) {
+                        progress = ((bytesDownloaded * 100) / totalSize).toInt()
+                    }
 
                     val filePath = localUri?.replace("file://", "") ?: ""
                     val fileSizeMb = String.format("%.1f MB", totalSize / (1024.0 * 1024.0))
@@ -99,6 +102,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         } finally {
             cursor?.close()
         }
-        list.reversed()
+
+        list
     }
 }
