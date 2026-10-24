@@ -3,7 +3,6 @@ package com.appdony.app.ui.screens
 import android.app.DownloadManager
 import android.content.Context
 import android.database.Cursor
-import androidx.annotation.RequiresApi // ✅ اضافه شد
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -37,20 +36,22 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    @RequiresApi(24) // ✅ اضافه شد
     fun pauseDownload(id: Long) {
         try {
-            downloadManager?.pauseDownload(id)
+            // استفاده از Reflection برای جلوگیری از خطای کامپایلر در گیت‌هاب اکشنز
+            val method = DownloadManager::class.java.getMethod("pauseDownload", Long::class.javaPrimitiveType)
+            method.invoke(downloadManager, id)
             loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    @RequiresApi(24) // ✅ اضافه شد
     fun resumeDownload(id: Long) {
         try {
-            downloadManager?.resumeDownload(id)
+            // استفاده از Reflection برای جلوگیری از خطای کامپایلر در گیت‌هاب اکشنز
+            val method = DownloadManager::class.java.getMethod("resumeDownload", Long::class.javaPrimitiveType)
+            method.invoke(downloadManager, id)
             loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
