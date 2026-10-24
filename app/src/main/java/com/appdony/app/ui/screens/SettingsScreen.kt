@@ -78,50 +78,87 @@ fun SettingsScreen(onBack: () -> Unit) {
     val favoritesManager = remember { FavoritesManager(context) }
     val chatHistoryManager = remember { ChatHistoryManager(context) }
     val scope = rememberCoroutineScope()
-    
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val primary = MaterialTheme.colorScheme.primary
-
     val wifiOnly by settingsManager.wifiOnly.collectAsStateWithLifecycle(initialValue = false)
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
-
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
+
     LaunchedEffect(Unit) {
         cacheSize = CacheUtils.getCacheSize(context)
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        "بازگشت",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("تنظیمات", color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "تنظیمات",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
-        
+
         item { SettingsHeader("دستیار هوش مصنوعی", Icons.Default.SmartToy, primary) }
         item {
-            SettingsSwitchRow("نمایش دکتر طاعون در صفحه", Icons.Default.Visibility, showAiAssistant) { checked ->
+            SettingsSwitchRow(
+                "نمایش دکتر طاعون در صفحه",
+                Icons.Default.Visibility,
+                showAiAssistant
+            ) { checked ->
                 scope.launch { settingsManager.setShowAiAssistant(checked) }
             }
         }
 
         item { SettingsHeader("ظاهر برنامه", Icons.Default.Palette, primary) }
         item {
-            SettingsSwitchRow("حالت تاریک", Icons.Default.Brightness4, themeState.mode == ThemeMode.DARK) { checked ->
-                scope.launch { themeManager.setMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT) }
+            SettingsSwitchRow(
+                "حالت تاریک",
+                Icons.Default.Brightness4,
+                themeState.mode == ThemeMode.DARK
+            ) { checked ->
+                scope.launch {
+                    themeManager.setMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT)
+                }
             }
         }
+
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ColorLens, null, tint = primary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("رنگ برنامه", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+                    Text(
+                        "رنگ برنامه",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 14.sp
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -130,19 +167,24 @@ fun SettingsScreen(onBack: () -> Unit) {
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(Color(color)) // 👈 اصلاح شد
+                                .background(Color(color))
                                 .clickable { scope.launch { themeManager.setColorIndex(index) } }
                         )
                     }
                 }
             }
         }
+
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.FontDownload, null, tint = primary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("اندازه فونت", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+                    Text(
+                        "اندازه فونت",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 14.sp
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,7 +200,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = when(size) {
+                                text = when (size) {
                                     FontSize.SMALL -> "کوچک"
                                     FontSize.MEDIUM -> "متوسط"
                                     FontSize.LARGE -> "بزرگ"
@@ -204,7 +246,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             SettingsActionRow("پاک کردن تاریخچه جستجو", "", Icons.Default.Search) {
                 scope.launch {
-                    historyManager.clearHistory() // 👈 اصلاح شد
+                    historyManager.clearHistory()
                     Toast.makeText(context, "تاریخچه پاک شد", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -220,7 +262,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             SettingsActionRow("پاک کردن تاریخچه چت", "", Icons.AutoMirrored.Filled.Chat) {
                 scope.launch {
-                    chatHistoryManager.clearHistory() // 👈 اصلاح شد
+                    chatHistoryManager.clearHistory()
                     Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -228,13 +270,19 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         item { SettingsHeader("حساب کاربری", Icons.AutoMirrored.Filled.Logout, primary) }
         item {
-            SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.Logout, color = Color.Red) {
+            SettingsActionRow(
+                "خروج از حساب",
+                "",
+                Icons.AutoMirrored.Filled.Logout,
+                color = Color.Red
+            ) {
                 scope.launch {
                     sessionManager.clearSession()
                     Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+
         item { Spacer(Modifier.height(32.dp)) }
     }
 }
@@ -242,7 +290,9 @@ fun SettingsScreen(onBack: () -> Unit) {
 @Composable
 private fun SettingsHeader(title: String, icon: ImageVector, tint: Color) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
@@ -252,9 +302,16 @@ private fun SettingsHeader(title: String, icon: ImageVector, tint: Color) {
 }
 
 @Composable
-private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SettingsSwitchRow(
+    title: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
@@ -263,27 +320,33 @@ private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MaterialTheme.colorScheme.primary
-            )
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaterialTheme.colorScheme.primary)
         )
     }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
 
 @Composable
-private fun SettingsActionRow(title: String, subtitle: String, icon: ImageVector, color: Color = MaterialTheme.colorScheme.onBackground, onClick: () -> Unit) {
+private fun SettingsActionRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    color: Color = MaterialTheme.colorScheme.onBackground,
+    onClick: () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(12.dp))
-        Text(title, color = color, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        if (subtitle.isNotBlank()) {
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = color, fontSize = 14.sp)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
         }
     }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 }
