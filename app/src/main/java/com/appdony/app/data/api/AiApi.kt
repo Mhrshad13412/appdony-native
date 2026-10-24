@@ -13,18 +13,18 @@ import java.util.concurrent.TimeUnit
 object AiApi {
     // آدرس API مدل زبانی LLM7
     private const val API_URL = "https://api.llm7.io/v1/chat/completions"
-    
-    // 👈 کلید اختصاصی شما
+    // کلید اختصاصی شما
     private const val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
-
-    // 👈 متن شخصیت دکتر طاعون (System Prompt)
+    // متن شخصیت دکتر طاعون (System Prompt)
     private const val SYSTEM_PROMPT = """
         تو "دکتر طاعون" هستی، دستیار هوشمند و بسیار باحال اپلیکیشن "اپدونی".
         اپدونی یک مرجع دانلود بازی و برنامه برای اندروید است.
+
         وظایف تو:
         1. کمک به کاربران برای پیدا کردن بازی‌ها و برنامه‌های مورد علاقه‌شون.
         2. پاسخ دادن به سوالات فنی در مورد نصب، دانلود و اجرای بازی‌ها.
         3. راهنمایی کاربران در مورد مقالات وبلاگ اپدونی.
+
         لحن تو باید دوستانه، کمی طنز و شوخ‌طبع (به خاطر اسمت) و در عین حال بسیار مفید و دقیق باشد.
         پاسخ‌هایت را کوتاه، مفید و به زبان فارسی روان بنویس. از ایموجی‌های مناسب استفاده کن.
     """.trimIndent()
@@ -46,7 +46,7 @@ object AiApi {
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val messagesArray = JSONArray()
-            
+
             // ۱. اضافه کردن شخصیت (System Prompt)
             val systemMsgObj = JSONObject().apply {
                 put("role", "system")
@@ -81,46 +81,34 @@ object AiApi {
             val body = requestBodyJson.toString().toRequestBody(mediaType)
 
             // ساخت درخواست HTTP
-            val requestBuilder = Request.Builder()
+            val request = Request.Builder()
                 .url(API_URL)
+                .addHeader("Authorization", "Bearer $API_KEY")
+                .addHeader("Content-Type", "application/json")
                 .post(body)
+                .build()
 
-            // 👈 ارسال کلید در هدر درخواست
-            if (API_KEY.isNotBlank()) {
-                requestBuilder.addHeader("Authorization", "Bearer $API_KEY")
+            // اجرای درخواست
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (!response.isSuccessful || responseBody == null) {
+                return@withContext Result.failure(Exception("HTTP Error: ${response.code}"))
             }
 
-            val request = requestBuilder.build()
-
-            // ارسال درخواست و دریافت پاسخ
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("خطا از سمت سرور: ${response.code}"))
-                }
-
-                val responseBody = response.body?.string()
-                    ?: return@withContext Result.failure(Exception("پاسخ خالی از سرور"))
-
-                // پارس کردن پاسخ JSON
-                val jsonResponse = JSONObject(responseBody)
-                val choices = jsonResponse.optJSONArray("choices")
-                
-                if (choices != null && choices.length() > 0) {
-                    val firstChoice = choices.getJSONObject(0)
-                    val messageObj = firstChoice.optJSONObject("message")
-                    val content = messageObj?.optString("content") ?: ""
-                    
-                    if (content.isNotBlank()) {
-                        Result.success(content.trim())
-                    } else {
-                        Result.failure(Exception("پاسخ نامعتبر از هوش مصنوعی"))
-                    }
-                } else {
-                    Result.failure(Exception("پاسخی از هوش مصنوعی دریافت نشد"))
-                }
+            // پارس کردن پاسخ
+            val jsonResponse = JSONObject(responseBody)
+            val choices = jsonResponse.getJSONArray("choices")
+            if (choices.length() == 0) {
+                return@withContext Result.failure(Exception("No choices found"))
             }
+
+            val messageObj = choices.getJSONObject(0).getJSONObject("message")
+            val content = messageObj.getString("content")
+
+            Result.success(content)
         } catch (e: Exception) {
-            Result.failure(Exception("خطا در ارتباط با هوش مصنوعی: ${e.message}"))
+            Result.failure(e)
         }
     }
 }
