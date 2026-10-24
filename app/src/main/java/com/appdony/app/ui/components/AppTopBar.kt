@@ -66,9 +66,7 @@ fun AppTopBar(
                 fontSize = 14.sp
             )
         }
-
         Spacer(modifier = Modifier.width(10.dp))
-
         Box(
             modifier = Modifier
                 .size(44.dp)
