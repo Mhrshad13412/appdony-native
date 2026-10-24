@@ -32,7 +32,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // برای اطمینان از عدم حذف کدها فعلاً غیرفعال است
+            isMinifyEnabled = false // برای جلوگیری از کرش، فعلاً غیرفعال است
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -72,8 +72,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    
-    // ✅ اضافه کردن کتابخانه آیکون‌های پایه برای رفع خطای Download, Visibility, FormatQuote
+
+    // ✅ کتابخانه آیکون‌های پایه (شامل Download, Visibility, FormatQuote)
     implementation("androidx.compose.material:material-icons-core")
 
     implementation("androidx.activity:activity-compose:1.9.3")
