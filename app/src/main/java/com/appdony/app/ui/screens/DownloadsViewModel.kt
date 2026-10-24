@@ -3,6 +3,7 @@ package com.appdony.app.ui.screens
 import android.app.DownloadManager
 import android.content.Context
 import android.database.Cursor
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -36,17 +37,17 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // استفاده مستقیم از متد اندروید بدون reflection (چون minSdk 24 هست)
+    @RequiresApi(24)
     fun pauseDownload(id: Long) {
         try {
             downloadManager?.pauseDownload(id)
-            loadDownloads() // آپدیت کردن لیست برای نمایش وضعیت جدید
+            loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    // استفاده مستقیم از متد اندروید
+    @RequiresApi(24)
     fun resumeDownload(id: Long) {
         try {
             downloadManager?.resumeDownload(id)
