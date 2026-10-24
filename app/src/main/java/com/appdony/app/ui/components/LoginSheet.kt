@@ -62,14 +62,12 @@ fun LoginSheet(
     var passwordVisible by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-
     var hiddenWebView by remember { mutableStateOf<WebView?>(null) }
     var isLoginSubmitted by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
-
         credentialsManager.getUsername()?.let { username = it }
         credentialsManager.getPassword()?.let { password = it }
         if (username.isNotBlank() && password.isNotBlank()) {
@@ -85,15 +83,12 @@ fun LoginSheet(
                 settings.saveFormData = false
                 settings.savePassword = false
                 settings.userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                
                 CookieManager.getInstance().setAcceptCookie(true)
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         if (url == null) return
-
                         if (url.contains("wp-login.php") && isLoginSubmitted) {
                             loading = true
                             val safeUser = username.replace("'", "\\'").replace("\n", "")
@@ -103,16 +98,18 @@ fun LoginSheet(
                                     var u = document.getElementById('user_login');
                                     var p = document.getElementById('user_pass');
                                     var b = document.getElementById('wp-submit');
-                                    if(u && p && b) { u.value = '$safeUser'; p.value = '$safePass'; b.click(); }
+                                    if(u && p && b) {
+                                        u.value = '$safeUser';
+                                        p.value = '$safePass';
+                                        b.click();
+                                    }
                                 })()
                             """.trimIndent(), null)
-                            isLoginSubmitted = false 
-                        } 
-                        else if (!url.contains("wp-login.php") && loading) {
+                            isLoginSubmitted = false
+                        } else if (!url.contains("wp-login.php") && loading) {
                             scope.launch {
-                                delay(1500) // زمان برای ذخیره کوکی‌ها
+                                delay(1500)
                                 val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
-                                
                                 if (cookies.contains("wordpress_logged_in")) {
                                     view?.evaluateJavascript("""
                                         (function() {
@@ -126,10 +123,9 @@ fun LoginSheet(
                                         })();
                                     """.trimIndent()) { nonceResult ->
                                         val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
-                                        
                                         scope.launch {
-                                            val result = withContext(Dispatchers.IO) { 
-                                                repository.getCurrentUser(cookies, cleanNonce) 
+                                            val result = withContext(Dispatchers.IO) {
+                                                repository.getCurrentUser(cookies, cleanNonce)
                                             }
                                             result.onSuccess { user ->
                                                 if (user.id > 0) {
@@ -172,7 +168,7 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface, // رفع مشکل پس‌زمینه
+        containerColor = MaterialTheme.colorScheme.surface,
         scrimColor = Color.Black.copy(alpha = 0.6f),
         dragHandle = null
     ) {
@@ -193,12 +189,16 @@ fun LoginSheet(
                     Text("با حساب کاربری سایت وارد شو", color = AppdonyTextMuted, fontSize = 13.sp)
                 }
                 Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onDismiss() },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Close, contentDescription = "بستن", tint = AppdonyTextPrimary)
                 }
             }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
@@ -219,6 +219,7 @@ fun LoginSheet(
                 ),
                 enabled = !loading
             )
+
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
@@ -230,7 +231,8 @@ fun LoginSheet(
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = null, tint = AppdonyTextMuted
+                            contentDescription = null,
+                            tint = AppdonyTextMuted
                         )
                     }
                 },
@@ -254,7 +256,11 @@ fun LoginSheet(
             if (errorMsg != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x33FF5252)).padding(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0x33FF5252))
+                        .padding(12.dp)
                 ) {
                     Text(errorMsg!!, color = Color(0xFFFF8A80), fontSize = 13.sp)
                 }
@@ -264,7 +270,9 @@ fun LoginSheet(
 
             Button(
                 onClick = { submitLogin() },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
                 enabled = !loading && username.isNotBlank() && password.isNotBlank(),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
