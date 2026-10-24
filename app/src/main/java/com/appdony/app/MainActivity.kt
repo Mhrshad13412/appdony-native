@@ -163,7 +163,10 @@ fun MainContent(
         },
         bottomBar = {
             if (isMainRoute) {
-                AppBottomNav(navController = navController, currentRoute = currentRoute)
+                AppBottomNav(
+                    navController = navController,
+                    currentRoute = currentRoute
+                )
             }
         }
     ) { padding ->
