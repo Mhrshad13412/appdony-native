@@ -11,14 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
 
 @Composable
 fun HomeScreen(
-    isGamesTab: Boolean, // تعیین میکنه الان تب بازی‌ها فعاله یا برنامه‌ها
+    isGamesTab: Boolean,
     onPostClick: (Int) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -27,13 +26,11 @@ fun HomeScreen(
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // هر وقت کاربر تب رو عوض کرد (بین بازی و برنامه)، دیتا رو از اول لود کن
     LaunchedEffect(isGamesTab) {
-        val category = if (isGamesTab) "game" else "app"
-        viewModel.loadInitialPosts(category)
+        val searchQuery = if (isGamesTab) "بازی" else "برنامه"
+        viewModel.loadInitialPosts(searchQuery)
     }
 
-    // تشخیص اسکرول به پایین صفحه برای لود کردن صفحه بعدی (اسکرول بی‌نهایت)
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
@@ -48,7 +45,6 @@ fun HomeScreen(
     }
 
     if (isLoading && posts.isEmpty()) {
-        // اسکلت لودینگ اولیه
         Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
             CircularProgressIndicator()
         }
@@ -58,7 +54,6 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // بخش ویژه (فقط ۵ پست اول رو به عنوان ویژه نشون بده)
             item {
                 Text(
                     text = "ویژه",
@@ -80,9 +75,7 @@ fun HomeScreen(
                 }
             }
 
-            // بقیه پست‌ها
             items(posts.drop(5)) { post ->
-                // اینجا میتونی یه کارت افقی برای لیست اصلی بذاری
                 AppCard(
                     title = post.cleanTitle(),
                     imageUrl = post.featuredImageUrl() ?: "",
@@ -93,7 +86,6 @@ fun HomeScreen(
                 )
             }
 
-            // نشانگر لودینگ پایین صفحه (وقتی داره صفحه بعدی رو میاره)
             if (isLoadingMore) {
                 item {
                     Box(
