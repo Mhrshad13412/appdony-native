@@ -46,3 +46,12 @@
 # ══════════════════ Firebase (اگر استفاده کردی) ══════════════════
 -keep class com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
+
+# ══════════════════ Jsoup (جدید - برای خواندن وبلاگ) ══════════════════
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+
+# ══════════════════ Room (دیتابیس) ══════════════════
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
