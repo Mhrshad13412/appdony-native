@@ -6,17 +6,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -27,25 +17,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,7 +98,6 @@ fun LoginSheet(
                             loading = true
                             val safeUser = username.replace("'", "\\'").replace("\n", "")
                             val safePass = password.replace("'", "\\'").replace("\n", "")
-                            
                             view?.evaluateJavascript("""
                                 javascript:(function(){
                                     var u = document.getElementById('user_login');
@@ -138,19 +110,19 @@ fun LoginSheet(
                         } 
                         else if (!url.contains("wp-login.php") && loading) {
                             scope.launch {
-                                delay(2000) // زمان برای ست شدن کوکی‌ها
+                                delay(1500) // زمان برای ذخیره کوکی‌ها
                                 val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
                                 
                                 if (cookies.contains("wordpress_logged_in")) {
                                     view?.evaluateJavascript("""
                                         (function() {
-                                            var nonce = '';
+                                            if (typeof wpApiSettings !== 'undefined' && wpApiSettings.nonce) return wpApiSettings.nonce;
                                             var scripts = document.getElementsByTagName('script');
                                             for (var i = 0; i < scripts.length; i++) {
                                                 var match = scripts[i].innerHTML.match(/"nonce":"([^"]+)"/);
-                                                if (match) { nonce = match[1]; break; }
+                                                if (match) return match[1];
                                             }
-                                            return nonce;
+                                            return '';
                                         })();
                                     """.trimIndent()) { nonceResult ->
                                         val cleanNonce = nonceResult.replace("\"", "").replace("null", "")
@@ -161,7 +133,6 @@ fun LoginSheet(
                                             }
                                             result.onSuccess { user ->
                                                 if (user.id > 0) {
-                                                    // 👈 همیشه ذخیره میکنیم
                                                     credentialsManager.saveCredentials(username, password)
                                                     sessionManager.updateNonce(cleanNonce)
                                                     onLoginSuccess(user.copy(nonce = cleanNonce))
@@ -201,8 +172,8 @@ fun LoginSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface, // 👈 رنگ سطح (خاکستری تیره)
-        scrimColor = Color.Black.copy(alpha = 0.6f), // 👈 سایه تیره پشت
+        containerColor = MaterialTheme.colorScheme.surface, // رفع مشکل پس‌زمینه
+        scrimColor = Color.Black.copy(alpha = 0.6f),
         dragHandle = null
     ) {
         Column(
@@ -241,7 +212,7 @@ fun LoginSheet(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = AppdonyCardBg,
-                    focusedContainerColor = AppdonyCardBg, // 👈 رنگ داخل باکس
+                    focusedContainerColor = AppdonyCardBg,
                     unfocusedContainerColor = AppdonyCardBg,
                     focusedTextColor = AppdonyTextPrimary,
                     unfocusedTextColor = AppdonyTextPrimary
@@ -279,8 +250,6 @@ fun LoginSheet(
                 ),
                 enabled = !loading
             )
-
-            // 👈 تیک مرا به خاطر بسپار حذف شد
 
             if (errorMsg != null) {
                 Spacer(modifier = Modifier.height(16.dp))
