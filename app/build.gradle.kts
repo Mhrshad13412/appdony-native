@@ -83,6 +83,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0") 
     debugImplementation("androidx.compose.ui:ui-tooling") 
     
-    // 👈 اضافه شدن کتابخانه Jsoup برای پارس کردن HTML
+    // 👈 اضافه شدن Jsoup برای پارس کردن HTML (فقط برای وبلاگ)
     implementation("org.jsoup:jsoup:1.17.2")
 }
