@@ -19,28 +19,8 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(
-        route = "games",
-        label = "بازی‌ها",
-        selectedIcon = Icons.Filled.PlayArrow,
-        unselectedIcon = Icons.Outlined.PlayArrow
-    ),
-    BottomNavItem(
-        route = "apps",
-        label = "برنامه‌ها",
-        selectedIcon = Icons.Filled.List,
-        unselectedIcon = Icons.Outlined.List
-    ),
-    BottomNavItem(
-        route = "blog",
-        label = "وبلاگ",
-        selectedIcon = Icons.Filled.Star,
-        unselectedIcon = Icons.Outlined.Star
-    ),
-    BottomNavItem(
-        route = "downloads",
-        label = "دانلودها",
-        selectedIcon = Icons.Filled.Download,
-        unselectedIcon = Icons.Outlined.Download
-    )
+    BottomNavItem(route = "games", label = "بازی‌ها", selectedIcon = Icons.Filled.PlayArrow, unselectedIcon = Icons.Outlined.PlayArrow),
+    BottomNavItem(route = "apps", label = "برنامه‌ها", selectedIcon = Icons.Filled.List, unselectedIcon = Icons.Outlined.List),
+    BottomNavItem(route = "blog", label = "وبلاگ", selectedIcon = Icons.Filled.Star, unselectedIcon = Icons.Outlined.Star),
+    BottomNavItem(route = "downloads", label = "دانلودها", selectedIcon = Icons.Filled.Download, unselectedIcon = Icons.Outlined.Download)
 )
