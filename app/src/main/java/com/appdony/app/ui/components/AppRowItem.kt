@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,64 +32,22 @@ import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
-fun AppRowItem(
-    rank: Int,
-    title: String,
-    imageUrl: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    showRank: Boolean = true
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, showRank: Boolean = true) {
+    Row(modifier = modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showRank) {
-            Text(
-                text = rank.toString(),
-                color = AppdonyTextMuted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(24.dp)
-            )
+            Text(text = rank.toString(), color = AppdonyTextMuted, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
             Spacer(modifier = Modifier.width(8.dp))
         }
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(AppdonyCardBg),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(AppdonyCardBg), contentAlignment = Alignment.Center) {
             if (!imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Icon(
-                    imageVector = Icons.Default.Android,
-                    contentDescription = null,
-                    tint = AppdonyTextMuted,
-                    modifier = Modifier.size(26.dp)
-                )
+                Icon(Icons.Default.Phone, contentDescription = null, tint = AppdonyTextMuted, modifier = Modifier.size(26.dp))
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = AppdonyTextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(text = title, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(2.dp))
             Text(text = "رایگان", color = AppdonyTextMuted, fontSize = 12.sp)
         }
