@@ -39,7 +39,6 @@ fun UpdateBanner(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clip(RoundedCornerShape(16.dp))
-                // 👇 یه گرادیانت خوشگل با رنگ اصلی اپ
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
@@ -56,7 +55,7 @@ fun UpdateBanner(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "نسخه جدید اومد! 🎉",
+                        text = "نسخه جدید اومد! ",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
@@ -68,8 +67,6 @@ fun UpdateBanner(
                         fontSize = 12.sp
                     )
                 }
-
-                // دکمه دانلود
                 Button(
                     onClick = onDownloadClick,
                     colors = ButtonDefaults.buttonColors(
@@ -83,10 +80,7 @@ fun UpdateBanner(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("دانلود", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
-
                 Spacer(modifier = Modifier.width(8.dp))
-
-                // دکمه بستن
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(28.dp)
