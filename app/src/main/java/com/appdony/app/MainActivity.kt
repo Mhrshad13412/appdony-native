@@ -17,9 +17,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -33,12 +34,10 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.appdony.app.data.model.UserData
-import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
-import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
@@ -47,71 +46,49 @@ import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
-import com.appdony.app.ui.components.SpotlightTutorial
-import com.appdony.app.ui.components.UpdateBanner
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            AppRoot(intent)
-        }
-    }
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
+        setContent { AppRoot() }
     }
 }
 
 @Composable
-fun AppRoot(intent: Intent?) {
+fun AppRoot() {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val settingsManager = remember { SettingsManager(context) }
     val onboardingManager = remember { OnboardingManager(context) }
     val sessionManager = remember { SessionManager(context) }
+    val scope = rememberCoroutineScope()
 
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
-    val avatarUrl by sessionManager.avatarUrl.collectAsStateWithLifecycle(initialValue = "")
-    val isOnboardingCompleted by onboardingManager.isCompleted.collectAsStateWithLifecycle(initialValue = false)
 
     var showSplash by remember { mutableStateOf(true) }
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
-    var showSpotlight by remember { mutableStateOf(false) }
-    var showUpdateBanner by remember { mutableStateOf(false) }
-    var updateVersionName by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         delay(1500)
         showSplash = false
-        if (!isOnboardingCompleted) {
-            showSpotlight = true
-        }
     }
 
     LaunchedEffect(Unit) {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-        val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(constraints)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "BlogUpdateWork",
-            ExistingPeriodicWorkPolicy.KEEP,
-            workRequest
-        )
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, workRequest)
     }
 
     val fontScale = when (themeState.fontSize) {
@@ -128,33 +105,17 @@ fun AppRoot(intent: Intent?) {
                     SplashScreen()
                 } else {
                     MainContent(
-                        themeState = themeState,
                         isLoggedIn = isLoggedIn,
                         username = username,
                         displayName = displayName,
-                        avatarUrl = avatarUrl,
                         showAiAssistant = showAiAssistant,
-                        showSpotlight = showSpotlight,
-                        showUpdateBanner = showUpdateBanner,
-                        updateVersionName = updateVersionName,
-                        onDismissSpotlight = {
-                            showSpotlight = false
-                            onboardingManager.setCompleted()
-                        },
-                        onDismissUpdateBanner = { showUpdateBanner = false },
                         onLoginClick = { showLoginSheet = true },
                         onAccountClick = { showAccountSheet = true }
                     )
                 }
 
                 if (showLoginSheet) {
-                    LoginSheet(
-                        onDismiss = { showLoginSheet = false },
-                        onLoginSuccess = { user: UserData ->
-                            // SessionManager خودش در LoginSheet آپدیت می‌شود
-                            showLoginSheet = false
-                        }
-                    )
+                    LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user: UserData -> showLoginSheet = false })
                 }
 
                 if (showAccountSheet) {
@@ -167,10 +128,7 @@ fun AppRoot(intent: Intent?) {
                         onFavorites = { showAccountSheet = false },
                         onHelp = { showAccountSheet = false },
                         onAbout = { showAccountSheet = false },
-                        onLogout = {
-                            sessionManager.clearSession()
-                            showAccountSheet = false
-                        }
+                        onLogout = { scope.launch { sessionManager.clearSession() }; showAccountSheet = false }
                     )
                 }
             }
@@ -180,17 +138,10 @@ fun AppRoot(intent: Intent?) {
 
 @Composable
 fun MainContent(
-    themeState: ThemeState,
     isLoggedIn: Boolean,
     username: String,
     displayName: String,
-    avatarUrl: String,
     showAiAssistant: Boolean,
-    showSpotlight: Boolean,
-    showUpdateBanner: Boolean,
-    updateVersionName: String,
-    onDismissSpotlight: () -> Unit,
-    onDismissUpdateBanner: () -> Unit,
     onLoginClick: () -> Unit,
     onAccountClick: () -> Unit
 ) {
@@ -217,14 +168,9 @@ fun MainContent(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AppNavGraph(
-                navController = navController,
-                onSearchClick = { navController.navigate("search") },
-                onAccountClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
-            )
-            
+            AppNavGraph(navController = navController)
             if (showAiAssistant && isMainRoute) {
-                Box(modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
+                Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
                     FloatingAssistant(
                         onSearchClick = { navController.navigate("search") },
                         onDownloadsClick = { navController.navigate("downloads") },
