@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,11 +80,11 @@ fun DetailScreen(
     onSimilarClick: (Int) -> Unit
 ) {
     val vm: DetailViewModel = viewModel(
-        key = "detail_${postId}_$isBlog", // 👈 کلید یکتا برای وبلاگ و پست معمولی
+        key = "detail_${postId}_$isBlog",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return DetailViewModel(postId, isBlog) as T // 👈 پاس دادن isBlog
+                return DetailViewModel(postId, isBlog) as T
             }
         }
     )
@@ -187,11 +188,12 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // ۱. عکس بزرگ شاخص (برای هر دو حالت)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .height(if (isBlog) 220.dp else 280.dp) // ارتفاع عکس توی وبلاگ کمی کمتره
                     .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
             ) {
                 AsyncImage(
@@ -200,6 +202,7 @@ private fun DetailContent(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+                // گرادیانت برای خوانایی بهتر
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -212,44 +215,48 @@ private fun DetailContent(
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(AppdonyCardBg)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = post.featuredImageUrl(),
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = post.cleanTitle(),
-                        color = AppdonyTextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+        if (!isBlog) {
+            // --- بخش بازی و برنامه (غیر وبلاگ) ---
+            
+            // باکس تایتل و تامبنیل کوچیک
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AppdonyCardBg)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = post.featuredImageUrl(),
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = post.primaryCategoryName(),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp
-                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = post.cleanTitle(),
+                            color = AppdonyTextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = post.primaryCategoryName(),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
-        }
 
-        if (!isBlog) {
+            // امتیازدهی
             item {
                 Column(
                     modifier = Modifier
@@ -270,6 +277,7 @@ private fun DetailContent(
                 }
             }
 
+            // نسخه
             item {
                 if (info.version != null) {
                     Row(
@@ -291,6 +299,7 @@ private fun DetailContent(
                 }
             }
 
+            // دکمه‌های دانلود
             item {
                 if (info.downloadLinks.isNotEmpty()) {
                     Column(
@@ -322,6 +331,7 @@ private fun DetailContent(
                 }
             }
 
+            // اشتراک‌گذاری
             item {
                 OutlinedButton(
                     onClick = onShare,
@@ -333,18 +343,54 @@ private fun DetailContent(
                     Text("اشتراک‌گذاری")
                 }
             }
+        } else {
+            // --- بخش وبلاگ (مثل عکس دومی که فرستادی) ---
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+                    Text(
+                        text = post.primaryCategoryName(),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End // دسته‌بندی سمت راست
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = post.cleanTitle(),
+                        color = AppdonyTextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Right, // عنوان سمت راست
+                        lineHeight = 32.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
         }
 
+        // متن مقاله یا توضیحات (برای هر دو حالت)
         item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = if (isBlog) "متن مقاله" else "توضیحات",
-                color = AppdonyTextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (!isBlog) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "توضیحات",
+                    color = AppdonyTextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else {
+                Text(
+                    text = "متن مقاله",
+                    color = AppdonyTextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            
             val contentString = post.content?.toString() ?: ""
             Text(
                 text = contentString.ifBlank { "توضیحاتی ثبت نشده است." },
@@ -355,6 +401,7 @@ private fun DetailContent(
             )
         }
 
+        // بخش مشابه‌ها (فقط برای بازی و برنامه)
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -384,6 +431,7 @@ private fun DetailContent(
             }
         }
 
+        // بخش نظرات
         item {
             Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(
