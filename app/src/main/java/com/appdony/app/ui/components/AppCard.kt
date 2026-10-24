@@ -43,7 +43,6 @@ fun AppCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    // 👈 درخواست عکس با سایز کوچیک‌تر (۲۵۰ پیکسل) برای دانلود سریع‌تر
     val imageRequest = ImageRequest.Builder(context)
         .data(imageUrl)
         .size(250)
@@ -52,7 +51,7 @@ fun AppCard(
 
     Column(
         modifier = modifier
-            .width(100.dp) // 👈 عرض کارت از ۱۲۰ به ۱۰۰ کاهش یافت
+            .width(100.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(bottom = 4.dp),
@@ -60,7 +59,7 @@ fun AppCard(
     ) {
         Box(
             modifier = Modifier
-                .size(100.dp) // 👈 سایز عکس از ۱۲۰ به ۱۰۰ کاهش یافت
+                .size(100.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(AppdonyCardBg)
         ) {
@@ -96,19 +95,16 @@ fun AppCard(
                 }
             )
         }
-        
         Spacer(modifier = Modifier.height(6.dp))
-        
         Text(
             text = title,
             color = AppdonyTextPrimary,
-            fontSize = 11.sp, // 👈 فونت هم کمی کوچیک‌تر شد که با کارت هماهنگ باشه
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            lineHeight = 16.sp,
-            modifier = Modifier.fillMaxWidth()
+            lineHeight = 16.sp
         )
     }
 }
