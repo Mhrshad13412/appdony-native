@@ -3,28 +3,21 @@ package com.appdony.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
@@ -39,8 +32,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import coil.imageLoader
-import coil.request.ImageRequest
+import com.appdony.app.data.model.UserData
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.OnboardingManager
@@ -48,7 +40,6 @@ import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
-import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
@@ -61,11 +52,7 @@ import com.appdony.app.ui.components.UpdateBanner
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
-import com.appdony.app.util.DownloadHelper
-import com.appdony.app.util.UpdateHelper
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -76,7 +63,6 @@ class MainActivity : ComponentActivity() {
             AppRoot(intent)
         }
     }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -87,224 +73,165 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(intent: Intent?) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
+    val settingsManager = remember { SettingsManager(context) }
+    val onboardingManager = remember { OnboardingManager(context) }
+    val sessionManager = remember { SessionManager(context) }
+
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
+    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+    val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
+    val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    val avatarUrl by sessionManager.avatarUrl.collectAsStateWithLifecycle(initialValue = "")
+    val isOnboardingCompleted by onboardingManager.isCompleted.collectAsStateWithLifecycle(initialValue = false)
+
+    var showSplash by remember { mutableStateOf(true) }
+    var showLoginSheet by remember { mutableStateOf(false) }
+    var showAccountSheet by remember { mutableStateOf(false) }
+    var showSpotlight by remember { mutableStateOf(false) }
+    var showUpdateBanner by remember { mutableStateOf(false) }
+    var updateVersionName by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        delay(1500)
+        showSplash = false
+        if (!isOnboardingCompleted) {
+            showSpotlight = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "BlogUpdateWork",
+            ExistingPeriodicWorkPolicy.KEEP,
+            workRequest
+        )
+    }
 
     val fontScale = when (themeState.fontSize) {
         FontSize.SMALL -> 0.85f
         FontSize.MEDIUM -> 1.0f
-        FontSize.LARGE -> 1.2f
+        FontSize.LARGE -> 1.15f
     }
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        AppdonyTheme(
-            darkTheme = themeState.mode == ThemeMode.DARK,
-            primaryColor = ThemeManager.themeColors[themeState.colorIndex]
-        ) {
-            MainScreen(incomingIntent = intent)
+        AppdonyTheme(themeState = themeState) {
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                if (showSplash) {
+                    SplashScreen()
+                } else {
+                    MainContent(
+                        themeState = themeState,
+                        isLoggedIn = isLoggedIn,
+                        username = username,
+                        displayName = displayName,
+                        avatarUrl = avatarUrl,
+                        showAiAssistant = showAiAssistant,
+                        showSpotlight = showSpotlight,
+                        showUpdateBanner = showUpdateBanner,
+                        updateVersionName = updateVersionName,
+                        onDismissSpotlight = {
+                            showSpotlight = false
+                            onboardingManager.setCompleted()
+                        },
+                        onDismissUpdateBanner = { showUpdateBanner = false },
+                        onLoginClick = { showLoginSheet = true },
+                        onAccountClick = { showAccountSheet = true }
+                    )
+                }
+
+                if (showLoginSheet) {
+                    LoginSheet(
+                        onDismiss = { showLoginSheet = false },
+                        onLoginSuccess = { user: UserData ->
+                            // SessionManager خودش در LoginSheet آپدیت می‌شود
+                            showLoginSheet = false
+                        }
+                    )
+                }
+
+                if (showAccountSheet) {
+                    AccountSheet(
+                        displayName = if (displayName.isNotBlank()) displayName else username,
+                        username = username,
+                        onDismiss = { showAccountSheet = false },
+                        onDownloads = { showAccountSheet = false },
+                        onSettings = { showAccountSheet = false },
+                        onFavorites = { showAccountSheet = false },
+                        onHelp = { showAccountSheet = false },
+                        onAbout = { showAccountSheet = false },
+                        onLogout = {
+                            sessionManager.clearSession()
+                            showAccountSheet = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun MainScreen(incomingIntent: Intent?) {
+fun MainContent(
+    themeState: ThemeState,
+    isLoggedIn: Boolean,
+    username: String,
+    displayName: String,
+    avatarUrl: String,
+    showAiAssistant: Boolean,
+    showSpotlight: Boolean,
+    showUpdateBanner: Boolean,
+    updateVersionName: String,
+    onDismissSpotlight: () -> Unit,
+    onDismissUpdateBanner: () -> Unit,
+    onLoginClick: () -> Unit,
+    onAccountClick: () -> Unit
+) {
     val navController = rememberNavController()
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route ?: ""
-    val showChrome = currentRoute != "search" && currentRoute != "settings" && currentRoute != "favorites" && currentRoute != "chat" && !currentRoute.startsWith("detail/")
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
 
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var isLoading by remember { mutableStateOf(true) }
-    val settingsManager = remember { SettingsManager(context) }
-    val startPage by settingsManager.startPage.collectAsStateWithLifecycle(initialValue = "games")
-    val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-
-    LaunchedEffect(Unit) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-        }
-        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-        val blogWorkRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "BlogUpdateWork",
-            ExistingPeriodicWorkPolicy.KEEP,
-            blogWorkRequest
-        )
-    }
-
-    LaunchedEffect(incomingIntent) {
-        incomingIntent?.data?.let { uri ->
-            val postId = uri.getQueryParameter("p")
-            if (postId != null) navController.navigate("detail/$postId?isBlog=false")
-        }
-        incomingIntent?.getStringExtra("shortcut_route")?.let { route ->
-            if (route == "search" || route == "updates" || route == "favorites") navController.navigate(route)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        val repo = AppRepository(context)
-        val result = repo.loadInitial("games")
-        result.onSuccess { data ->
-            val imageUrls = listOfNotNull(
-                data.banner?.featuredImageUrl(),
-                data.singleFeature?.featuredImageUrl()
-            ) + data.featured.mapNotNull { it.featuredImageUrl() }
-
-            imageUrls.take(10).forEach { url ->
-                val request = ImageRequest.Builder(context)
-                    .data(url)
-                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .build()
-                context.imageLoader.enqueue(request)
+    Scaffold(
+        topBar = {
+            if (currentRoute == "games" || currentRoute == "apps") {
+                AppTopBar(
+                    isLoggedIn = isLoggedIn,
+                    userInitial = if (displayName.isNotBlank()) displayName else username,
+                    onSearchClick = { navController.navigate("search") },
+                    onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
+                )
+            }
+        },
+        bottomBar = {
+            if (isMainRoute) {
+                AppBottomNav(navController = navController, currentRoute = currentRoute)
             }
         }
-        // 👈 زمان تاخیر رو از ۱۵۰۰ به ۳۰۰ میلی‌ثانیه کاهش دادم که سریعتر بره تو اپ
-        delay(300) 
-        isLoading = false
-    }
-
-    if (isLoading) {
-        SplashScreen()
-    } else {
-        val sessionManager = remember { SessionManager(context) }
-        val onboardingManager = remember { OnboardingManager(context) }
-        val snackbarHostState = remember { SnackbarHostState() }
-
-        val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
-        val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
-        val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
-        val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = null)
-
-        var showLoginSheet by remember { mutableStateOf(false) }
-        var showAccountSheet by remember { mutableStateOf(false) }
-        var showTutorial by remember { mutableStateOf(false) }
-        var updateInfo by remember { mutableStateOf<UpdateHelper.UpdateInfo?>(null) }
-        var showUpdateBanner by remember { mutableStateOf(false) }
-
-        LaunchedEffect(hasSeenOnboarding) {
-            if (hasSeenOnboarding == false) {
-                showTutorial = true
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            val currentVersion = BuildConfig.VERSION_NAME
-            val info = UpdateHelper.checkForUpdate()
-            if (info != null && info.latestVersion != currentVersion) {
-                updateInfo = info
-                delay(2000)
-                showUpdateBanner = true
-            }
-        }
-
-        Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold(
-                modifier = if (showTutorial) Modifier.blur(16.dp) else Modifier,
-                topBar = {
-                    if (showChrome) {
-                        Column {
-                            AppTopBar(
-                                isLoggedIn = isLoggedIn,
-                                userInitial = displayName,
-                                onSearchClick = { navController.navigate("search") },
-                                onLoginClick = {
-                                    if (isLoggedIn) showAccountSheet = true else showLoginSheet = true
-                                }
-                            )
-                            UpdateBanner(
-                                isVisible = showUpdateBanner,
-                                versionName = updateInfo?.latestVersion ?: "",
-                                onDownloadClick = {
-                                    showUpdateBanner = false
-                                    updateInfo?.let { info ->
-                                        scope.launch(Dispatchers.Main) {
-                                            DownloadHelper.startDownload(
-                                                context,
-                                                info.downloadUrl,
-                                                "Appdony-Update-${info.latestVersion}.apk"
-                                            )
-                                        }
-                                    }
-                                },
-                                onDismiss = { showUpdateBanner = false }
-                            )
-                        }
-                    }
-                },
-                bottomBar = {
-                    if (showChrome) {
-                        AppBottomNav(
-                            currentRoute = currentRoute,
-                            onTabSelected = { route ->
-                                navController.navigate(route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                    }
-                },
-                snackbarHost = { SnackbarHost(snackbarHostState) }
-            ) { padding ->
-                Box(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    AppNavGraph(navController = navController, startDestination = startPage)
-                    if (showChrome && !showTutorial && showAiAssistant) {
-                        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 90.dp, end = 16.dp)) {
-                            FloatingAssistant(
-                                onSearchClick = { navController.navigate("search") },
-                                onDownloadsClick = { navController.navigate("updates") },
-                                onHelpClick = { showTutorial = true },
-                                onChatClick = { navController.navigate("chat") }
-                            )
-                        }
-                    }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            AppNavGraph(
+                navController = navController,
+                onSearchClick = { navController.navigate("search") },
+                onAccountClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
+            )
+            
+            if (showAiAssistant && isMainRoute) {
+                Box(modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
+                    FloatingAssistant(
+                        onSearchClick = { navController.navigate("search") },
+                        onDownloadsClick = { navController.navigate("downloads") },
+                        onHelpClick = { navController.navigate("blog") },
+                        onChatClick = { navController.navigate("ai_chat") }
+                    )
                 }
-            }
-
-            if (showTutorial) {
-                SpotlightTutorial(onFinish = {
-                    scope.launch { onboardingManager.setSeen() }
-                    showTutorial = false
-                })
-            }
-
-            if (showLoginSheet) {
-                LoginSheet(
-                    onDismiss = { showLoginSheet = false },
-                    onLoginSuccess = { user ->
-                        scope.launch {
-                            sessionManager.saveSession(user.id, user.username, user.name, user.email, user.avatarUrl() ?: "", user.nonce)
-                            showLoginSheet = false
-                            snackbarHostState.showSnackbar("خوش آمدید ${user.displayName()} ")
-                        }
-                    }
-                )
-            }
-
-            if (showAccountSheet) {
-                AccountSheet(
-                    displayName = displayName.ifBlank { username },
-                    username = username,
-                    onDismiss = { showAccountSheet = false },
-                    onDownloads = { navController.navigate("updates") },
-                    onSettings = { navController.navigate("settings") },
-                    onFavorites = { navController.navigate("favorites") },
-                    onHelp = { showTutorial = true },
-                    onAbout = { scope.launch { snackbarHostState.showSnackbar("اپدونی - نسخه 2.9.35") } },
-                    onLogout = {
-                        scope.launch {
-                            sessionManager.clearSession()
-                            showAccountSheet = false
-                            snackbarHostState.showSnackbar("از حساب خود خارج شدید")
-                        }
-                    }
-                )
             }
         }
     }
