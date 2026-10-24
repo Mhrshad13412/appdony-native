@@ -11,67 +11,97 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object AiApi {
-    // 👇 کلید خودت که تو عکس بود
-    private const val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
-    
+    // آدرس API مدل زبانی (LLM7)
     private const val API_URL = "https://api.llm7.io/v1/chat/completions"
+    
+    // کلید API در صورت نیاز (معمولاً برای LLM7 نیازی به کلید نیست، ولی اگه داری اینجا بذار)
+    private const val API_KEY = "" 
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    suspend fun sendMessage(userMessage: String, history: List<Pair<String, String>> = emptyList()): Result<String> = withContext(Dispatchers.IO) {
+    /**
+     * ارسال پیام به هوش مصنوعی و دریافت پاسخ
+     * @param userMessage پیام جدیدی که کاربر تایپ کرده است
+     * @param history تاریخچه چت (لیستی از جفت‌های role و content)
+     */
+    suspend fun sendMessage(
+        userMessage: String,
+        history: List<Pair<String, String>> = emptyList()
+    ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            // ساخت آرایه پیام‌ها (تاریخچه + پیام جدید)
             val messagesArray = JSONArray()
             
-            messagesArray.put(JSONObject().apply {
-                put("role", "system")
-                put("content", "تو یک دستیار هوش مصنوعی در اپلیکیشن دانلود اپدونی هستی. اسمت دکتر طاعونه. لحنت دوستانه، بامزه و مفیده. به فارسی جواب بده و خیلی خلاصه و مفید توضیح بده. اگر کاربر درباره بازی یا برنامه پرسید راهنماییش کن.")
-            })
-
+            // اضافه کردن تاریخچه
             history.forEach { (role, content) ->
-                messagesArray.put(JSONObject().apply {
+                val msgObj = JSONObject().apply {
                     put("role", role)
                     put("content", content)
-                })
+                }
+                messagesArray.put(msgObj)
             }
 
-            messagesArray.put(JSONObject().apply {
+            // اضافه کردن پیام جدید کاربر
+            val userMsgObj = JSONObject().apply {
                 put("role", "user")
                 put("content", userMessage)
-            })
+            }
+            messagesArray.put(userMsgObj)
 
-            val jsonBody = JSONObject().apply {
-                put("model", "default") // 👈 مدل رایگان
+            // ساخت بدنه درخواست (JSON)
+            val requestBodyJson = JSONObject().apply {
+                put("model", "gpt-3.5-turbo") // یا هر مدلی که LLM7 پشتیبانی می‌کنه
                 put("messages", messagesArray)
+                put("temperature", 0.7)
             }
 
-            val request = Request.Builder()
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val body = requestBodyJson.toString().toRequestBody(mediaType)
+
+            // ساخت درخواست HTTP
+            val requestBuilder = Request.Builder()
                 .url(API_URL)
-                .addHeader("Authorization", "Bearer $API_KEY")
-                .addHeader("Content-Type", "application/json")
-                .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                .build()
+                .post(body)
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("خطا در اتصال (کد ${response.code}): $responseBody"))
+            if (API_KEY.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $API_KEY")
             }
 
-            if (responseBody != null) {
+            val request = requestBuilder.build()
+
+            // ارسال درخواست و دریافت پاسخ
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+                }
+
+                val responseBody = response.body?.string()
+                    ?: return@withContext Result.failure(Exception("پاسخ خالی از سرور"))
+
+                // پارس کردن پاسخ JSON
                 val jsonResponse = JSONObject(responseBody)
-                val choices = jsonResponse.getJSONArray("choices")
-                if (choices.length() > 0) {
-                    val message = choices.getJSONObject(0).getJSONObject("message")
-                    return@withContext Result.success(message.getString("content"))
+                val choices = jsonResponse.optJSONArray("choices")
+                
+                if (choices != null && choices.length() > 0) {
+                    val firstChoice = choices.getJSONObject(0)
+                    val messageObj = firstChoice.optJSONObject("message")
+                    val content = messageObj?.optString("content") ?: ""
+                    
+                    if (content.isNotBlank()) {
+                        Result.success(content.trim())
+                    } else {
+                        Result.failure(Exception("پاسخ نامعتبر از هوش مصنوعی"))
+                    }
+                } else {
+                    Result.failure(Exception("پاسخی از هوش مصنوعی دریافت نشد"))
                 }
             }
-            Result.failure(Exception("پاسخی دریافت نشد."))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception("خطا در ارتباط با هوش مصنوعی: ${e.message}"))
         }
     }
 }
