@@ -2,11 +2,13 @@ package com.appdony.app.ui.screens
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
@@ -163,6 +166,7 @@ private fun DetailContent(
     onNeedLogin: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val primaryColor = MaterialTheme.colorScheme.primary
     val textColor = AppdonyTextPrimary
 
@@ -173,6 +177,7 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // ۱. عکس شاخص
         item {
             Box(modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp).clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
                 AsyncImage(model = post.featuredImageUrl(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -180,6 +185,7 @@ private fun DetailContent(
             }
         }
 
+        // ۲. تایتل و اطلاعات
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                 if (isBlog) {
@@ -201,23 +207,47 @@ private fun DetailContent(
             }
         }
 
+        // ۳. فهرست مطالب (استایل دقیقاً مثل عکس)
         if (isBlog && tocItems.isNotEmpty()) {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(16.dp)) {
-                    Text("فهرست مطالب", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .background(AppdonyCardBg)
+                        .padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.List, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("فهرست مطالب", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
+                    
                     tocItems.forEach { header ->
                         Text(
                             text = "• ${header.text}",
                             color = textColor,
                             fontSize = 14.sp,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val index = contentBlocks.indexOf(header)
+                                    scope.launch {
+                                        // 👈 اسکرول به ایندکس تیتر (تعداد آیتم‌های قبل از بلاک‌ها = 3)
+                                        listState.animateScrollToItem(index + 3)
+                                    }
+                                }
+                                .padding(vertical = 6.dp)
                         )
                     }
                 }
             }
         }
 
+        // ۴. بخش بازی/برنامه (دکمه‌ها)
         if (!isBlog) {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -241,47 +271,48 @@ private fun DetailContent(
             }
         }
 
-        item {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    contentBlocks.forEach { block ->
-                        when (block) {
-                            is ContentBlock.Header -> {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(block.text, color = textColor, fontSize = if (block.level == 2) 20.sp else 18.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
-                                Spacer(modifier = Modifier.height(8.dp))
+        // ۵. محتوای اصلی (بلاک‌ها به صورت مجزا برای اسکرول دقیق)
+        itemsIndexed(contentBlocks) { index, block ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                when (block) {
+                    is ContentBlock.Header -> {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(block.text, color = textColor, fontSize = if (block.level == 2) 20.sp else 18.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    is ContentBlock.Paragraph -> {
+                        Text(block.text, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 28.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    is ContentBlock.Image -> {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AsyncImage(model = block.url, contentDescription = null, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.FillWidth)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    is ContentBlock.Quote -> {
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(8.dp)).background(primaryColor.copy(alpha = 0.1f))) {
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.FormatQuote, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
                             }
-                            is ContentBlock.Paragraph -> {
-                                Text(block.text, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 28.sp)
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-                            is ContentBlock.Image -> {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                AsyncImage(model = block.url, contentDescription = null, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.FillWidth)
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-                            is ContentBlock.Quote -> {
-                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(8.dp)).background(primaryColor.copy(alpha = 0.1f))) {
-                                    Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
-                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.FormatQuote, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
-                                    }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    is ContentBlock.ListBlock -> {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            block.items.forEachIndexed { i, item ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text(if (block.isOrdered) "${i + 1}." else "•", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(item, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 26.sp)
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-                            is ContentBlock.ListBlock -> {
-                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                                    block.items.forEachIndexed { index, item ->
-                                        Row(verticalAlignment = Alignment.Top) {
-                                            Text(if (block.isOrdered) "${index + 1}." else "•", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(item, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 26.sp)
-                                        }
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                    }
-                                }
+                                Spacer(modifier = Modifier.height(6.dp))
                             }
                         }
                     }
@@ -289,6 +320,7 @@ private fun DetailContent(
             }
         }
 
+        // ۶. اشتراک‌گذاری
         item {
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp), shape = RoundedCornerShape(14.dp)) {
@@ -298,6 +330,7 @@ private fun DetailContent(
             }
         }
 
+        // ۷. مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -313,6 +346,7 @@ private fun DetailContent(
             }
         }
 
+        // ۸. نظرات
         item {
             Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
