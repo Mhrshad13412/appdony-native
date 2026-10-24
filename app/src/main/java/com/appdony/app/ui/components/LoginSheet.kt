@@ -12,12 +12,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.appdony.app.data.model.UserData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginSheet(
     onDismiss: () -> Unit,
-    onLoginSuccess: (Any) -> Unit
+    onLoginSuccess: (UserData) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
