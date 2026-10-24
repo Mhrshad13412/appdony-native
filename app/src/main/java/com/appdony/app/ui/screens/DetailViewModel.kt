@@ -13,33 +13,42 @@ import kotlinx.coroutines.launch
 
 sealed class DetailUiState {
     object Loading : DetailUiState()
-    data class Success(
-        val post: Post,
-        val info: AppInfo,
-        val similar: List<Post>
-    ) : DetailUiState()
+    data class Success(val post: Post, val info: AppInfo, val similar: List<Post>) : DetailUiState()
     data class Error(val message: String) : DetailUiState()
 }
 
-class DetailViewModel(private val postId: Int) : ViewModel() {
-
+class DetailViewModel(
+    private val postId: Int,
+    private val isBlog: Boolean // 👈 پارامتر جدید
+) : ViewModel() {
     private val repo = AppRepository()
-
     private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val state: StateFlow<DetailUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+    }
 
     fun load() {
         viewModelScope.launch {
             _state.value = DetailUiState.Loading
-            val postResult = repo.getPost(postId)
+            
+            // 👈 انتخاب متد بر اساس نوع پست
+            val postResult = if (isBlog) {
+                repo.getBlogPost(postId)
+            } else {
+                repo.getPost(postId)
+            }
+
             postResult.onSuccess { post ->
                 val info = HtmlParser.parsePostContent(post.content.rendered)
                 val catId = post.primaryCategoryId()
                 val similar = if (catId != null) {
                     repo.getPostsByCategory(catId, perPage = 8)
-                        .getOrNull()?.filter { it.id != post.id }?.take(6) ?: emptyList()
+                        .getOrNull()
+                        ?.filter { it.id != post.id }
+                        ?.take(6)
+                        ?: emptyList()
                 } else emptyList()
                 _state.value = DetailUiState.Success(post, info, similar)
             }.onFailure {
