@@ -28,8 +28,10 @@ android {
     } 
     buildTypes { 
         release { 
-            isMinifyEnabled = false 
-            isShrinkResources = false 
+            // 👈 فعال‌سازی R8 و حذف منابع اضافی برای کاهش حجم
+            isMinifyEnabled = true 
+            isShrinkResources = true 
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") 
             signingConfig = signingConfigs.getByName("release") 
         } 
         debug { 
@@ -82,7 +84,5 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion") 
     implementation("androidx.work:work-runtime-ktx:2.9.0") 
     debugImplementation("androidx.compose.ui:ui-tooling") 
-    
-    // 👈 اضافه شدن Jsoup برای پارس کردن HTML (فقط برای وبلاگ)
     implementation("org.jsoup:jsoup:1.17.2")
 }
