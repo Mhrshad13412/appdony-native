@@ -1,217 +1,109 @@
 package com.appdony.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
-import com.appdony.app.ui.components.BannerCard
-import com.appdony.app.ui.components.BannerSkeleton
-import com.appdony.app.ui.components.EmptyState
-import com.appdony.app.ui.components.SectionHeader
-import com.appdony.app.ui.components.SectionRowSkeleton
-import com.appdony.app.ui.components.SectionTitleSkeleton
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedScreen(
-    feedType: String,
+fun HomeScreen(
+    isGamesTab: Boolean, // تعیین میکنه الان تب بازی‌ها فعاله یا برنامه‌ها
     onPostClick: (Int) -> Unit,
-    onCategoryClick: (Int, String) -> Unit
+    viewModel: HomeViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-    val vm: HomeViewModel = viewModel(
-        key = "feed_$feedType",
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(feedType = feedType, context = context) as T
-            }
-        }
-    )
+    val posts by viewModel.posts.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
 
-    val loading by vm.initialLoading.collectAsStateWithLifecycle()
-    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val errorMsg by vm.error.collectAsStateWithLifecycle()
-    val plusPosts by vm.plusPosts.collectAsStateWithLifecycle()
-    val featuredList by vm.featured.collectAsStateWithLifecycle()
-    val categoriesList by vm.categories.collectAsStateWithLifecycle()
-    val sectionStates by vm.sections.collectAsStateWithLifecycle()
+    // هر وقت کاربر تب رو عوض کرد (بین بازی و برنامه)، دیتا رو از اول لود کن
+    LaunchedEffect(isGamesTab) {
+        val category = if (isGamesTab) "game" else "app"
+        viewModel.loadInitialPosts(category)
+    }
 
-    when {
-        loading -> HomeSkeleton()
-        errorMsg != null && categoriesList.isEmpty() -> {
-            EmptyState(
-                title = "اتصال برقرار نشد!",
-                description = "دکتر طاعون میگه اینترنتت قطع شده یا سرور جواب نمیده. یه بار دیگه امتحان کن.",
-                buttonText = "تلاش دوباره",
-                onButtonClick = { vm.loadInitial() }
-            )
+    // تشخیص اسکرول به پایین صفحه برای لود کردن صفحه بعدی (اسکرول بی‌نهایت)
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
         }
-        else -> {
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = { vm.refresh() },
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) {
+            viewModel.loadMorePosts()
+        }
+    }
+
+    if (isLoading && posts.isEmpty()) {
+        // اسکلت لودینگ اولیه
+        Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
+            // بخش ویژه (فقط ۵ پست اول رو به عنوان ویژه نشون بده)
+            item {
+                Text(
+                    text = "ویژه",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val topPosts = if (plusPosts.isNotEmpty()) plusPosts else featuredList
-                    val topTitle = if (plusPosts.isNotEmpty()) "اپدونی پلاس" else "ویژه"
-
-                    if (topPosts.isNotEmpty()) {
-                        item(key = "top_title") { SectionHeader(title = topTitle) }
-                        item(key = "top_row") {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(topPosts, key = { "top_${it.id}" }) { p ->
-                                    BannerCard(
-                                        title = p.cleanTitle(),
-                                        imageUrl = p.featuredImageUrl(),
-                                        onClick = { onPostClick(p.id) }
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(16.dp))
-                        }
-                    }
-
-                    items(categoriesList, key = { "cat_${it.id}" }) { cat ->
-                        val sectionState = sectionStates[cat.id] ?: SectionState.NotLoaded
-                        LaunchedEffect(cat.id) {
-                            if (sectionState is SectionState.NotLoaded) {
-                                vm.loadSection(cat.id)
-                            }
-                        }
-                        SectionBlock(
-                            title = cat.name,
-                            state = sectionState,
-                            onPostClick = onPostClick,
-                            onMoreClick = { onCategoryClick(cat.id, cat.name) }
+                    items(posts.take(5)) { post ->
+                        AppCard(
+                            title = post.cleanTitle(),
+                            imageUrl = post.featuredImageUrl() ?: "",
+                            onClick = { onPostClick(post.id) },
+                            modifier = Modifier.width(200.dp)
                         )
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun HomeSkeleton() {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        item { SectionTitleSkeleton() }
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(3) { BannerSkeleton() }
+            // بقیه پست‌ها
+            items(posts.drop(5)) { post ->
+                // اینجا میتونی یه کارت افقی برای لیست اصلی بذاری
+                AppCard(
+                    title = post.cleanTitle(),
+                    imageUrl = post.featuredImageUrl() ?: "",
+                    onClick = { onPostClick(post.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
-            Spacer(Modifier.height(16.dp))
-        }
-        items(4) {
-            Column {
-                SectionTitleSkeleton()
-                Spacer(Modifier.height(4.dp))
-                SectionRowSkeleton()
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-}
 
-@Composable
-private fun SectionBlock(
-    title: String,
-    state: SectionState,
-    onPostClick: (Int) -> Unit,
-    onMoreClick: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        SectionHeader(title = title, onMoreClick = onMoreClick)
-        
-        when (state) {
-            is SectionState.NotLoaded, is SectionState.Loading -> {
-                // اینجا فقط تا وقتی که دیتا نیومده اسکلت نشون میدیم
-                SectionRowSkeleton()
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            is SectionState.Error -> {
-                Box(
-                    Modifier.fillMaxWidth().height(80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "خطا در دریافت این بخش",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-            is SectionState.Loaded -> {
-                // به محض اینکه دیتا اومد (حتی اگه عکسا لود نشده باشن)،
-                // کارت‌ها ساخته میشن و اسم بازی نمایش داده میشه.
-                if (state.posts.isEmpty()) {
+            // نشانگر لودینگ پایین صفحه (وقتی داره صفحه بعدی رو میاره)
+            if (isLoadingMore) {
+                item {
                     Box(
-                        Modifier.fillMaxWidth().height(60.dp),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
                     ) {
-                        Text(
-                            "محتوایی نیست",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
-                } else {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(state.posts, key = { it.id }) { p ->
-                            AppCard(
-                                title = p.cleanTitle(),
-                                imageUrl = p.featuredImageUrl(),
-                                onClick = { onPostClick(p.id) }
-                            )
-                        }
+                        CircularProgressIndicator()
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }
