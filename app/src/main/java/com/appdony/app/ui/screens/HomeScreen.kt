@@ -20,7 +20,7 @@ import com.appdony.app.ui.components.AppCard
 fun HomeScreen(
     isGamesTab: Boolean,
     onPostClick: (Int) -> Unit,
-    onCategoryClick: (String) -> Unit = {}, // ✅ اضافه شد تا AppNavGraph خطا نده
+    onCategoryClick: (Int, String) -> Unit = { _, _ -> }, // ✅ امضا با AppNavGraph هماهنگ شد
     viewModel: HomeViewModel = viewModel()
 ) {
     val posts by viewModel.posts.collectAsStateWithLifecycle()
