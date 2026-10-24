@@ -37,6 +37,30 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    // 👈 متد جدید برای متوقف کردن دانلود
+    fun pauseDownload(id: Long) {
+        try {
+            val request = DownloadManager.Request(android.net.Uri.parse(""))
+            // استفاده از reflection برای دسترسی به متد pauseDownload که در API 24+ هست
+            val method = downloadManager?.javaClass?.getMethod("pauseDownload", Long::class.javaPrimitiveType)
+            method?.invoke(downloadManager, id)
+            loadDownloads()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // 👈 متد جدید برای ادامه دادن دانلود
+    fun resumeDownload(id: Long) {
+        try {
+            val method = downloadManager?.javaClass?.getMethod("resumeDownload", Long::class.javaPrimitiveType)
+            method?.invoke(downloadManager, id)
+            loadDownloads()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private suspend fun fetchDownloads(): List<DownloadItem> = withContext(Dispatchers.IO) {
         val list = mutableListOf<DownloadItem>()
         if (downloadManager == null) return@withContext list
@@ -44,7 +68,8 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         var cursor: Cursor? = null
         try {
             val query = DownloadManager.Query().setFilterByStatus(
-                DownloadManager.STATUS_SUCCESSFUL or DownloadManager.STATUS_FAILED or DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PAUSED
+                DownloadManager.STATUS_SUCCESSFUL or DownloadManager.STATUS_FAILED or 
+                DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PAUSED
             )
             cursor = downloadManager.query(query)
             
@@ -74,7 +99,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
                 } while (cursor.moveToNext())
             }
         } catch (e: Exception) {
-            e.printStackTrace() // مدیریت خطا برای جلوگیری از کرش
+            e.printStackTrace()
         } finally {
             cursor?.close()
         }
