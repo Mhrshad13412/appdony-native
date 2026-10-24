@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,76 +33,25 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
-fun BannerCard(
-    title: String,
-    imageUrl: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun BannerCard(title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val imageRequest = ImageRequest.Builder(context)
-        .data(imageUrl)
-        .size(500, 300)
-        .crossfade(true)
-        .build()
+    val imageRequest = ImageRequest.Builder(context).data(imageUrl).size(500, 300).crossfade(true).build()
 
-    Box(
-        modifier = modifier
-            .width(220.dp)
-            .height(130.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(AppdonyCardBg)
-            .clickable { onClick() }
-    ) {
+    Box(modifier = modifier.width(220.dp).height(130.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).clickable { onClick() }) {
         SubcomposeAsyncImage(
-            model = imageRequest,
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-            loading = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            },
+            model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+            loading = { Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
             error = {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BrokenImage,
-                        contentDescription = "خطا",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(32.dp)
-                    )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Warning, "خطا", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
                 }
             },
-            success = {
-                SubcomposeAsyncImageContent()
-            }
+            success = { SubcomposeAsyncImageContent() }
         )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                        startY = 80f
-                    )
-                )
-        )
+        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)), startY = 80f)))
         Text(
-            text = title,
-            color = AppdonyTextPrimary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
+            text = title, color = AppdonyTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
         )
     }
 }
