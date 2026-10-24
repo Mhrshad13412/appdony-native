@@ -79,11 +79,11 @@ fun DetailScreen(
     onSimilarClick: (Int) -> Unit
 ) {
     val vm: DetailViewModel = viewModel(
-        key = "detail_$postId",
+        key = "detail_${postId}_$isBlog", // 👈 کلید یکتا برای وبلاگ و پست معمولی
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return DetailViewModel(postId) as T
+                return DetailViewModel(postId, isBlog) as T // 👈 پاس دادن isBlog
             }
         }
     )
@@ -336,7 +336,7 @@ private fun DetailContent(
         }
 
         item {
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = if (isBlog) "متن مقاله" else "توضیحات",
                 color = AppdonyTextPrimary,
@@ -345,8 +345,6 @@ private fun DetailContent(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
-            
-            // 👈 اصلاح نهایی: تبدیل امن به رشته و جلوگیری از خطای تایپ
             val contentString = post.content?.toString() ?: ""
             Text(
                 text = contentString.ifBlank { "توضیحاتی ثبت نشده است." },
@@ -359,7 +357,7 @@ private fun DetailContent(
 
         if (!isBlog && similar.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "مشابه‌ها",
                     color = AppdonyTextPrimary,
@@ -387,7 +385,7 @@ private fun DetailContent(
         }
 
         item {
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(
                 postId = post.id,
                 isLoggedIn = isLoggedIn,
