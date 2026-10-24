@@ -1,6 +1,11 @@
 package com.appdony.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,7 +51,6 @@ import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.CommentsSection
-import com.appdony.app.ui.components.DetailSkeleton
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.theme.AppdonyCardBg
@@ -96,9 +100,21 @@ fun DetailScreen(
         )
     }
 
+    // تابع اشتراک‌گذاری که به بالای صفحه منتقل شد
+    val shareAction = {
+        if (state is DetailUiState.Success) {
+            val post = (state as DetailUiState.Success).post
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "مشاهده در اپدونی\nhttps://appdony.ir/?p=${post.id}")
+            }
+            context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
-            is DetailUiState.Loading -> DetailSkeleton()
+            is DetailUiState.Loading -> if (isBlog) BlogDetailSkeleton() else DetailSkeleton()
             is DetailUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(s.message, color = AppdonyTextMuted)
             }
@@ -117,18 +133,12 @@ fun DetailScreen(
                     onDownload = { url, title ->
                         scope.launch { DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url)) }
                     },
-                    onShare = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "مشاهده در اپدونی\nhttps://appdony.ir/?p=${s.post.id}")
-                        }
-                        context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
-                    },
                     onNeedLogin = { showLoginSheet = true }
                 )
             }
         }
 
+        // 👈 دکمه بازگشت (چپ)
         Box(
             modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { onBack() },
             contentAlignment = Alignment.Center
@@ -136,15 +146,27 @@ fun DetailScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
-        Box(
-            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } },
-            contentAlignment = Alignment.Center
+        // 👈 دکمه‌های اشتراک‌گذاری و علاقه‌مندی (راست)
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                if (favorites.contains(postId)) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                contentDescription = "علاقه‌مندی",
-                tint = if (favorites.contains(postId)) Color(0xFFFF5252) else Color.White
-            )
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری", tint = Color.White)
+            }
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (favorites.contains(postId)) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = "علاقه‌مندی",
+                    tint = if (favorites.contains(postId)) Color(0xFFFF5252) else Color.White
+                )
+            }
         }
     }
 }
@@ -162,7 +184,6 @@ private fun DetailContent(
     onRatingChanged: (Int) -> Unit,
     onSimilarClick: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
-    onShare: () -> Unit,
     onNeedLogin: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -194,20 +215,36 @@ private fun DetailContent(
                     Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                 } else {
-                    Row(modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(model = post.featuredImageUrl(), contentDescription = null, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(post.cleanTitle(), color = textColor, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(post.primaryCategoryName(), color = primaryColor, fontSize = 12.sp)
+                    // 👈 استایل جدید و جمع‌وجور برای بازی/برنامه
+                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(model = post.featuredImageUrl(), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
+                                if (info.version != null) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("نسخه ${info.version}", color = AppdonyTextMuted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // بخش امتیازدهی داخل همین کادر
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                            Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
                         }
                     }
                 }
             }
         }
 
-        // ۳. فهرست مطالب (استایل دقیقاً مثل عکس)
+        // ۳. فهرست مطالب (برای وبلاگ)
         if (isBlog && tocItems.isNotEmpty()) {
             item {
                 Column(
@@ -235,10 +272,7 @@ private fun DetailContent(
                                 .fillMaxWidth()
                                 .clickable {
                                     val index = contentBlocks.indexOf(header)
-                                    scope.launch {
-                                        // 👈 اسکرول به ایندکس تیتر (تعداد آیتم‌های قبل از بلاک‌ها = 3)
-                                        listState.animateScrollToItem(index + 3)
-                                    }
+                                    scope.launch { listState.animateScrollToItem(index + 3) }
                                 }
                                 .padding(vertical = 6.dp)
                         )
@@ -247,16 +281,10 @@ private fun DetailContent(
             }
         }
 
-        // ۴. بخش بازی/برنامه (دکمه‌ها)
+        // ۴. بخش دانلود (فقط برای بازی/برنامه)
         if (!isBlog) {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("به این برنامه امتیاز دهید", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
-                }
-            }
-            item {
+                // 👈 اگر لینکی پیدا شد، دکمه‌ها نمایش داده می‌شوند.
                 if (info.downloadLinks.isNotEmpty()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         info.downloadLinks.forEachIndexed { index, link ->
@@ -267,17 +295,18 @@ private fun DetailContent(
                             }
                         }
                     }
+                } else {
+                    // 👈 اگر هیچ لینکی پیدا نشد، این متن نمایش داده میشه
+                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text("لینک دانلودی یافت نشد", color = AppdonyTextMuted, fontSize = 14.sp)
+                    }
                 }
             }
         }
 
-        // ۵. محتوای اصلی (بلاک‌ها به صورت مجزا برای اسکرول دقیق)
+        // ۵. محتوای اصلی
         itemsIndexed(contentBlocks) { index, block ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
                 when (block) {
                     is ContentBlock.Header -> {
                         Spacer(modifier = Modifier.height(16.dp))
@@ -320,17 +349,7 @@ private fun DetailContent(
             }
         }
 
-        // ۶. اشتراک‌گذاری
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp), shape = RoundedCornerShape(14.dp)) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("اشتراک‌گذاری")
-            }
-        }
-
-        // ۷. مشابه‌ها
+        // ۶. مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -346,10 +365,45 @@ private fun DetailContent(
             }
         }
 
-        // ۸. نظرات
+        // ۷. نظرات
         item {
             Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
+        }
+    }
+}
+
+// 👈 اسکلت لودینگ اختصاصی وبلاگ (شبیه یوتیوب)
+@Composable
+fun BlogDetailSkeleton() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        label = "alpha"
+    )
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(220.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Column(modifier = Modifier.padding(16.dp)) {
+            Box(modifier = Modifier.fillMaxWidth(0.8f).height(24.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(modifier = Modifier.fillMaxWidth(0.5f).height(24.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            repeat(3) {
+                Box(modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth(0.9f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
