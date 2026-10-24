@@ -40,9 +40,7 @@ class AppRepository(private val context: Context? = null) {
                 val categories: List<Category> = gson.fromJson(body, type)
                 categories.firstOrNull()?.id
             }
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
     suspend fun loadInitial(page: String): Result<InitialData> = withContext(Dispatchers.IO) {
@@ -76,25 +74,18 @@ class AppRepository(private val context: Context? = null) {
                     )
                 )
             }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        } catch (e: Exception) { Result.failure(e) }
     }
 
     suspend fun loadPlusPosts(page: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
-            val plusCatId = getCategoryId("appdony-plus")
-            if (plusCatId == null) return@withContext Result.success(emptyList())
-            
-            val request = Request.Builder()
-                .url("${baseUrl}posts?categories=$plusCatId&page=$page&per_page=$perPage&_embed")
-                .build()
-                
+            val plusCatId = getCategoryId("appdony-plus") ?: return@withContext Result.success(emptyList())
+            val request = Request.Builder().url("${baseUrl}posts?categories=$plusCatId&page=$page&per_page=$perPage&_embed").build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -106,7 +97,7 @@ class AppRepository(private val context: Context? = null) {
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -118,7 +109,7 @@ class AppRepository(private val context: Context? = null) {
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -126,20 +117,17 @@ class AppRepository(private val context: Context? = null) {
     suspend fun getPostsByIds(ids: List<Int>): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
             if (ids.isEmpty()) return@withContext Result.success(emptyList())
-            val idsString = ids.joinToString(",")
-            val request = Request.Builder().url("${baseUrl}posts?include=$idsString&_embed").build()
+            val request = Request.Builder().url("${baseUrl}posts?include=${ids.joinToString(",")}&_embed").build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    fun clearCache() {
-        try { client.cache?.evictAll() } catch (e: Exception) {}
-    }
+    fun clearCache() { try { client.cache?.evictAll() } catch (e: Exception) {} }
 
     suspend fun getPostsByCategory(categoryId: Int, perPage: Int): Result<List<Post>> = withContext(Dispatchers.IO) {
         try {
@@ -148,7 +136,7 @@ class AppRepository(private val context: Context? = null) {
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -160,7 +148,7 @@ class AppRepository(private val context: Context? = null) {
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Post>>() {}.type
-                Result.success(gson.fromJson<List<Post>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -183,7 +171,7 @@ class AppRepository(private val context: Context? = null) {
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
                 val type = object : TypeToken<List<Comment>>() {}.type
-                Result.success(gson.fromJson<List<Comment>>(body, type))
+                Result.success(gson.fromJson(body, type))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
@@ -191,7 +179,12 @@ class AppRepository(private val context: Context? = null) {
     suspend fun postComment(postId: Int, content: String, nonce: String): Result<Comment> = withContext(Dispatchers.IO) {
         try {
             val formBody = FormBody.Builder().add("post", postId.toString()).add("content", content).build()
-            val request = Request.Builder().url("${baseUrl}comments").addHeader("X-WP-Nonce", nonce).post(formBody).build()
+            val request = Request.Builder()
+                .url("${baseUrl}comments")
+                .addHeader("X-WP-Nonce", nonce)
+                .addHeader("Cookie", CookieManager.getInstance().getCookie("https://appdony.ir") ?: "")
+                .post(formBody)
+                .build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
