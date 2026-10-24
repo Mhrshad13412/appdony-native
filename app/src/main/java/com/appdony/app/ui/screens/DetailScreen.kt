@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -62,12 +61,7 @@ import com.appdony.app.util.DownloadHelper
 import kotlinx.coroutines.launch
 
 @Composable
-fun DetailScreen(
-    postId: Int,
-    isBlog: Boolean,
-    onBack: () -> Unit,
-    onSimilarClick: (Int) -> Unit
-) {
+fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClick: (Int) -> Unit) {
     val vm: DetailViewModel = viewModel(
         key = "detail_${postId}_$isBlog",
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -90,27 +84,18 @@ fun DetailScreen(
     var userRating by remember { mutableIntStateOf(0) }
 
     if (showLoginSheet) {
-        LoginSheet(
-            onDismiss = { showLoginSheet = false },
-            onLoginSuccess = { user ->
-                scope.launch {
-                    sessionManager.saveSession(
-                        user.id, user.username, user.name,
-                        user.email, user.avatarUrl() ?: "", user.nonce
-                    )
-                    showLoginSheet = false
-                }
+        LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user ->
+            scope.launch {
+                sessionManager.saveSession(user.id, user.username, user.name, user.email, user.avatarUrl() ?: "", user.nonce)
+                showLoginSheet = false
             }
-        )
+        })
     }
 
     val shareAction = {
         if (state is DetailUiState.Success) {
             val post = (state as DetailUiState.Success).post
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "مشاهده در اپدونی\nhttps://appdony.ir/?p=${post.id}")
-            }
+            val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "مشاهده در اپدونی\nhttps://appdony.ir/?p=${post.id}") }
             context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
         }
     }
@@ -118,182 +103,64 @@ fun DetailScreen(
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
             is DetailUiState.Loading -> if (isBlog) BlogDetailSkeleton() else DetailSkeleton()
-            is DetailUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.message, color = AppdonyTextMuted)
-            }
+            is DetailUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(s.message, color = AppdonyTextMuted) }
             is DetailUiState.Success -> {
                 DetailContent(
-                    post = s.post,
-                    info = s.info,
-                    similar = s.similar,
-                    contentBlocks = s.contentBlocks,
-                    isLoggedIn = isLoggedIn,
-                    nonce = nonce,
-                    isBlog = isBlog,
-                    userRating = userRating,
-                    onRatingChanged = { rating ->
-                        if (isLoggedIn) userRating = rating else showLoginSheet = true
-                    },
+                    post = s.post, info = s.info, similar = s.similar, contentBlocks = s.contentBlocks,
+                    isLoggedIn = isLoggedIn, nonce = nonce, isBlog = isBlog, userRating = userRating,
+                    onRatingChanged = { if (isLoggedIn) userRating = it else showLoginSheet = true },
                     onSimilarClick = onSimilarClick,
-                    onDownload = { url, title ->
-                        scope.launch {
-                            DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url))
-                        }
-                    },
+                    onDownload = { url, title -> scope.launch { DownloadHelper.startDownload(context, url, DownloadHelper.buildFileName(title, url)) } },
                     onNeedLogin = { showLoginSheet = true }
                 )
             }
         }
 
-        Box(
-            modifier = Modifier
-                .padding(12.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color(0xCC000000))
-                .clickable { onBack() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
+        Box(modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { onBack() }, contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color.White)
         }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xCC000000))
-                    .clickable { shareAction() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری", tint = Color.White)
+        Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() }, contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Share, "اشتراک‌گذاری", tint = Color.White)
             }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xCC000000))
-                    .clickable {
-                        scope.launch { favoritesManager.toggle(postId) }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (favorites.contains(postId)) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = "علاقه‌مندی",
-                    tint = if (favorites.contains(postId)) Color(0xFFFF5252) else Color.White
-                )
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { scope.launch { favoritesManager.toggle(postId) } }, contentAlignment = Alignment.Center) {
+                Icon(if (favorites.contains(postId)) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "علاقه‌مندی", tint = if (favorites.contains(postId)) Color(0xFFFF5252) else Color.White)
             }
         }
     }
 }
 
 @Composable
-private fun DetailContent(
-    post: Post,
-    info: AppInfo,
-    similar: List<Post>,
-    contentBlocks: List<ContentBlock>,
-    isLoggedIn: Boolean,
-    nonce: String,
-    isBlog: Boolean,
-    userRating: Int,
-    onRatingChanged: (Int) -> Unit,
-    onSimilarClick: (Int) -> Unit,
-    onDownload: (String, String) -> Unit,
-    onNeedLogin: () -> Unit
-) {
+private fun DetailContent(post: Post, info: AppInfo, similar: List<Post>, contentBlocks: List<ContentBlock>, isLoggedIn: Boolean, nonce: String, isBlog: Boolean, userRating: Int, onRatingChanged: (Int) -> Unit, onSimilarClick: (Int) -> Unit, onDownload: (String, String) -> Unit, onNeedLogin: () -> Unit) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val primaryColor = MaterialTheme.colorScheme.primary
     val textColor = AppdonyTextPrimary
     val tocItems = contentBlocks.filterIsInstance<ContentBlock.Header>().filter { it.level == 2 }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isBlog) 220.dp else 280.dp)
-                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-            ) {
-                AsyncImage(
-                    model = post.featuredImageUrl(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
-                                )
-                            )
-                        )
-                )
+            Box(modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp).clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
+                AsyncImage(model = post.featuredImageUrl(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))))
             }
         }
 
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                 if (isBlog) {
-                    Text(
-                        post.primaryCategoryName(),
-                        color = primaryColor,
-                        fontSize = 14.sp,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End
-                    )
+                    Text(post.primaryCategoryName(), color = primaryColor, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        post.cleanTitle(),
-                        color = textColor,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Right,
-                        lineHeight = 32.sp
-                    )
+                    Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                 } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(AppdonyCardBg)
-                            .padding(16.dp)
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = post.featuredImageUrl(),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(RoundedCornerShape(16.dp)),
-                                contentScale = ContentScale.Crop
-                            )
+                            AsyncImage(model = post.featuredImageUrl(), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    post.cleanTitle(),
-                                    color = textColor,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
                                 if (info.version != null) {
@@ -305,11 +172,7 @@ private fun DetailContent(
                         Spacer(modifier = Modifier.height(16.dp))
                         Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                             Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
@@ -321,34 +184,15 @@ private fun DetailContent(
 
         if (isBlog && tocItems.isNotEmpty()) {
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                        .background(AppdonyCardBg)
-                        .padding(16.dp)
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.List, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.List, null, tint = primaryColor, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("فهرست مطالب", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     tocItems.forEach { header ->
-                        Text(
-                            text = "• ${header.text}",
-                            color = textColor,
-                            fontSize = 14.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    val index = contentBlocks.indexOf(header)
-                                    scope.launch { listState.animateScrollToItem(index + 3) }
-                                }
-                                .padding(vertical = 6.dp)
-                        )
+                        Text("• ${header.text}", color = textColor, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().clickable { scope.launch { listState.animateScrollToItem(contentBlocks.indexOf(header) + 3) } }.padding(vertical = 6.dp))
                     }
                 }
             }
@@ -357,42 +201,17 @@ private fun DetailContent(
         if (!isBlog) {
             item {
                 if (info.downloadLinks.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         info.downloadLinks.forEachIndexed { index, link ->
-                            Button(
-                                onClick = { onDownload(link.url, post.cleanTitle()) },
-                                modifier = Modifier.fillMaxWidth().height(54.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (index == 0) primaryColor else AppdonyCardBg
-                                )
-                            ) {
+                            Button(onClick = { onDownload(link.url, post.cleanTitle()) }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if (index == 0) primaryColor else AppdonyCardBg)) {
                                 Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else textColor)
                                 Spacer(Modifier.width(8.dp))
-                                Text(
-                                    link.title.ifBlank { "دانلود" },
-                                    color = if (index == 0) Color.White else textColor,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Text(link.title.ifBlank { "دانلود" }, color = if (index == 0) Color.White else textColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(AppdonyCardBg)
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp), contentAlignment = Alignment.Center) {
                         Text("لینک دانلودی یافت نشد", color = AppdonyTextMuted, fontSize = 14.sp)
                     }
                 }
@@ -404,13 +223,7 @@ private fun DetailContent(
                 when (block) {
                     is ContentBlock.Header -> {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            block.text,
-                            color = textColor,
-                            fontSize = if (block.level == 2) 20.sp else 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 30.sp
-                        )
+                        Text(block.text, color = textColor, fontSize = if (block.level == 2) 20.sp else 18.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     is ContentBlock.Paragraph -> {
@@ -419,22 +232,11 @@ private fun DetailContent(
                     }
                     is ContentBlock.Image -> {
                         Spacer(modifier = Modifier.height(8.dp))
-                        AsyncImage(
-                            model = block.url,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                            contentScale = ContentScale.FillWidth
-                        )
+                        AsyncImage(model = block.url, contentDescription = null, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.FillWidth)
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                     is ContentBlock.Quote -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(primaryColor.copy(alpha = 0.1f))
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(8.dp)).background(primaryColor.copy(alpha = 0.1f))) {
                             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("❝", color = primaryColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -469,12 +271,7 @@ private fun DetailContent(
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(similar, key = { it.id }) { p ->
-                        AppCard(
-                            title = p.cleanTitle(),
-                            imageUrl = p.featuredImageUrl() ?: "",
-                            onClick = { onSimilarClick(p.id) },
-                            modifier = Modifier.width(160.dp)
-                        )
+                        AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl() ?: "", onClick = { onSimilarClick(p.id) }, modifier = Modifier.width(160.dp))
                     }
                 }
             }
@@ -490,12 +287,7 @@ private fun DetailContent(
 @Composable
 fun DetailSkeleton() {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-        label = "alpha"
-    )
+    val alpha by transition.animateFloat(initialValue = 0.3f, targetValue = 0.7f, animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha")
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(modifier = Modifier.fillMaxWidth().height(280.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
         Spacer(modifier = Modifier.height(16.dp))
@@ -525,12 +317,7 @@ fun DetailSkeleton() {
 @Composable
 fun BlogDetailSkeleton() {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-        label = "alpha"
-    )
+    val alpha by transition.animateFloat(initialValue = 0.3f, targetValue = 0.7f, animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha")
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(modifier = Modifier.fillMaxWidth().height(220.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
         Spacer(modifier = Modifier.height(16.dp))
