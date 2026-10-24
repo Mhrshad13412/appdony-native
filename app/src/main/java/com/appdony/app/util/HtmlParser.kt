@@ -34,7 +34,6 @@ object HtmlParser {
         "pinterest.com", "gamerant", "ign.com", "youtube.com", "aparat.com", "youtu.be"
     )
 
-    // 👈 تابع کمکی برای پاک کردن هرگونه تگ HTML باقی‌مانده
     private fun cleanText(text: String): String {
         return text.replace(Regex("<[^>]*>"), "")
             .replace("&nbsp;", " ")
@@ -192,8 +191,10 @@ object HtmlParser {
             val url = m.groupValues[1].trim()
             val rawText = Html.fromHtml(m.groupValues[2], Html.FROM_HTML_MODE_LEGACY).toString().trim()
             val isBlocked = blockedDomains.any { url.contains(it, ignoreCase = true) }
-            val isDirectFile = url.contains(".apk", true) || url.contains(".zip", true) || url.contains(".rar", true) ||
-                    url.contains("appdony.ir/download") || url.contains("dl.appdony.ir")
+            // 👈 بازتر کردن شرط تشخیص لینک دانلود (هر لینکی که کلمه download یا apk توش باشه)
+            val isDirectFile = url.contains(".apk", true) || url.contains(".zip", true) || url.contains(".rar", true) || 
+                    url.contains("download", true) || url.contains("dl.", true)
+            
             if (url.startsWith("http") && !isBlocked && isDirectFile) {
                 val title = rawText.ifBlank { "دانلود" }.replace(Regex("\\s+"), " ").take(60)
                 if (result.none { it.url == url }) {
