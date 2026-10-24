@@ -1,14 +1,14 @@
 package com.appdony.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.SportsEsports
-import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.ui.graphics.vector.ImageVector
 
 data class BottomNavItem(
@@ -22,25 +22,25 @@ val bottomNavItems = listOf(
     BottomNavItem(
         route = "games",
         label = "بازی‌ها",
-        selectedIcon = Icons.Filled.SportsEsports,
-        unselectedIcon = Icons.Outlined.SportsEsports
+        selectedIcon = Icons.Filled.PlayArrow,
+        unselectedIcon = Icons.Outlined.PlayArrow
     ),
     BottomNavItem(
         route = "apps",
         label = "برنامه‌ها",
-        selectedIcon = Icons.Filled.Apps,
-        unselectedIcon = Icons.Outlined.Apps
+        selectedIcon = Icons.Filled.List,
+        unselectedIcon = Icons.Outlined.List
     ),
     BottomNavItem(
         route = "blog",
         label = "وبلاگ",
-        selectedIcon = Icons.AutoMirrored.Filled.Article,
-        unselectedIcon = Icons.AutoMirrored.Outlined.Article
+        selectedIcon = Icons.Filled.Star,
+        unselectedIcon = Icons.Outlined.Star
     ),
     BottomNavItem(
         route = "downloads",
         label = "دانلودها",
-        selectedIcon = Icons.Filled.FileDownload,
-        unselectedIcon = Icons.Outlined.FileDownload
+        selectedIcon = Icons.Filled.Download,
+        unselectedIcon = Icons.Outlined.Download
     )
 )
