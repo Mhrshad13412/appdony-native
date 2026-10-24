@@ -1,9 +1,10 @@
 package com.appdony.app.ui.screens
 
+import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
 import android.database.Cursor
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,10 +22,12 @@ data class DownloadItem(
     val size: String
 )
 
-class DownloadsViewModel(private val context: Context) : ViewModel() {
+class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
-    private val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+    
+    // استفاده از applicationContext برای جلوگیری از نشتی حافظه و کرش
+    private val downloadManager = application.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
 
     init {
         loadDownloads()
