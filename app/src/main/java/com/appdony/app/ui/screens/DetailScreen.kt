@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -375,7 +374,8 @@ private fun DetailContent(
                         ) {
                             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.FormatQuote, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                                // جایگزینی آیکون FormatQuote با متن استایل‌دار برای حذف وابستگی به کتابخانه extended
+                                Text("❝", color = primaryColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
                             }
