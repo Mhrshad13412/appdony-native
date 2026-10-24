@@ -11,12 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width // ✅ این ایمپورت جا افتاده بود
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,7 +43,6 @@ import java.io.File
 @Composable
 fun DownloadsScreen() {
     val context = LocalContext.current
-    // استفاده از viewModel() استاندارد؛ AndroidViewModel خودکار Application را دریافت می‌کند
     val vm: DownloadsViewModel = viewModel()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
 
@@ -121,7 +120,7 @@ private fun DownloadCard(
             when (item.status) {
                 android.app.DownloadManager.STATUS_RUNNING -> {
                     LinearProgressIndicator(
-                        progress = item.progress / 100f,
+                        progress = { item.progress / 100f },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -139,7 +138,7 @@ private fun DownloadCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(4.dp)) // اینجا از width استفاده شده بود
                     Text("حذف", color = AppdonyTextMuted)
                 }
                 if (item.status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
