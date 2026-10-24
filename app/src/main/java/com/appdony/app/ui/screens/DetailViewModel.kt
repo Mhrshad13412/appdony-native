@@ -15,8 +15,8 @@ import kotlinx.coroutines.launch
 sealed class DetailUiState {
     object Loading : DetailUiState()
     data class Success(
-        val post: Post, 
-        val info: AppInfo, 
+        val post: Post,
+        val info: AppInfo,
         val similar: List<Post>,
         val contentBlocks: List<ContentBlock>
     ) : DetailUiState()
@@ -38,7 +38,7 @@ class DetailViewModel(
     fun load() {
         viewModelScope.launch {
             _state.value = DetailUiState.Loading
-            
+
             val postResult = if (isBlog) {
                 repo.getBlogPost(postId)
             } else {
@@ -47,13 +47,15 @@ class DetailViewModel(
 
             postResult.onSuccess { post ->
                 val rawHtml = post.content?.rendered ?: ""
-                
-                // پارس کردن HTML به بلاک‌های تمیز
-                val blocks = HtmlParser.parseContent(rawHtml)
-                
-                // استخراج اطلاعات (مثل لینک دانلود)
+
+                // برای وبلاگ، بلاک‌های متنی رو با Jsoup پارس می‌کنیم
+                val blocks = if (isBlog) {
+                    HtmlParser.parseContent(rawHtml)
+                } else emptyList()
+
+                // برای بازی/برنامه، اطلاعات (لینک دانلود، نسخه و ...) رو استخراج می‌کنیم
                 val info = HtmlParser.parsePostContent(rawHtml)
-                
+
                 val catId = post.primaryCategoryId()
                 val similar = if (!isBlog && catId != null) {
                     repo.getPostsByCategory(catId, perPage = 8)
@@ -62,7 +64,7 @@ class DetailViewModel(
                         ?.take(6)
                         ?: emptyList()
                 } else emptyList()
-                
+
                 _state.value = DetailUiState.Success(post, info, similar, blocks)
             }.onFailure {
                 _state.value = DetailUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
