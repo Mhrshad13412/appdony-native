@@ -32,8 +32,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true // چون آیکون‌های اضافی رو دستی حذف کردیم، این رو روشن می‌ذاریم تا بقیه کدهای اضافی پاک بشن
-            isShrinkResources = true
+            isMinifyEnabled = false // برای اطمینان از عدم حذف کدها فعلاً غیرفعال است
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -72,7 +72,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    // ✅ کتابخانه سنگین material-icons-extended حذف شد. آیکون‌های پایه از material-icons-core که همراه material3 می‌آید استفاده می‌کنند.
+    
+    // ✅ اضافه کردن کتابخانه آیکون‌های پایه برای رفع خطای Download, Visibility, FormatQuote
+    implementation("androidx.compose.material:material-icons-core")
+
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.navigation:navigation-compose:2.8.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
