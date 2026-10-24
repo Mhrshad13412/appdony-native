@@ -11,7 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,10 +30,7 @@ import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppRowItem
 
 @Composable
-fun SearchScreen(
-    onBack: () -> Unit,
-    onPostClick: (Int) -> Unit
-) {
+fun SearchScreen(onBack: () -> Unit, onPostClick: (Int) -> Unit) {
     val context = LocalContext.current
     val viewModel: SearchViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -48,32 +45,22 @@ fun SearchScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
             }
             OutlinedTextField(
-                value = query,
-                onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.weight(1f),
+                value = query, onValueChange = viewModel::onQueryChange, modifier = Modifier.weight(1f),
                 placeholder = { Text("جستجو...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "پاک کردن", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.Clear, "پاک کردن", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
-                singleLine = true,
-                shape = RoundedCornerShape(22.dp),
+                singleLine = true, shape = RoundedCornerShape(22.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -90,36 +77,14 @@ fun SearchScreen(
         when (val s = state) {
             is SearchUiState.Idle -> {
                 if (history.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "جستجوهای اخیر",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 16.sp,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        )
-                        Text(
-                            "پاک کردن",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 13.sp,
-                            modifier = Modifier.clickable { viewModel.clearHistory() }
-                        )
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("جستجوهای اخیر", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("پاک کردن", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, modifier = Modifier.clickable { viewModel.clearHistory() })
                     }
                     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
                         items(history, key = { it }) { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { viewModel.setQueryFromHistory(item) }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.setQueryFromHistory(item) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(12.dp))
                                 Text(item, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
                             }
@@ -149,13 +114,7 @@ fun SearchScreen(
                 } else {
                     LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
                         items(s.posts, key = { it.id }) { post ->
-                            AppRowItem(
-                                rank = 0,
-                                title = post.cleanTitle(),
-                                imageUrl = post.featuredImageUrl(),
-                                onClick = { onPostClick(post.id) },
-                                showRank = false
-                            )
+                            AppRowItem(rank = 0, title = post.cleanTitle(), imageUrl = post.featuredImageUrl(), onClick = { onPostClick(post.id) }, showRank = false)
                         }
                     }
                 }
