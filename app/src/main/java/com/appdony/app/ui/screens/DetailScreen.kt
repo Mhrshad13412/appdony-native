@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -145,27 +146,39 @@ fun DetailScreen(
         }
 
         Box(
-            modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape)
-                .background(Color(0xCC000000)).clickable { onBack() },
+            modifier = Modifier
+                .padding(12.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(0xCC000000))
+                .clickable { onBack() },
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
         Row(
-            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape)
-                    .background(Color(0xCC000000)).clickable { shareAction() },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xCC000000))
+                    .clickable { shareAction() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری", tint = Color.White)
             }
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape)
-                    .background(Color(0xCC000000)).clickable {
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xCC000000))
+                    .clickable {
                         scope.launch { favoritesManager.toggle(postId) }
                     },
                 contentAlignment = Alignment.Center
@@ -208,7 +221,9 @@ private fun DetailContent(
     ) {
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isBlog) 220.dp else 280.dp)
                     .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
             ) {
                 AsyncImage(
@@ -217,32 +232,68 @@ private fun DetailContent(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                                )
+                            )
+                        )
+                )
             }
         }
 
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                 if (isBlog) {
-                    Text(post.primaryCategoryName(), color = primaryColor, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                    Text(
+                        post.primaryCategoryName(),
+                        color = primaryColor,
+                        fontSize = 14.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
+                    Text(
+                        post.cleanTitle(),
+                        color = textColor,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Right,
+                        lineHeight = 32.sp
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                 } else {
                     Column(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                            .background(AppdonyCardBg).padding(16.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(AppdonyCardBg)
+                            .padding(16.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(
                                 model = post.featuredImageUrl(),
                                 contentDescription = null,
-                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)),
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(16.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    post.cleanTitle(),
+                                    color = textColor,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
                                 if (info.version != null) {
@@ -334,8 +385,12 @@ private fun DetailContent(
                     }
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AppdonyCardBg)
+                            .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("لینک دانلودی یافت نشد", color = AppdonyTextMuted, fontSize = 14.sp)
@@ -349,7 +404,13 @@ private fun DetailContent(
                 when (block) {
                     is ContentBlock.Header -> {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(block.text, color = textColor, fontSize = if (block.level == 2) 20.sp else 18.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
+                        Text(
+                            block.text,
+                            color = textColor,
+                            fontSize = if (block.level == 2) 20.sp else 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 30.sp
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     is ContentBlock.Paragraph -> {
@@ -368,13 +429,14 @@ private fun DetailContent(
                     }
                     is ContentBlock.Quote -> {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(primaryColor.copy(alpha = 0.1f))
                         ) {
                             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                // جایگزینی آیکون FormatQuote با متن استایل‌دار برای حذف وابستگی به کتابخانه extended
                                 Text("❝", color = primaryColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
