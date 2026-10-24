@@ -25,7 +25,7 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
 
-    private val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    private val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
 
     init {
         loadDownloads()
@@ -39,12 +39,16 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
 
     private suspend fun fetchDownloads(): List<DownloadItem> = withContext(Dispatchers.IO) {
         val list = mutableListOf<DownloadItem>()
+        if (downloadManager == null) return@withContext list
+
+        var cursor: Cursor? = null
         try {
             val query = DownloadManager.Query().setFilterByStatus(
                 DownloadManager.STATUS_SUCCESSFUL or DownloadManager.STATUS_FAILED or DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PAUSED
             )
-            val cursor: Cursor = downloadManager.query(query)
-            if (cursor.moveToFirst()) {
+            cursor = downloadManager.query(query)
+            
+            if (cursor != null && cursor.moveToFirst()) {
                 val idIdx = cursor.getColumnIndex(DownloadManager.COLUMN_ID)
                 val titleIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
                 val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
@@ -53,12 +57,12 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
                 val bytesDownloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
 
                 do {
-                    val id = cursor.getLong(idIdx)
-                    val title = cursor.getString(titleIdx) ?: "نامشخص"
-                    val status = cursor.getInt(statusIdx)
-                    val localUri = cursor.getString(localUriIdx)
-                    val totalSize = cursor.getLong(sizeIdx)
-                    val bytesDownloaded = cursor.getLong(bytesDownloadedIdx)
+                    val id = if (idIdx >= 0) cursor.getLong(idIdx) else 0L
+                    val title = if (titleIdx >= 0) cursor.getString(titleIdx) ?: "نامشخص" else "نامشخص"
+                    val status = if (statusIdx >= 0) cursor.getInt(statusIdx) else DownloadManager.STATUS_FAILED
+                    val localUri = if (localUriIdx >= 0) cursor.getString(localUriIdx) else null
+                    val totalSize = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
+                    val bytesDownloaded = if (bytesDownloadedIdx >= 0) cursor.getLong(bytesDownloadedIdx) else 0L
                     
                     var progress = 0
                     if (totalSize > 0) progress = ((bytesDownloaded * 100) / totalSize).toInt()
@@ -68,10 +72,11 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
 
                     list.add(DownloadItem(id, title, status, progress, filePath, fileSizeMb))
                 } while (cursor.moveToNext())
-                cursor.close()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            e.printStackTrace() // مدیریت خطا برای جلوگیری از کرش
+        } finally {
+            cursor?.close()
         }
         list.reversed()
     }
