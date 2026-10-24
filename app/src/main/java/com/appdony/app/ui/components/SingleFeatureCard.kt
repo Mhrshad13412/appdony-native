@@ -68,7 +68,6 @@ fun SingleFeatureCard(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // آیکون بزرگ سمت راست (چون RTL، ولی تصویر این سمت بهتره)
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -92,10 +91,7 @@ fun SingleFeatureCard(
                     )
                 }
             }
-
             Spacer(modifier = Modifier.width(14.dp))
-
-            // متن
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -114,7 +110,6 @@ fun SingleFeatureCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                // نوار سبز نصب
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
