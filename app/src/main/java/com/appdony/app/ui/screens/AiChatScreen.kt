@@ -1,6 +1,7 @@
 package com.appdony.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,35 +9,86 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.appdony.app.ui.theme.AppdonyCardBg
-import com.appdony.app.ui.theme.AppdonyTextMuted
-import com.appdony.app.ui.theme.AppdonyTextPrimary
+import com.appdony.app.data.api.AiApi
+import com.appdony.app.data.preferences.ChatHistoryManager
+import com.appdony.app.data.preferences.ChatMessage
+import com.appdony.app.ui.components.PlagueDoctorAvatar
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AiChatScreen(
-    onBack: () -> Unit,
-    viewModel: AiChatViewModel = viewModel()
-) {
-    val messages by viewModel.messages.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    var inputText by remember { mutableStateOf("") }
+fun AiChatScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val chatHistoryManager = remember { ChatHistoryManager(context) }
+    var inputText by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var isHistoryLoaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        chatHistoryManager.getChatHistory().collect { history ->
+            if (history.isEmpty()) {
+                val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور میتونم کمکت کنم؟", false))
+                messages = welcomeMsg
+                chatHistoryManager.saveChatHistory(welcomeMsg)
+            } else {
+                messages = history
+            }
+            isHistoryLoaded = true
+        }
+    }
+
+    fun sendMessage(customText: String? = null) {
+        val textToSend = customText ?: inputText
+        if (textToSend.isBlank() || isLoading) return
+        val userMsg = textToSend.trim()
+        val updatedMessages = messages + ChatMessage(userMsg, true)
+        messages = updatedMessages
+        if (customText == null) inputText = ""
+        isLoading = true
+        scope.launch { chatHistoryManager.saveChatHistory(updatedMessages) }
+
+        scope.launch {
+            val history = messages.dropLast(1).map { (if (it.isUser) "user" else "assistant") to it.text }
+            val result = AiApi.sendMessage(userMsg, history)
+            result.onSuccess { response ->
+                val finalMessages = messages + ChatMessage(response, false)
+                messages = finalMessages
+                chatHistoryManager.saveChatHistory(finalMessages)
+            }.onFailure { error ->
+                val errorMsg = ChatMessage("خطا: ${error.message ?: "مشکل در اتصال"}", false)
+                val finalMessages = messages + errorMsg
+                messages = finalMessages
+                chatHistoryManager.saveChatHistory(finalMessages)
+            }
+            isLoading = false
+        }
+    }
+
+    fun clearChat() {
+        scope.launch {
+            chatHistoryManager.clearHistory()
+            val welcomeMsg = listOf(ChatMessage("سلام! من دکتر طاعونم. چطور میتونم کمکت کنم؟", false))
+            messages = welcomeMsg
+            chatHistoryManager.saveChatHistory(welcomeMsg)
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -47,165 +99,130 @@ fun AiChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "چت با دکتر طاعون",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = AppdonyTextPrimary
-                    )
-                },
+                title = { Text("چت با دکتر طاعون", color = MaterialTheme.colorScheme.onBackground) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت",
-                            tint = AppdonyTextPrimary
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.clearChat() }) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "پاک کردن چت",
-                            tint = Color(0xFFFF5252)
-                        )
+                    IconButton(onClick = { clearChat() }) {
+                        Icon(Icons.Default.Delete, contentDescription = "پاک کردن چت", tint = MaterialTheme.colorScheme.error)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .imePadding()
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
-            ) {
-                items(messages) { message ->
-                    ChatBubble(message = message)
+            if (!isHistoryLoaded) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
-                
-                if (isLoading) {
-                    item {
-                        Box(
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(messages) { msg ->
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.CenterStart
+                            horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
                         ) {
-                            Text(
-                                text = "دکتر طاعون در حال فکر کردن است...",
-                                color = AppdonyTextMuted,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
+                            if (!msg.isUser) {
+                                PlagueDoctorAvatar(sizeDp = 40)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 16.dp,
+                                            topEnd = 16.dp,
+                                            bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                                            bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                                        )
+                                    )
+                                    .background(if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = msg.text,
+                                    color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    lineHeight = 22.sp
+                                )
+                            }
+                        }
+                    }
+                    if (isLoading) {
+                        item {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                PlagueDoctorAvatar(sizeDp = 40)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
-            }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("پیامت رو بنویس...", color = AppdonyTextMuted) },
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = AppdonyCardBg,
-                        unfocusedContainerColor = AppdonyCardBg,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = AppdonyTextPrimary,
-                        unfocusedTextColor = AppdonyTextPrimary
-                    ),
-                    maxLines = 4
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = {
-                        if (inputText.isNotBlank() && !isLoading) {
-                            viewModel.sendMessage(inputText)
-                            inputText = ""
-                        }
-                    },
+                Row(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    enabled = inputText.isNotBlank() && !isLoading
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "ارسال",
-                        tint = Color.White
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { sendMessage("یه بازی یا برنامه خوب برام پیشنهاد بده") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SmartToy,
+                            contentDescription = "پیشنهاد هوشمند",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) },
+                        shape = RoundedCornerShape(24.dp),
+                        maxLines = 4,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable { sendMessage() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "ارسال", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ChatBubble(message: ChatMessage) {
-    val isUser = message.isUser
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
-    ) {
-        if (!isUser) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                // آیکون جایگزین شد
-                Icon(Icons.Default.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 0.dp,
-                        bottomEnd = if (isUser) 0.dp else 16.dp
-                    )
-                )
-                .background(if (isUser) MaterialTheme.colorScheme.primary else AppdonyCardBg)
-                .padding(12.dp)
-        ) {
-            Text(
-                text = message.text,
-                color = if (isUser) Color.White else AppdonyTextPrimary,
-                fontSize = 14.sp,
-                lineHeight = 22.sp,
-                textAlign = TextAlign.Right
-            )
         }
     }
 }
