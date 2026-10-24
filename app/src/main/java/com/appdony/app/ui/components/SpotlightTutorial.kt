@@ -50,13 +50,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SpotlightTutorial(onFinish: () -> Unit) {
     var currentStep by remember { mutableIntStateOf(0) }
-    
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-
-    // 👈 استخراج رنگ قبل از Canvas برای جلوگیری از خطای Composable
     val primaryColor = MaterialTheme.colorScheme.primary
 
     val targetRect = when (currentStep) {
@@ -93,7 +90,7 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .clickable(enabled = false) {} 
+            .clickable(enabled = false) {}
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val path = Path().apply {
@@ -106,24 +103,21 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
                 )
                 fillType = PathFillType.EvenOdd
             }
-            
             drawPath(
                 path = path,
                 color = Color.Black.copy(alpha = 0.2f * spotlightAlpha)
             )
-
             drawRoundRect(
-                color = primaryColor, // 👈 استفاده از رنگ استخراج شده
+                color = primaryColor,
                 topLeft = targetRect.topLeft,
                 size = targetRect.size,
                 cornerRadius = CornerRadius(16.dp.toPx()),
                 style = Stroke(
-                    width = 2.dp.toPx(), 
+                    width = 2.dp.toPx(),
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 15f), 0f)
                 )
             )
         }
-
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -159,7 +153,6 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
                 lineHeight = 24.sp
             )
             Spacer(modifier = Modifier.height(24.dp))
-            
             Button(
                 onClick = {
                     if (currentStep < 4) {
@@ -182,21 +175,10 @@ fun SpotlightTutorial(onFinish: () -> Unit) {
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .padding(start = 4.dp)
+                        modifier = Modifier.padding(start = 4.dp).size(16.dp)
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Text(
-                text = "رد کردن آموزش",
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                fontSize = 12.sp,
-                modifier = Modifier.clickable { onFinish() }
-            )
         }
     }
 }
