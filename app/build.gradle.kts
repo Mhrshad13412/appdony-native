@@ -32,8 +32,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true // ✅ فعال شد (پاکسازی کدهای اضافی)
+            isShrinkResources = true // ✅ فعال شد (پاکسازی منابع و آیکون‌های اضافی)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -94,8 +94,6 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
-    // ✅ رفع خطای WorkManager
     implementation("androidx.work:work-runtime-ktx:2.10.0")
-    // ✅ رفع خطای jsoup
     implementation("org.jsoup:jsoup:1.18.3")
 }
