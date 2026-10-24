@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
 import android.database.Cursor
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -25,8 +27,8 @@ data class DownloadItem(
 class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
-    
-    // استفاده از applicationContext برای جلوگیری از نشتی حافظه و کرش
+
+    // استفاده از Application Context برای جلوگیری از نشتی حافظه و کرش
     private val downloadManager = application.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
 
     init {
@@ -39,22 +41,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // جایگزینی Reflection با فراخوانی مستقیم و مدیریت صحیح نسخه اندروید
+    @RequiresApi(Build.VERSION_CODES.N)
     fun pauseDownload(id: Long) {
         try {
-            // استفاده از Reflection برای جلوگیری از خطای کامپایلر در گیت‌هاب اکشنز
-            val method = DownloadManager::class.java.getMethod("pauseDownload", Long::class.javaPrimitiveType)
-            method.invoke(downloadManager, id)
+            downloadManager?.pauseDownload(id)
             loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     fun resumeDownload(id: Long) {
         try {
-            // استفاده از Reflection برای جلوگیری از خطای کامپایلر در گیت‌هاب اکشنز
-            val method = DownloadManager::class.java.getMethod("resumeDownload", Long::class.javaPrimitiveType)
-            method.invoke(downloadManager, id)
+            downloadManager?.resumeDownload(id)
             loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
