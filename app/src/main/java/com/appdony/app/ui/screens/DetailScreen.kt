@@ -104,7 +104,6 @@ fun DetailScreen(
         )
     }
 
-    // تابع اشتراک‌گذاری که به بالای صفحه منتقل شد
     val shareAction = {
         if (state is DetailUiState.Success) {
             val post = (state as DetailUiState.Success).post
@@ -146,7 +145,6 @@ fun DetailScreen(
             }
         }
 
-        // دکمه بازگشت (چپ)
         Box(
             modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape)
                 .background(Color(0xCC000000)).clickable { onBack() },
@@ -155,7 +153,6 @@ fun DetailScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
         }
 
-        // دکمه‌های اشتراک‌گذاری و علاقه‌مندی (راست)
         Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -210,7 +207,6 @@ private fun DetailContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // ۱. عکس شاخص
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
@@ -226,7 +222,6 @@ private fun DetailContent(
             }
         }
 
-        // ۲. تایتل و اطلاعات
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                 if (isBlog) {
@@ -235,7 +230,6 @@ private fun DetailContent(
                     Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                 } else {
-                    // استایل جدید و جمع‌وجور برای بازی/برنامه
                     Column(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
                             .background(AppdonyCardBg).padding(16.dp)
@@ -261,7 +255,6 @@ private fun DetailContent(
                         Spacer(modifier = Modifier.height(16.dp))
                         Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
-                        // بخش امتیازدهی داخل همین کادر
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth(),
@@ -276,7 +269,6 @@ private fun DetailContent(
             }
         }
 
-        // ۳. فهرست مطالب (برای وبلاگ)
         if (isBlog && tocItems.isNotEmpty()) {
             item {
                 Column(
@@ -312,10 +304,8 @@ private fun DetailContent(
             }
         }
 
-        // ۴. بخش دانلود (فقط برای بازی/برنامه)
         if (!isBlog) {
             item {
-                // اگر لینکی پیدا شد، دکمه‌ها نمایش داده می‌شوند.
                 if (info.downloadLinks.isNotEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -344,7 +334,6 @@ private fun DetailContent(
                         }
                     }
                 } else {
-                    // اگر هیچ لینکی پیدا نشد، این متن نمایش داده میشه
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
                             .clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).padding(24.dp),
@@ -356,7 +345,6 @@ private fun DetailContent(
             }
         }
 
-        // ۵. محتوای اصلی
         itemsIndexed(contentBlocks) { index, block ->
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
                 when (block) {
@@ -410,7 +398,6 @@ private fun DetailContent(
             }
         }
 
-        // ۶. مشابه‌ها
         if (!isBlog && similar.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -431,7 +418,6 @@ private fun DetailContent(
             }
         }
 
-        // ۷. نظرات
         item {
             Spacer(modifier = Modifier.height(24.dp))
             CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
@@ -439,7 +425,41 @@ private fun DetailContent(
     }
 }
 
-// اسکلت لودینگ اختصاصی وبلاگ (شبیه یوتیوب)
+@Composable
+fun DetailSkeleton() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        label = "alpha"
+    )
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxWidth().height(280.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+        Spacer(modifier = Modifier.height(16.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.fillMaxWidth(0.8f).height(20.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.5f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            repeat(3) {
+                Box(modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth(0.9f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
 @Composable
 fun BlogDetailSkeleton() {
     val transition = rememberInfiniteTransition(label = "shimmer")
