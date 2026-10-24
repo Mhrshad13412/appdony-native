@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,6 +20,7 @@ import com.appdony.app.ui.components.AppCard
 fun HomeScreen(
     isGamesTab: Boolean,
     onPostClick: (Int) -> Unit,
+    onCategoryClick: (String) -> Unit = {}, // ✅ اضافه شد تا AppNavGraph خطا نده
     viewModel: HomeViewModel = viewModel()
 ) {
     val posts by viewModel.posts.collectAsStateWithLifecycle()
@@ -45,7 +47,7 @@ fun HomeScreen(
     }
 
     if (isLoading && posts.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
     } else {
@@ -90,7 +92,7 @@ fun HomeScreen(
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        contentAlignment = androidx.compose.ui.Alignment.Center
+                        contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
                     }
