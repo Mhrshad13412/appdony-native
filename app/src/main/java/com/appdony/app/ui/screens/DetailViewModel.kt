@@ -48,12 +48,12 @@ class DetailViewModel(
             postResult.onSuccess { post ->
                 val rawHtml = post.content?.rendered ?: ""
 
-                // برای وبلاگ، بلاک‌های متنی رو با Jsoup پارس می‌کنیم
+                // تبدیل HTML به بلاک‌های تمیز (برای وبلاگ)
                 val blocks = if (isBlog) {
                     HtmlParser.parseContent(rawHtml)
                 } else emptyList()
 
-                // برای بازی/برنامه، اطلاعات (لینک دانلود، نسخه و ...) رو استخراج می‌کنیم
+                // استخراج اطلاعات (لینک دانلود، نسخه و ...) برای بازی/برنامه
                 val info = HtmlParser.parsePostContent(rawHtml)
 
                 val catId = post.primaryCategoryId()
