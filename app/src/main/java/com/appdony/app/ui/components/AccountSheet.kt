@@ -52,6 +52,7 @@ fun AccountSheet(
     onLogout: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -81,7 +82,9 @@ fun AccountSheet(
                     )
                 }
             }
+
             Spacer(Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -119,7 +122,9 @@ fun AccountSheet(
                     )
                 }
             }
+
             Spacer(Modifier.height(16.dp))
+
             AccountRow(Icons.Default.Download, "دانلودها", onDownloads)
             AccountRow(Icons.AutoMirrored.Filled.Help, "راهنما", onHelp)
             AccountRow(Icons.Default.Settings, "تنظیمات", onSettings)
