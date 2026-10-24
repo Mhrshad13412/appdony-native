@@ -11,11 +11,11 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object AiApi {
-    // آدرس API مدل زبانی LLM7
     private val API_URL = "https://api.llm7.io/v1/chat/completions"
-    // کلید اختصاصی شما
+    
+    // کلید API خود را اینجا قرار دهید (ترجیحاً از token.llm7.io دریافت کنید)
     private val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
-    // متن شخصیت دکتر طاعون (System Prompt)
+    
     private val SYSTEM_PROMPT = """
         تو "دکتر طاعون" هستی، دستیار هوشمند و بسیار باحال اپلیکیشن "اپدونی".
         اپدونی یک مرجع دانلود بازی و برنامه برای اندروید است.
@@ -62,8 +62,9 @@ object AiApi {
             }
             messagesArray.put(userMsgObj)
 
+            // ✅ مدل به "fast" تغییر کرد تا با LLM7 سازگار باشد
             val requestBodyJson = JSONObject().apply {
-                put("model", "gpt-3.5-turbo")
+                put("model", "fast") 
                 put("messages", messagesArray)
                 put("temperature", 0.7)
             }
