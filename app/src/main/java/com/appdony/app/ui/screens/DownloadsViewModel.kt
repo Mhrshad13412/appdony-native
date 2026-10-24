@@ -37,24 +37,20 @@ class DownloadsViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // 👈 متد جدید برای متوقف کردن دانلود
+    // 👈 استفاده مستقیم از متد اندروید بدون reflection (چون minSdk 24 هست)
     fun pauseDownload(id: Long) {
         try {
-            val request = DownloadManager.Request(android.net.Uri.parse(""))
-            // استفاده از reflection برای دسترسی به متد pauseDownload که در API 24+ هست
-            val method = downloadManager?.javaClass?.getMethod("pauseDownload", Long::class.javaPrimitiveType)
-            method?.invoke(downloadManager, id)
-            loadDownloads()
+            downloadManager?.pauseDownload(id)
+            loadDownloads() // آپدیت کردن لیست برای نمایش وضعیت جدید
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    // 👈 متد جدید برای ادامه دادن دانلود
+    // 👈 استفاده مستقیم از متد اندروید
     fun resumeDownload(id: Long) {
         try {
-            val method = downloadManager?.javaClass?.getMethod("resumeDownload", Long::class.javaPrimitiveType)
-            method?.invoke(downloadManager, id)
+            downloadManager?.resumeDownload(id)
             loadDownloads()
         } catch (e: Exception) {
             e.printStackTrace()
