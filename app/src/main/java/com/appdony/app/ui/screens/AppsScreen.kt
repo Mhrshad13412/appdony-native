@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 @Composable
 fun AppsScreen(
     onPostClick: (Int) -> Unit,
-    onCategoryClick: (String) -> Unit = {} // ✅ اضافه شد
+    onCategoryClick: (Int, String) -> Unit = { _, _ -> } // ✅ امضا اصلاح شد
 ) {
     HomeScreen(
         isGamesTab = false,
