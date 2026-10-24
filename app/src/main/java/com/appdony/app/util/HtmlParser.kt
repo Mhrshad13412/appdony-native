@@ -28,14 +28,22 @@ sealed class ContentBlock {
 }
 
 object HtmlParser {
-    // سایت‌های خبری و تبلیغاتی که نباید به عنوان لینک دانلود شناسایی بشن
     private val blockedDomains = listOf(
         "google.com", "doubleclick", "googlesyndication",
         "facebook.com", "google-analytics", "t.me/", "telegram.me/", "twitter.com",
         "pinterest.com", "gamerant", "ign.com", "youtube.com", "aparat.com", "youtu.be"
     )
 
-    // 👈 این متد رو برای وبلاگ اضافه کردم که HTML رو به بلاک‌های تمیز تبدیل کنه
+    // 👈 تابع کمکی برای پاک کردن هرگونه تگ HTML باقی‌مانده
+    private fun cleanText(text: String): String {
+        return text.replace(Regex("<[^>]*>"), "")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .trim()
+    }
+
     fun parseContent(html: String): List<ContentBlock> {
         val blocks = mutableListOf<ContentBlock>()
         if (html.isBlank()) return blocks
@@ -53,13 +61,13 @@ object HtmlParser {
     private fun parseElement(element: Element, blocks: MutableList<ContentBlock>) {
         when (element.tagName().lowercase()) {
             "h1", "h2", "h3", "h4" -> {
-                val text = element.text().trim()
+                val text = cleanText(element.text())
                 if (text.isNotEmpty()) {
                     blocks.add(ContentBlock.Header(text, element.tagName().substring(1).toIntOrNull() ?: 2))
                 }
             }
             "p" -> {
-                val text = element.text().trim()
+                val text = cleanText(element.text())
                 if (text.isNotEmpty()) {
                     blocks.add(ContentBlock.Paragraph(text))
                 }
@@ -73,13 +81,13 @@ object HtmlParser {
                 if (src.isNotEmpty()) blocks.add(ContentBlock.Image(src))
             }
             "blockquote" -> {
-                val text = element.text().trim()
+                val text = cleanText(element.text())
                 if (text.isNotEmpty()) {
                     blocks.add(ContentBlock.Quote(text))
                 }
             }
             "ul", "ol" -> {
-                val items = element.select("li").map { it.text().trim() }.filter { it.isNotEmpty() }
+                val items = element.select("li").map { cleanText(it.text()) }.filter { it.isNotEmpty() }
                 if (items.isNotEmpty()) {
                     blocks.add(ContentBlock.ListBlock(items, element.tagName() == "ol"))
                 }
@@ -89,7 +97,7 @@ object HtmlParser {
                     val src = img.attr("src")
                     if (src.isNotEmpty()) blocks.add(ContentBlock.Image(src))
                 }
-                val caption = element.select("figcaption").text().trim()
+                val caption = cleanText(element.select("figcaption").text())
                 if (caption.isNotEmpty()) {
                     blocks.add(ContentBlock.Paragraph(caption))
                 }
@@ -102,7 +110,6 @@ object HtmlParser {
         }
     }
 
-    // 👈 متدهای اصلی خودت برای بازی/برنامه (دست نخورده)
     fun parsePostContent(html: String): AppInfo {
         val version = extractVersion(html)
         val size = extractSize(html)
