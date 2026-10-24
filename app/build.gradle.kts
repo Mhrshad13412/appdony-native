@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.appdony.app"
-        minSdk = 24 // تضمین پشتیبانی از pauseDownload و resumeDownload
+        minSdk = 24
         targetSdk = 35
         versionCode = 2935
         versionName = "2.9.35"
@@ -32,7 +32,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // موقتاً غیرفعال شد تا R8 کدهای دانلود را حذف نکند
+            isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -93,4 +93,9 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
+
+    // ✅ رفع خطای WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    // ✅ رفع خطای jsoup
+    implementation("org.jsoup:jsoup:1.18.3")
 }
