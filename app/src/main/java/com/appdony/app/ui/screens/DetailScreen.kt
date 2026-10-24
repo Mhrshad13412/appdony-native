@@ -376,7 +376,7 @@ private fun DetailContent(
                         ) {
                             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("❝", color = primaryColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.FormatQuote, contentDescription = null, tint = primaryColor, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
                             }
