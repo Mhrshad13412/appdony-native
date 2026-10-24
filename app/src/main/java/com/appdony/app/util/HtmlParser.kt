@@ -31,7 +31,8 @@ object HtmlParser {
     private val blockedDomains = listOf(
         "google.com", "doubleclick", "googlesyndication",
         "facebook.com", "google-analytics", "t.me/", "telegram.me/", "twitter.com",
-        "pinterest.com", "gamerant", "ign.com", "youtube.com", "aparat.com", "youtu.be"
+        "pinterest.com", "gamerant", "ign.com", "youtube.com", "aparat.com", "youtu.be",
+        "instagram.com", "whatsapp.com"
     )
 
     private fun cleanText(text: String): String {
@@ -190,13 +191,19 @@ object HtmlParser {
         anchorRegex.findAll(html).forEach { m ->
             val url = m.groupValues[1].trim()
             val rawText = Html.fromHtml(m.groupValues[2], Html.FROM_HTML_MODE_LEGACY).toString().trim()
-            val isBlocked = blockedDomains.any { url.contains(it, ignoreCase = true) }
-            // 👈 بازتر کردن شرط تشخیص لینک دانلود (هر لینکی که کلمه download یا apk توش باشه)
-            val isDirectFile = url.contains(".apk", true) || url.contains(".zip", true) || url.contains(".rar", true) || 
-                    url.contains("download", true) || url.contains("dl.", true)
             
-            if (url.startsWith("http") && !isBlocked && isDirectFile) {
-                val title = rawText.ifBlank { "دانلود" }.replace(Regex("\\s+"), " ").take(60)
+            val isBlocked = blockedDomains.any { url.contains(it, ignoreCase = true) }
+            
+            // 👈 تشخیص اینکه لینک، یه عکس یا یه لینک داخلی سایت نیست
+            val isImage = url.endsWith(".jpg", true) || url.endsWith(".jpeg", true) || 
+                          url.endsWith(".png", true) || url.endsWith(".webp", true)
+            val isInternalPost = url.contains("/blog/") || url.contains("wp-content/uploads")
+            
+            // هر لینک خارجی که مسدود یا عکس نباشه، به عنوان لینک دانلود در نظر گرفته میشه
+            if (url.startsWith("http") && !isBlocked && !isImage && !isInternalPost) {
+                // اگر متن لینک خالی بود، یه اسم پیش فرض میذاریم
+                val title = rawText.ifBlank { "لینک دانلود" }.replace(Regex("\\s+"), " ").take(60)
+                
                 if (result.none { it.url == url }) {
                     result.add(DownloadLink(title = title, url = url))
                 }
