@@ -1,87 +1,99 @@
 package com.appdony.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appdony.app.R
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountSheet(
-    displayName: String, username: String, onDismiss: () -> Unit,
-    onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
-    onHelp: () -> Unit, onAbout: () -> Unit, onLogout: () -> Unit
+fun FloatingAssistant(
+    onSearchClick: () -> Unit,
+    onDownloadsClick: () -> Unit,
+    onHelpClick: () -> Unit,
+    onChatClick: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.background, dragHandle = null) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onDismiss() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onBackground)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Bottom) {
+        if (!isExpanded) {
+            Surface(
+                modifier = Modifier.padding(bottom = 8.dp, end = 4.dp).shadow(4.dp, RoundedCornerShape(16.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp)
             ) {
-                Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                    Text(text = displayName.firstOrNull()?.uppercase() ?: "U", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(text = displayName, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
+                Text("سلام! کمکی نیاز داری؟", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
             }
-            Spacer(Modifier.height(16.dp))
-            AccountRow(Icons.Default.Download, "دانلودها", onDownloads)
-            AccountRow(Icons.Default.Info, "راهنما", onHelp)
-            AccountRow(Icons.Default.Settings, "تنظیمات", onSettings)
-            AccountRow(Icons.Default.Star, "علاقه‌مندی‌ها", onFavorites)
-            AccountRow(Icons.Default.Info, "درباره اپدونی", onAbout)
-            AccountRow(Icons.AutoMirrored.Filled.ExitToApp, "خروج از حساب", onLogout)
+        }
+
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.5f),
+            exit = fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 0.5f)
+        ) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistantMenuItem(icon = Icons.Default.Email, label = "چت با دکتر", onClick = { isExpanded = false; onChatClick() })
+                AssistantMenuItem(icon = Icons.Default.Info, label = "راهنما", onClick = { isExpanded = false; onHelpClick() })
+                AssistantMenuItem(icon = Icons.Default.Download, label = "دانلودها", onClick = { isExpanded = false; onDownloadsClick() })
+                AssistantMenuItem(icon = Icons.Default.Search, label = "جستجو", onClick = { isExpanded = false; onSearchClick() })
+                Spacer(modifier = Modifier.padding(bottom = 4.dp))
+            }
+        }
+
+        Box(
+            modifier = Modifier.size(64.dp).shadow(8.dp, CircleShape).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable { isExpanded = !isExpanded },
+            contentAlignment = Alignment.Center
+        ) {
+            if (isExpanded) {
+                Icon(Icons.Default.Close, contentDescription = "بستن", tint = Color.White, modifier = Modifier.size(28.dp))
+            } else {
+                Image(painter = painterResource(id = R.drawable.plague_doctor), contentDescription = "دستیار", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
         }
     }
 }
 
 @Composable
-private fun AccountRow(icon: ImageVector, title: String, onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick() }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.width(12.dp))
-        Text(text = title, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+private fun AssistantMenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.shadow(2.dp, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp)).clickable { onClick() },
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(imageVector = icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
     }
 }
