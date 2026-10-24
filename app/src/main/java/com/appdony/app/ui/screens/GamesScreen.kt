@@ -4,11 +4,12 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun GamesScreen(
-    onPostClick: (Int) -> Unit
+    onPostClick: (Int) -> Unit,
+    onCategoryClick: (Int, String) -> Unit = { _, _ -> } // ✅ امضا اصلاح شد
 ) {
-    // استفاده مستقیم از HomeScreen با تنظیم isGamesTab روی true
     HomeScreen(
         isGamesTab = true,
-        onPostClick = onPostClick
+        onPostClick = onPostClick,
+        onCategoryClick = onCategoryClick
     )
 }
