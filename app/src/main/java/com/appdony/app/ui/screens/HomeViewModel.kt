@@ -1,97 +1,77 @@
 package com.appdony.app.ui.screens
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.appdony.app.data.model.InitialData
-import com.appdony.app.data.model.Post
-import com.appdony.app.data.repository.AppRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.appdony.app.data.model.Post
+import com.appdony.app.data.repository.MainRepository
 
-sealed class SectionState {
-    object NotLoaded : SectionState()
-    object Loading : SectionState()
-    data class Loaded(val posts: List<Post>) : SectionState()
-    object Error : SectionState()
-}
+class HomeViewModel(private val repository: MainRepository) : ViewModel() {
 
-class HomeViewModel(
-    private val feedType: String,
-    private val context: Context
-) : ViewModel() {
+    // نگهداری لیست پست‌ها
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    val posts: StateFlow<List<Post>> = _posts.asStateFlow()
 
-    private val repo = AppRepository(context)
+    // وضعیت لودینگ اولیه
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _initialLoading = MutableStateFlow(true)
-    val initialLoading: StateFlow<Boolean> = _initialLoading.asStateFlow()
+    // وضعیت لودینگ برای بارگذاری بی‌نهایت (پایین صفحه)
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
-
-    private val _plusPosts = MutableStateFlow<List<Post>>(emptyList())
-    val plusPosts: StateFlow<List<Post>> = _plusPosts.asStateFlow()
-
-    private val _featured = MutableStateFlow<List<Post>>(emptyList())
-    val featured: StateFlow<List<Post>> = _featured.asStateFlow()
-
-    private val _categories = MutableStateFlow<List<com.appdony.app.data.model.Category>>(emptyList())
-    val categories: StateFlow<List<com.appdony.app.data.model.Category>> = _categories.asStateFlow()
-
-    private val _sections = MutableStateFlow<Map<Int, SectionState>>(emptyMap())
-    val sections: StateFlow<Map<Int, SectionState>> = _sections.asStateFlow()
+    private var currentPage = 1
+    private var isLastPage = false
+    private var currentCategory = "app" // پیش‌فرض: برنامه‌ها
 
     init {
-        loadInitial()
+        loadInitialPosts("app")
     }
 
-    fun loadInitial() {
+    // لود کردن صفحه اول (زمانی که کاربر روی تب بازی‌ها یا برنامه‌ها کلیک می‌کنه)
+    fun loadInitialPosts(category: String) {
+        currentCategory = category
+        currentPage = 1
+        isLastPage = false
+        _posts.value = emptyList()
+        _isLoading.value = true
+
         viewModelScope.launch {
-            _initialLoading.value = true
-            _error.value = null
-            repo.loadInitial(feedType).onSuccess { data ->
-                _featured.value = data.featured
-                _categories.value = data.categories
-                _initialLoading.value = false
-            }.onFailure { e ->
-                _error.value = e.message
-                _initialLoading.value = false
+            try {
+                // درخواست به API (مثلاً وردپرس) برای گرفتن صفحه اول
+                val newPosts = repository.getPosts(category = category, page = currentPage)
+                _posts.value = newPosts
+                if (newPosts.isEmpty() || newPosts.size < 10) isLastPage = true
+            } catch (e: Exception) {
+                // مدیریت خطا
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    fun refresh() {
-        viewModelScope.launch {
-            _isRefreshing.value = true
-            repo.loadInitial(feedType).onSuccess { data ->
-                _featured.value = data.featured
-                _categories.value = data.categories
-                _isRefreshing.value = false
-            }.onFailure {
-                _isRefreshing.value = false
-            }
-        }
-    }
+    // لود کردن صفحات بعدی (زمانی که کاربر به پایین صفحه اسکرول می‌کنه)
+    fun loadMorePosts() {
+        if (_isLoadingMore.value || isLastPage) return
 
-    fun loadSection(categoryId: Int) {
-        viewModelScope.launch {
-            val current = _sections.value.toMutableMap()
-            current[categoryId] = SectionState.Loading
-            _sections.value = current
+        _isLoadingMore.value = true
+        currentPage++
 
-            repo.getPostsByCategory(categoryId, 6).onSuccess { posts ->
-                val updated = _sections.value.toMutableMap()
-                updated[categoryId] = SectionState.Loaded(posts)
-                _sections.value = updated
-            }.onFailure {
-                val updated = _sections.value.toMutableMap()
-                updated[categoryId] = SectionState.Error
-                _sections.value = updated
+        viewModelScope.launch {
+            try {
+                val newPosts = repository.getPosts(category = currentCategory, page = currentPage)
+                if (newPosts.isEmpty()) {
+                    isLastPage = true
+                } else {
+                    _posts.value = _posts.value + newPosts
+                }
+            } catch (e: Exception) {
+                currentPage-- // در صورت خطا، صفحه رو برنگردون عقب
+            } finally {
+                _isLoadingMore.value = false
             }
         }
     }
