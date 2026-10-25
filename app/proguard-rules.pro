@@ -1,57 +1,30 @@
-# ══════════════════ مدل‌های اپدونی ══════════════════
--keep class com.appdony.app.data.model.** { *; }
+# ==========================================
+# قوانین ProGuard برای اپلیکیشن اپدونی
+# ==========================================
 
-# ══════════════════ Retrofit & OkHttp ══════════════════
--keep class retrofit2.** { *; }
--keepclasseswithmembers class * {
-    @retrofit2.http.* <methods>;
-}
--dontwarn retrofit2.**
--dontwarn okhttp3.**
--dontwarn okio.**
-
-# ══════════════════ Gson ══════════════════
--keep class com.google.gson.** { *; }
--keepattributes Signature
--keepattributes *Annotation*
-
-# ══════════════════ Jetpack Compose ══════════════════
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.ui.** { *; }
--keep class androidx.compose.material3.** { *; }
--dontwarn androidx.compose.**
-
-# ══════════════════ Coil (عکس‌ها) ══════════════════
--keep class coil.** { *; }
--dontwarn coil.**
-
-# ══════════════════ DataStore & Security ══════════════════
--keep class androidx.datastore.** { *; }
--keep class androidx.security.crypto.** { *; }
-
-# ══════════════════ Coroutines ══════════════════
--dontwarn kotlinx.coroutines.**
--keepclassmembers class kotlinx.coroutines.** {
-    volatile <fields>;
+# ۱. حفظ کردن WorkManager (دلیل اصلی کرش در اسپلش اسکرین)
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.CoroutineWorker { *; }
+-keep class androidx.work.impl.WorkManagerInitializer { *; }
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(); }
+-keepclassmembers class * extends androidx.work.Worker {
+    <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 
-# ══════════════════ کلاس‌های اصلی اپدونی ══════════════════
--keep class com.appdony.app.** { *; }
-
-# ══════════════════ رفع خطای Security-Crypto و Tink ══════════════════
--dontwarn com.google.errorprone.annotations.**
--dontwarn com.google.crypto.tink.**
--keep class com.google.crypto.tink.** { *; }
-
-# ══════════════════ Firebase (اگر استفاده کردی) ══════════════════
--keep class com.google.firebase.** { *; }
--dontwarn com.google.firebase.**
-
-# ══════════════════ Jsoup (جدید - برای خواندن وبلاگ) ══════════════════
+# ۲. حفظ کردن کتابخانه jsoup (برای پارس کردن HTML)
 -keep class org.jsoup.** { *; }
 -dontwarn org.jsoup.**
 
-# ══════════════════ Room (دیتابیس) ══════════════════
--keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class *
--dontwarn androidx.room.paging.**
+# ۳. حفظ کردن مدل‌های API و دیتابیس (برای Retrofit، Gson و Room)
+-keep class com.appdony.app.data.model.** { *; }
+-keep class com.appdony.app.data.api.** { *; }
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keepattributes Signature
+-keepattributes *Annotation*
+
+# ۴. حفظ کردن کدهای Reflection برای مدیریت دانلود
+-keep class android.app.DownloadManager { *; }
+-keepclassmembers class android.app.DownloadManager {
+    public void pauseDownload(long);
+    public void resumeDownload(long);
+}
