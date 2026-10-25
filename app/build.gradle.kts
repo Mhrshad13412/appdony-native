@@ -13,8 +13,8 @@ android {
         applicationId = "com.appdony.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2935
-        versionName = "2.9.35"
+        versionCode = 21335
+        versionName = "2.13.53"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
