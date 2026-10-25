@@ -32,8 +32,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // فعلاً خاموش بمونه تا کرش نکنه
-            isShrinkResources = false
+            // ✅ روشن کردن فشرده‌سازی برای کاهش حجم
+            isMinifyEnabled = true 
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -73,7 +74,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     
-    // ✅ کتابخانه آیکون‌ها برگشت تا خطای کامپایلر تموم بشه
+    // این کتابخانه رو نگه می‌داریم، ولی چون Minify روشنه، فقط آیکون‌هایی که استفاده کردیم توی اپ می‌مونن
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.activity:activity-compose:1.9.3")
