@@ -1,6 +1,5 @@
 package com.appdony.app
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,16 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.preferences.FontSize
-import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
+import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AccountSheet
@@ -48,10 +42,8 @@ import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
-import com.appdony.app.util.BlogUpdateWorker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +58,6 @@ fun AppRoot() {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val settingsManager = remember { SettingsManager(context) }
-    val onboardingManager = remember { OnboardingManager(context) }
     val sessionManager = remember { SessionManager(context) }
     val scope = rememberCoroutineScope()
 
@@ -85,12 +76,6 @@ fun AppRoot() {
         showSplash = false
     }
 
-    LaunchedEffect(Unit) {
-        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-        val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, workRequest)
-    }
-
     val fontScale = when (themeState.fontSize) {
         FontSize.SMALL -> 0.85f
         FontSize.MEDIUM -> 1.0f
@@ -99,7 +84,8 @@ fun AppRoot() {
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        AppdonyTheme(themeState = themeState) {
+        // ✅ اصلاح پارامتر تم: استفاده از darkTheme
+        AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 if (showSplash) {
                     SplashScreen()
@@ -147,7 +133,7 @@ fun MainContent(
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val currentRoute = navBackStackEntry?.destination?.route ?: "games"
     val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
 
     Scaffold(
@@ -163,15 +149,18 @@ fun MainContent(
         },
         bottomBar = {
             if (isMainRoute) {
+                // ✅ اصلاح پارامترهای AppBottomNav
                 AppBottomNav(
-                    navController = navController,
-                    currentRoute = currentRoute
+                    currentRoute = currentRoute,
+                    onTabSelected = { route -> navController.navigate(route) }
                 )
             }
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // ✅ اصلاح پارامتر AppNavGraph
             AppNavGraph(navController = navController)
+            
             if (showAiAssistant && isMainRoute) {
                 Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
                     FloatingAssistant(
