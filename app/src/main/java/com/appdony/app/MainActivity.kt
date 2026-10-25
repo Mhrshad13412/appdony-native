@@ -84,7 +84,6 @@ fun AppRoot() {
     val density = LocalDensity.current
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        // ✅ اصلاح پارامتر تم: استفاده از darkTheme
         AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 if (showSplash) {
@@ -149,7 +148,6 @@ fun MainContent(
         },
         bottomBar = {
             if (isMainRoute) {
-                // ✅ اصلاح پارامترهای AppBottomNav
                 AppBottomNav(
                     currentRoute = currentRoute,
                     onTabSelected = { route -> navController.navigate(route) }
@@ -158,7 +156,6 @@ fun MainContent(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // ✅ اصلاح پارامتر AppNavGraph
             AppNavGraph(navController = navController)
             
             if (showAiAssistant && isMainRoute) {
