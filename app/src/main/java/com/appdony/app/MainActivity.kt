@@ -89,6 +89,7 @@ fun AppRoot() {
             val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, workRequest)
         } catch (e: Exception) {
+            // ✅ جلوگیری از کرش برنامه در صورت خطای WorkManager
             e.printStackTrace()
         }
     }
@@ -165,7 +166,6 @@ fun MainContent(
         },
         bottomBar = {
             if (isMainRoute) {
-                // ✅ پارامترهای AppBottomNav دقیقاً مطابق استاندارد پروژه اصلاح شد
                 AppBottomNav(
                     currentRoute = currentRoute,
                     onTabSelected = { route -> navController.navigate(route) }
@@ -174,7 +174,6 @@ fun MainContent(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // ✅ پارامترهای AppNavGraph اصلاح شد
             AppNavGraph(navController = navController)
             
             if (showAiAssistant && isMainRoute) {
