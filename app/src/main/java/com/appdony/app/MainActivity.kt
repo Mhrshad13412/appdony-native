@@ -27,6 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.SettingsManager
@@ -42,8 +47,10 @@ import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
 import com.appdony.app.ui.navigation.AppNavGraph
 import com.appdony.app.ui.theme.AppdonyTheme
+import com.appdony.app.util.BlogUpdateWorker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +81,16 @@ fun AppRoot() {
     LaunchedEffect(Unit) {
         delay(1500)
         showSplash = false
+    }
+
+    LaunchedEffect(Unit) {
+        try {
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, workRequest)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     val fontScale = when (themeState.fontSize) {
@@ -148,6 +165,7 @@ fun MainContent(
         },
         bottomBar = {
             if (isMainRoute) {
+                // ✅ پارامترهای AppBottomNav دقیقاً مطابق استاندارد پروژه اصلاح شد
                 AppBottomNav(
                     currentRoute = currentRoute,
                     onTabSelected = { route -> navController.navigate(route) }
@@ -156,6 +174,7 @@ fun MainContent(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // ✅ پارامترهای AppNavGraph اصلاح شد
             AppNavGraph(navController = navController)
             
             if (showAiAssistant && isMainRoute) {
