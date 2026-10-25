@@ -13,8 +13,8 @@ android {
         applicationId = "com.appdony.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 21335
-        versionName = "2.13.53"
+        versionCode = 2935
+        versionName = "2.9.35"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
@@ -32,7 +32,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // فعلاً خاموش می‌مونه تا خطاهای آیکون حل بشه
+            isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -73,8 +73,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     
-    // ✅ این خط جادوییه! آیکون‌های Download و Visibility رو برمی‌گردونه
-    implementation("androidx.compose.material:material-icons-core")
+    // ✅ برگرداندن کتابخانه آیکون‌ها برای رفع قطعی خطای Download, Visibility, FormatQuote
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.navigation:navigation-compose:2.8.3")
