@@ -19,6 +19,7 @@ import com.appdony.app.ui.screens.AppsScreen
 import com.appdony.app.ui.screens.BlogScreen
 import com.appdony.app.ui.screens.CategoryScreen
 import com.appdony.app.ui.screens.DetailScreen
+import com.appdony.app.ui.screens.DownloadsScreen
 import com.appdony.app.ui.screens.FavoritesScreen
 import com.appdony.app.ui.screens.GamesScreen
 import com.appdony.app.ui.screens.SearchScreen
@@ -61,6 +62,8 @@ fun AppNavGraph(
         composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
         composable("favorites") { FavoritesScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
         composable("chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
+        composable("ai_chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
+        composable("downloads") { DownloadsScreen() }
 
         composable(
             route = "category/{categoryId}/{categoryName}",
