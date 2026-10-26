@@ -7,6 +7,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.local.AppDatabase
+import com.appdony.app.util.CrashReporter
 
 class AppdonyApp : Application(), ImageLoaderFactory {
 
@@ -14,6 +15,7 @@ class AppdonyApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.install(this)
         ApiClient.init(this)
     }
 
