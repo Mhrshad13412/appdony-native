@@ -1,8 +1,8 @@
 # ==========================================
-# قوانین کامل ProGuard برای اپلیکیشن اپدونی
+# قوانین ProGuard/R8 اپلیکیشن اپدونی (نسخه‌ی سبک)
 # ==========================================
 
-# --- ۱. حفظ کردن اطلاعات اصلی کاتلین ---
+# --- ۱. Attributeهای لازم ---
 -keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes Exceptions
@@ -12,77 +12,57 @@
     public <methods>;
 }
 
-# --- ۲. قوانین WorkManager (بسیار مهم برای جلوگیری از کرش در اسپلش) ---
--keep class androidx.work.** { *; }
--keep class * extends androidx.work.Worker
--keep class * extends androidx.work.CoroutineWorker { *; }
--keep class androidx.work.impl.WorkManagerInitializer { *; }
--keep class androidx.work.impl.WorkDatabase_Impl { <init>(); }
--keepclassmembers class * extends androidx.work.Worker {
-    <init>(android.content.Context, androidx.work.WorkerParameters);
+# --- ۲. رفع خطای Missing class (علت اصلی فیل شدن بیلد) ---
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn javax.annotation.concurrent.**
+-dontwarn org.checkerframework.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
+-dontwarn com.google.j2objc.annotations.**
+-dontwarn com.google.crypto.tink.**
+-dontwarn androidx.security.crypto.**
+
+# --- ۳. Tink (فقط کلاس‌های پروتوبافِ لازم، نه کل کتابخانه) ---
+-keepclassmembers class * extends com.google.crypto.tink.shaded.protobuf.GeneratedMessageLite {
+    <fields>;
 }
--keepclassmembers class * extends androidx.work.CoroutineWorker {
+
+# --- ۴. WorkManager (فقط Workerهای خودت) ---
+-keepclassmembers class * extends androidx.work.ListenableWorker {
     <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 
-# --- ۳. قوانین Room Database (دیتابیس) ---
+# --- ۵. Room ---
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keep @androidx.room.Entity class * { *; }
--keepclassmembers class * {
-    @androidx.room.* <methods>;
-}
 -dontwarn androidx.room.paging.**
 
-# --- ۴. قوانین Retrofit و Gson ---
+# --- ۶. Retrofit / Gson / OkHttp ---
 -keep class com.appdony.app.data.model.** { *; }
 -keep class com.appdony.app.data.api.** { *; }
--keep class com.google.gson.** { *; }
--keep class * implements com.google.gson.TypeAdapterFactory
--keep class * implements com.google.gson.JsonSerializer
--keep class * implements com.google.gson.JsonDeserializer
 -keepclassmembers,allowobfuscation class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn retrofit2.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
 
-# --- ۵. قوانین Jsoup (برای پارس کردن HTML) ---
--keep class org.jsoup.** { *; }
+# --- ۷. Jsoup / Coil / Compose ---
 -dontwarn org.jsoup.**
-
-# --- ۶. قوانین Coil (برای لود عکس‌ها) ---
--keep class coil.** { *; }
 -dontwarn coil.**
+-dontwarn androidx.compose.**
 
-# --- ۷. قوانین Security-Crypto و DataStore ---
--keep class androidx.security.crypto.** { *; }
--keep class androidx.datastore.** { *; }
--dontwarn androidx.security.crypto.**
-
-# --- ۸. قوانین Coroutines ---
+# --- ۸. Coroutines ---
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 -keepclassmembernames class kotlinx.** {
     volatile <fields>;
 }
 
-# --- ۹. قوانین Compose ---
--dontwarn androidx.compose.**
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.ui.platform.** { *; }
--keepclassmembers class androidx.compose.runtime.SnapshotStateKt {
-    public static ** mutableStateOf(...);
-}
-
-# --- ۱۰. حفظ کردن متدهای Reflection برای مدیریت دانلود ---
--keep class android.app.DownloadManager { *; }
--keepclassmembers class android.app.DownloadManager {
-    public void pauseDownload(long);
-    public void resumeDownload(long);
-}
-
-# --- ۱۱. جلوگیری از حذف کلاس‌های اصلی برنامه ---
+# --- ۹. کلاس‌های اصلی اپ ---
 -keep class com.appdony.app.MainActivity { *; }
 -keep class com.appdony.app.data.session.** { *; }
 -keep class com.appdony.app.data.preferences.** { *; }
