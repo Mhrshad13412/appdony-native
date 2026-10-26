@@ -46,16 +46,30 @@ jobs:
           echo "Keystore decoded securely."
 
       - name: Build Release APK
+        shell: bash
         env:
           KEYSTORE_FILE: release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee build-log.txt
 
       - name: Cleanup Keystore
         if: always()
         run: rm -f app/release.keystore
+
+      - name: Upload Build Logs and R8 Reports
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: build-logs
+          path: |
+            build-log.txt
+            app/build/outputs/mapping/release/**
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Extract Version Name
         id: get_version
@@ -80,3 +94,53 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 14
           if-no-files-found: error
+
+  crash-test:
+    name: Run APK on Emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: appdony-release-apk
+          path: apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prepare log folder
+        run: mkdir -p crash-logs
+
+      - name: Install, launch and capture logs
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            adb logcat -c
+            adb install -r apk/app-release.apk
+            adb shell am start -W -n com.appdony.app/.MainActivity
+            sleep 30
+            adb logcat -d > crash-logs/logcat_full.txt
+            adb logcat -d -b crash > crash-logs/logcat_crash.txt
+            adb shell dumpsys activity exit-info com.appdony.app > crash-logs/exit-info.txt
+            adb shell pidof com.appdony.app > crash-logs/pid.txt || true
+            adb exec-out screencap -p > crash-logs/screenshot.png
+
+      - name: Upload Crash Logs
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: crash-logs
+          path: crash-logs/**
+          retention-days: 14
+          if-no-files-found: warn
