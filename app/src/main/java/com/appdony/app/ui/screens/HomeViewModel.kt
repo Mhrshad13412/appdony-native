@@ -6,10 +6,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.appdony.app.data.api.ApiClient
+import com.appdony.app.data.api.WordPressApi
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.repository.MainRepository
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
-class HomeViewModel(private val repository: MainRepository) : ViewModel() {
+private fun createDefaultMainRepository(): MainRepository {
+    val api = Retrofit.Builder()
+        .baseUrl(ApiClient.BASE_URL)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(WordPressApi::class.java)
+    return MainRepository(api)
+}
+
+class HomeViewModel(
+    private val repository: MainRepository = createDefaultMainRepository()
+) : ViewModel() {
 
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts.asStateFlow()
