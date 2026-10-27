@@ -1,242 +1,289 @@
 package com.appdony.app.ui.screens
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
+import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.AppCard
-import com.appdony.app.ui.components.AppRowItem
+import com.appdony.app.ui.components.BannerSkeleton
+import com.appdony.app.ui.components.CardSkeleton
+import com.appdony.app.ui.components.SectionHeader
+import com.appdony.app.ui.components.SectionRowSkeleton
+import com.appdony.app.ui.components.SectionTitleSkeleton
+import com.appdony.app.ui.components.ShimmerBox
+import com.appdony.app.ui.theme.AppdonyCardBg
+import com.appdony.app.ui.theme.AppdonyTextMuted
+import com.appdony.app.ui.theme.AppdonyTextPrimary
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
     isGamesTab: Boolean,
     onPostClick: (Int) -> Unit,
-    onCategoryClick: (Int, String) -> Unit = { _, _ -> }, // ✅ امضا با AppNavGraph هماهنگ شد
+    onCategoryClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
-    val posts by viewModel.posts.collectAsStateWithLifecycle()
+    val featured by viewModel.featured.collectAsStateWithLifecycle()
+    val sections by viewModel.sections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
-
-    val searchQuery = if (isGamesTab) "بازی" else "برنامه"
+    val hasError by viewModel.hasError.collectAsStateWithLifecycle()
 
     LaunchedEffect(isGamesTab) {
-        viewModel.loadInitialPosts(searchQuery)
+        viewModel.load(isGamesTab)
     }
 
-    // جلوگیری از آیدی تکراری (وقتی صفحه‌ی بعد پست تکراری برگردونه)
-    val uniquePosts = remember(posts) { posts.distinctBy { it.id } }
-    val featured = remember(uniquePosts) { uniquePosts.take(8) }
-    val rest = remember(uniquePosts) { uniquePosts.drop(8) }
+    if (hasError && sections.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("دریافت اطلاعات ممکن نشد. اینترنت را بررسی کن.", color = AppdonyTextMuted, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = { viewModel.load(isGamesTab, force = true) }) { Text("تلاش دوباره") }
+            }
+        }
+        return
+    }
 
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item(key = "featured") {
+            FeaturedBlock(posts = featured, onPostClick = onPostClick)
+        }
+
+        if (isLoading) {
+            items(3, key = { "skeleton_$it" }) {
+                Column {
+                    SectionTitleSkeleton()
+                    SectionRowSkeleton()
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        }
+
+        items(sections, key = { it.section.id }) { state ->
+            // وقتی این ردیف به صفحه نزدیک شد، داده‌ش گرفته می‌شه
+            LaunchedEffect(state.section.id) {
+                viewModel.loadSection(state.section.id)
+            }
+            CategorySection(
+                state = state,
+                onPostClick = onPostClick,
+                onMoreClick = { onCategoryClick(state.section.id, state.section.title) }
+            )
+        }
+
+        if (!isLoading && sections.isEmpty()) {
+            item(key = "empty") {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                    Text("محتوایی برای نمایش نیست", color = AppdonyTextMuted)
+                }
+            }
         }
     }
+}
 
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) {
-            viewModel.loadMorePosts()
+// ───────────── بلوک «ویژه» ─────────────
+
+@Composable
+private fun FeaturedBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
+    if (posts != null && posts.isEmpty()) return
+
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        SectionHeader(title = "ویژه")
+
+        if (posts == null) {
+            LazyRow(
+                userScrollEnabled = false,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(2) { BannerSkeleton() }
+            }
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
+                    FadeIn(key = "featured-${post.id}", index = index) {
+                        FeaturedCard(post = post, onClick = { onPostClick(post.id) })
+                    }
+                }
+            }
         }
+        Spacer(modifier = Modifier.height(12.dp))
     }
+}
 
-    when {
-        isLoading && uniquePosts.isEmpty() -> HomeSkeleton()
+@Composable
+private fun FeaturedCard(post: Post, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val image = post.safeImage()
+    val category = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
 
-        uniquePosts.isEmpty() -> EmptyHome(onRetry = { viewModel.loadInitialPosts(searchQuery) })
-
-        else -> LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            item {
+    Column(
+        modifier = Modifier
+            .width(300.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(AppdonyCardBg)
+            .clickable { onClick() }
+            .padding(bottom = 12.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context).data(image).size(600, 340).crossfade(true).build(),
+                contentDescription = post.cleanTitle(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
+                error = { Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
+                success = { SubcomposeAsyncImageContent() }
+            )
+        }
+        // متن بلافاصله نشون داده می‌شه، حتی قبل از رسیدن عکس
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            if (!category.isNullOrBlank()) {
                 Text(
-                    text = "ویژه",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.titleLarge
+                    text = category,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(featured, key = { it.id }) { post ->
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+            Text(
+                text = post.cleanTitle(),
+                color = AppdonyTextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+// ───────────── ردیف‌های دسته‌بندی ─────────────
+
+@Composable
+private fun CategorySection(
+    state: SectionState,
+    onPostClick: (Int) -> Unit,
+    onMoreClick: () -> Unit
+) {
+    val posts = state.posts
+
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        // عنوان همیشه فوراً نشون داده می‌شه
+        SectionHeader(title = state.section.title, onMoreClick = onMoreClick)
+
+        if (posts == null) {
+            LazyRow(
+                userScrollEnabled = false,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(4) { CardSkeleton() }
+            }
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
+                    FadeIn(key = "${state.section.id}-${post.id}", index = index) {
                         AppCard(
                             title = post.cleanTitle(),
-                            imageUrl = post.featuredImageUrl() ?: "",
+                            imageUrl = post.safeImage(),
                             onClick = { onPostClick(post.id) }
                         )
                     }
                 }
             }
-
-            if (rest.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "جدیدترین‌ها",
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
-
-                items(rest, key = { it.id }) { post ->
-                    AppRowItem(
-                        rank = 0,
-                        title = post.cleanTitle(),
-                        imageUrl = post.featuredImageUrl(),
-                        onClick = { onPostClick(post.id) },
-                        showRank = false
-                    )
-                }
-            }
-
-            if (isLoadingMore) {
-                item { LoadingMoreSkeleton() }
-            }
         }
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
+// ───────────── کمکی‌ها ─────────────
+
+// ظاهر شدن تدریجی کارت‌ها (یکی‌یکی)
 @Composable
-private fun EmptyHome(onRetry: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "نتیجه‌ای دریافت نشد. اتصال اینترنت را بررسی کن.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = onRetry) { Text("تلاش دوباره") }
+private fun FadeIn(key: Any, index: Int, content: @Composable () -> Unit) {
+    var visible by rememberSaveable(key) { mutableStateOf(false) }
+
+    LaunchedEffect(key) {
+        if (!visible) {
+            delay(index.coerceAtMost(6) * 70L)
+            visible = true
         }
     }
-}
 
-// ───────────── اسکلتون لودینگ (نور عرضی مثل یوتیوب) ─────────────
-
-@Composable
-private fun rememberShimmerBrush(): Brush {
-    val transition = rememberInfiniteTransition(label = "home_shimmer")
-    val x by transition.animateFloat(
-        initialValue = -500f,
-        targetValue = 1300f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "home_shimmer_x"
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(350),
+        label = "fade_in"
     )
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val shine = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f).compositeOver(base)
-    return Brush.linearGradient(
-        colors = listOf(base, shine, base),
-        start = Offset(x, 0f),
-        end = Offset(x + 400f, 0f)
-    )
-}
 
-@Composable
-private fun Placeholder(brush: Brush, modifier: Modifier, radius: Dp = 8.dp) {
-    Box(modifier = modifier.clip(RoundedCornerShape(radius)).background(brush))
-}
-
-@Composable
-private fun HomeSkeleton() {
-    val brush = rememberShimmerBrush()
-    Column(modifier = Modifier.fillMaxSize()) {
-        Placeholder(
-            brush = brush,
-            modifier = Modifier.padding(16.dp).width(70.dp).height(22.dp),
-            radius = 6.dp
-        )
-        LazyRow(
-            userScrollEnabled = false,
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(4) {
-                Column(modifier = Modifier.width(100.dp)) {
-                    Placeholder(brush, Modifier.size(100.dp), 16.dp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Placeholder(brush, Modifier.fillMaxWidth().height(12.dp), 4.dp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Placeholder(brush, Modifier.width(60.dp).height(10.dp), 4.dp)
-                }
-            }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            this.alpha = alpha
+            translationY = (1f - alpha) * 30f
         }
-        Placeholder(
-            brush = brush,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
-                .width(110.dp).height(22.dp),
-            radius = 6.dp
-        )
-        repeat(6) { RowSkeleton(brush) }
-    }
-}
-
-@Composable
-private fun RowSkeleton(brush: Brush) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Placeholder(brush, Modifier.size(56.dp), 14.dp)
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Placeholder(brush, Modifier.fillMaxWidth(0.75f).height(14.dp), 4.dp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Placeholder(brush, Modifier.width(60.dp).height(12.dp), 4.dp)
-        }
+        content()
     }
 }
 
-@Composable
-private fun LoadingMoreSkeleton() {
-    val brush = rememberShimmerBrush()
-    Column {
-        RowSkeleton(brush)
-        RowSkeleton(brush)
+// درخواست‌های لیست فیلد content ندارن؛ این تابع از کرش جلوگیری می‌کنه
+private fun Post.safeImage(): String? {
+    return try {
+        featuredImageUrl()
+    } catch (e: Exception) {
+        null
     }
 }
