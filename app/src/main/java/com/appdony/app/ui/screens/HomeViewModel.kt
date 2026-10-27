@@ -2,85 +2,90 @@ package com.appdony.app.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.appdony.app.data.model.Post
+import com.appdony.app.data.repository.HomeRepository
+import com.appdony.app.data.repository.HomeSection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.appdony.app.data.api.ApiClient
-import com.appdony.app.data.api.WordPressApi
-import com.appdony.app.data.model.Post
-import com.appdony.app.data.repository.MainRepository
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 
-private fun createDefaultMainRepository(): MainRepository {
-    val api = Retrofit.Builder()
-        .baseUrl(ApiClient.BASE_URL)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(WordPressApi::class.java)
-    return MainRepository(api)
-}
+data class SectionState(
+    val section: HomeSection,
+    val posts: List<Post>? = null // null یعنی هنوز لود نشده
+)
 
 class HomeViewModel(
-    private val repository: MainRepository = createDefaultMainRepository()
+    private val repository: HomeRepository = HomeRepository()
 ) : ViewModel() {
 
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())
-    val posts: StateFlow<List<Post>> = _posts.asStateFlow()
+    private val _featured = MutableStateFlow<List<Post>?>(null)
+    val featured: StateFlow<List<Post>?> = _featured.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _sections = MutableStateFlow<List<SectionState>>(emptyList())
+    val sections: StateFlow<List<SectionState>> = _sections.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _isLoadingMore = MutableStateFlow(false)
-    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+    private val _hasError = MutableStateFlow(false)
+    val hasError: StateFlow<Boolean> = _hasError.asStateFlow()
 
-    private var currentPage = 1
-    private var isLastPage = false
-    private var currentSearchQuery: String? = null
+    private var rootId: Int? = null
+    private var loadedTab: Boolean? = null
+    private val requested = mutableSetOf<Int>()
 
-    init {
-        loadInitialPosts("برنامه")
-    }
-
-    fun loadInitialPosts(searchQuery: String) {
-        currentSearchQuery = searchQuery
-        currentPage = 1
-        isLastPage = false
-        _posts.value = emptyList()
+    fun load(isGames: Boolean, force: Boolean = false) {
+        if (!force && loadedTab == isGames) return
+        loadedTab = isGames
+        requested.clear()
+        _featured.value = null
+        _sections.value = emptyList()
         _isLoading.value = true
+        _hasError.value = false
 
         viewModelScope.launch {
             try {
-                val newPosts = repository.getPosts(page = currentPage, searchQuery = currentSearchQuery)
-                _posts.value = newPosts
-                if (newPosts.size < 10) isLastPage = true
+                val structure = repository.loadStructure(isGames)
+                rootId = structure.rootId
+                // اول فقط عنوان ردیف‌ها نشون داده می‌شه (متن اول، عکس بعد)
+                _sections.value = structure.sections.map { SectionState(it) }
+                _isLoading.value = false
+
+                launch {
+                    _featured.value = try {
+                        repository.loadFeatured(rootId)
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-            } finally {
+                loadedTab = null
+                _hasError.value = true
                 _isLoading.value = false
             }
         }
     }
 
-    fun loadMorePosts() {
-        if (_isLoadingMore.value || isLastPage) return
-
-        _isLoadingMore.value = true
-        currentPage++
+    // هر ردیف فقط وقتی به صفحه نزدیک شد صدا زده می‌شه
+    fun loadSection(id: Int) {
+        if (!requested.add(id)) return
+        val section = _sections.value.firstOrNull { it.section.id == id }?.section ?: return
 
         viewModelScope.launch {
             try {
-                val newPosts = repository.getPosts(page = currentPage, searchQuery = currentSearchQuery)
-                if (newPosts.isEmpty()) {
-                    isLastPage = true
-                } else {
-                    _posts.value = _posts.value + newPosts
+                val posts = repository.loadSection(section, rootId)
+                _sections.update { list ->
+                    if (posts.isEmpty()) {
+                        list.filterNot { it.section.id == id }
+                    } else {
+                        list.map { if (it.section.id == id) it.copy(posts = posts) else it }
+                    }
                 }
             } catch (e: Exception) {
-                currentPage--
-            } finally {
-                _isLoadingMore.value = false
+                requested.remove(id) // دفعه‌ی بعد که ردیف دوباره دیده شد، دوباره تلاش می‌کنه
             }
         }
     }
