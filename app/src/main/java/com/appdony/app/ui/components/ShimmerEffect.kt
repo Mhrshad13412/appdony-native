@@ -17,28 +17,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun ShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateAnim by transition.animateFloat(
-        initialValue = -1000f,
-        targetValue = 2000f,
+        initialValue = -600f,
+        targetValue = 1400f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            animation = tween(durationMillis = 1100, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer_translate"
     )
 
-    val bg = MaterialTheme.colorScheme.surfaceVariant
-    val highlight = MaterialTheme.colorScheme.surface
+    // نور براق: رنگ پایه + یه لایه‌ی روشن‌تر که از چپ به راست رد می‌شه
+    val base = MaterialTheme.colorScheme.surfaceVariant
+    val shine = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f).compositeOver(base)
 
     return Brush.linearGradient(
-        colors = listOf(bg, highlight, bg),
+        colors = listOf(base, shine, base),
         start = Offset(translateAnim, 0f),
-        end = Offset(translateAnim + 500f, 0f)
+        end = Offset(translateAnim + 450f, 0f)
     )
 }
 
