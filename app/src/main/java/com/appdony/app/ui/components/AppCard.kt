@@ -45,7 +45,7 @@ fun AppCard(title: String, imageUrl: String?, onClick: () -> Unit, modifier: Mod
         Box(modifier = Modifier.size(100.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg)) {
             SubcomposeAsyncImage(
                 model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
-                loading = { Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
+                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
                 error = {
                     Box(modifier = Modifier.fillMaxSize().background(AppdonyCardBg), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Warning, "خطا", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
