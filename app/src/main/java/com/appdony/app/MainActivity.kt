@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.work.Constraints
@@ -47,6 +50,7 @@ import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
+import com.appdony.app.ui.components.AboutDialog
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
@@ -86,6 +90,8 @@ fun AppRoot() {
     var showSplash by remember { mutableStateOf(true) }
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    val navController = rememberNavController()
     var crashReport by remember { mutableStateOf(CrashReporter.read(context)) }
 
     LaunchedEffect(Unit) {
@@ -118,6 +124,7 @@ fun AppRoot() {
                     SplashScreen()
                 } else {
                     MainContent(
+                        navController = navController,
                         isLoggedIn = isLoggedIn,
                         username = username,
                         displayName = displayName,
@@ -136,13 +143,20 @@ fun AppRoot() {
                         displayName = if (displayName.isNotBlank()) displayName else username,
                         username = username,
                         onDismiss = { showAccountSheet = false },
-                        onDownloads = { showAccountSheet = false },
-                        onSettings = { showAccountSheet = false },
-                        onFavorites = { showAccountSheet = false },
-                        onHelp = { showAccountSheet = false },
-                        onAbout = { showAccountSheet = false },
-                        onLogout = { scope.launch { sessionManager.clearSession() }; showAccountSheet = false }
+                        onDownloads = { navController.navigateToTab("downloads") },
+                        onSettings = { navController.navigate("settings") { launchSingleTop = true } },
+                        onFavorites = { navController.navigate("favorites") { launchSingleTop = true } },
+                        onHelp = { navController.navigateToTab("blog") },
+                        onAbout = { showAbout = true },
+                        onLogout = { scope.launch { sessionManager.clearSession() } }
                     )
+                }
+
+                if (showAbout) {
+                    val versionName = remember {
+                        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
+                    }
+                    AboutDialog(versionName = versionName, onDismiss = { showAbout = false })
                 }
 
                 val report = crashReport
@@ -183,6 +197,7 @@ fun AppRoot() {
 
 @Composable
 fun MainContent(
+    navController: NavHostController,
     isLoggedIn: Boolean,
     username: String,
     displayName: String,
@@ -190,7 +205,6 @@ fun MainContent(
     onLoginClick: () -> Unit,
     onAccountClick: () -> Unit
 ) {
-    val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "games"
     val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
@@ -210,7 +224,7 @@ fun MainContent(
             if (isMainRoute) {
                 AppBottomNav(
                     currentRoute = currentRoute,
-                    onTabSelected = { route -> navController.navigate(route) }
+                    onTabSelected = { route -> navController.navigateToTab(route) }
                 )
             }
         }
@@ -222,12 +236,21 @@ fun MainContent(
                 Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
                     FloatingAssistant(
                         onSearchClick = { navController.navigate("search") },
-                        onDownloadsClick = { navController.navigate("downloads") },
-                        onHelpClick = { navController.navigate("blog") },
+                        onDownloadsClick = { navController.navigateToTab("downloads") },
+                        onHelpClick = { navController.navigateToTab("blog") },
                         onChatClick = { navController.navigate("ai_chat") }
                     )
                 }
             }
         }
+    }
+}
+
+/** رفتن به یکی از چهار تب اصلی، بدون انباشتن پشته (هر تب یک نمونه و حالتش ذخیره می‌شود). */
+fun NavController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
