@@ -3,109 +3,192 @@ package com.appdony.app.ui.screens
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
-import android.database.Cursor
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.appdony.app.data.preferences.DownloadStore
+import com.appdony.app.util.DownloadHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 data class DownloadItem(
     val id: Long,
     val title: String,
+    val iconUrl: String?,
+    val fileName: String,
+    val sourceUrl: String,
     val status: Int,
     val progress: Int,
-    val filePath: String,
-    val size: String
+    val bytes: Long,
+    val total: Long,
+    val localUri: String?,
+    val message: String?
 )
 
 class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
-    private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
-    val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
 
-    private val downloadManager = application.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+    private val store = DownloadStore(application)
+    private val manager = application.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+
+    private val _items = MutableStateFlow<List<DownloadItem>>(emptyList())
+    val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
+
+    private class Row(val status: Int, val bytes: Long, val total: Long, val localUri: String?, val reason: Int)
 
     init {
-        loadDownloads()
-    }
-
-    fun loadDownloads() {
         viewModelScope.launch {
-            _downloads.value = fetchDownloads()
+            while (isActive) {
+                val hasActive = withContext(Dispatchers.IO) { refreshOnce() }
+                delay(if (hasActive) 800L else 4000L)
+            }
         }
     }
 
-    // استفاده از Reflection برای جلوگیری از خطای کامپایلر گیت‌هاب
-    fun pauseDownload(id: Long) {
-        try {
-            val method = DownloadManager::class.java.getMethod("pauseDownload", Long::class.javaPrimitiveType)
-            method.invoke(downloadManager, id)
-            loadDownloads()
-        } catch (e: Exception) {
-            e.printStackTrace()
+    fun delete(item: DownloadItem) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                manager?.remove(item.id)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            store.remove(item.id)
+            refreshOnce()
         }
     }
 
-    fun resumeDownload(id: Long) {
-        try {
-            val method = DownloadManager::class.java.getMethod("resumeDownload", Long::class.javaPrimitiveType)
-            method.invoke(downloadManager, id)
-            loadDownloads()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private suspend fun fetchDownloads(): List<DownloadItem> = withContext(Dispatchers.IO) {
-        val list = mutableListOf<DownloadItem>()
-        if (downloadManager == null) return@withContext list
-
-        var cursor: Cursor? = null
-        try {
-            val query = DownloadManager.Query().setFilterByStatus(
-                DownloadManager.STATUS_SUCCESSFUL or
-                DownloadManager.STATUS_FAILED or
-                DownloadManager.STATUS_RUNNING or
-                DownloadManager.STATUS_PAUSED
-            )
-            cursor = downloadManager.query(query)
-
-            if (cursor != null && cursor.moveToFirst()) {
-                val idIdx = cursor.getColumnIndex(DownloadManager.COLUMN_ID)
-                val titleIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
-                val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                val localUriIdx = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
-                val sizeIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                val bytesDownloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-
-                do {
-                    val id = if (idIdx >= 0) cursor.getLong(idIdx) else 0L
-                    val title = if (titleIdx >= 0) cursor.getString(titleIdx) ?: "نامشخص" else "نامشخص"
-                    val status = if (statusIdx >= 0) cursor.getInt(statusIdx) else DownloadManager.STATUS_FAILED
-                    val localUri = if (localUriIdx >= 0) cursor.getString(localUriIdx) else null
-                    val totalSize = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
-                    val bytesDownloaded = if (bytesDownloadedIdx >= 0) cursor.getLong(bytesDownloadedIdx) else 0L
-
-                    var progress = 0
-                    if (totalSize > 0) {
-                        progress = ((bytesDownloaded * 100) / totalSize).toInt()
+    fun retry(item: DownloadItem, onResult: (Result<Long>) -> Unit) {
+        viewModelScope.launch {
+            val result = DownloadHelper.startDownload(getApplication(), item.sourceUrl, item.title, item.iconUrl)
+            if (result.isSuccess) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        manager?.remove(item.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
+                    store.remove(item.id)
+                    refreshOnce()
+                }
+            }
+            onResult(result)
+        }
+    }
 
-                    val filePath = localUri?.replace("file://", "") ?: ""
-                    val fileSizeMb = String.format("%.1f MB", totalSize / (1024.0 * 1024.0))
+    // true یعنی هنوز دانلود فعالی هست
+    private fun refreshOnce(): Boolean {
+        val records = store.getAll()
+        val rows = queryRows(records.map { it.id })
+        var active = false
 
-                    list.add(DownloadItem(id, title, status, progress, filePath, fileSizeMb))
-                } while (cursor.moveToNext())
+        val list = records.map { record ->
+            val row = rows[record.id]
+            var status = DownloadManager.STATUS_FAILED
+            var message: String? = null
+            var bytes = 0L
+            var total = record.totalBytes
+            var localUri = record.localUri
+
+            if (row != null) {
+                status = row.status
+                bytes = row.bytes
+                if (row.total > 0) total = row.total
+                if (row.localUri != null) localUri = row.localUri
+
+                when (row.status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        val corrupt = total in 1L until DownloadHelper.MIN_VALID_BYTES &&
+                            DownloadHelper.isBinaryName(record.fileName)
+                        if (corrupt) {
+                            status = DownloadManager.STATUS_FAILED
+                            message = "فایل ناقص یا خراب دانلود شد"
+                        } else if (!record.completed) {
+                            store.update(record.copy(completed = true, localUri = localUri, totalBytes = total))
+                        }
+                        bytes = total
+                    }
+                    DownloadManager.STATUS_FAILED -> message = failMessage(row.reason)
+                    DownloadManager.STATUS_PAUSED -> {
+                        message = pausedMessage(row.reason)
+                        active = true
+                    }
+                    else -> active = true
+                }
+            } else if (record.completed) {
+                // سیستم رکورد رو پاک کرده ولی ما نگهش داشتیم
+                status = DownloadManager.STATUS_SUCCESSFUL
+                bytes = total
+            } else {
+                message = "این دانلود از سیستم حذف شده"
+            }
+
+            val progress = if (total > 0) ((bytes * 100) / total).toInt().coerceIn(0, 100) else 0
+
+            DownloadItem(
+                id = record.id,
+                title = record.title,
+                iconUrl = record.iconUrl,
+                fileName = record.fileName,
+                sourceUrl = record.sourceUrl,
+                status = status,
+                progress = progress,
+                bytes = bytes,
+                total = total,
+                localUri = localUri,
+                message = message
+            )
+        }
+
+        _items.value = list
+        return active
+    }
+
+    private fun queryRows(ids: List<Long>): Map<Long, Row> {
+        val dm = manager ?: return emptyMap()
+        if (ids.isEmpty()) return emptyMap()
+        val result = HashMap<Long, Row>()
+        try {
+            dm.query(DownloadManager.Query().setFilterById(*ids.toLongArray()))?.use { c ->
+                val idIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID)
+                val statusIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
+                val bytesIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                val totalIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                val uriIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI)
+                val reasonIdx = c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)
+                while (c.moveToNext()) {
+                    result[c.getLong(idIdx)] = Row(
+                        status = c.getInt(statusIdx),
+                        bytes = c.getLong(bytesIdx),
+                        total = c.getLong(totalIdx),
+                        localUri = c.getString(uriIdx),
+                        reason = c.getInt(reasonIdx)
+                    )
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        } finally {
-            cursor?.close()
         }
+        return result
+    }
 
-        list
+    private fun failMessage(reason: Int): String = when {
+        reason == DownloadManager.ERROR_INSUFFICIENT_SPACE -> "فضای گوشی کافی نیست"
+        reason == DownloadManager.ERROR_CANNOT_RESUME -> "امکان ادامه‌ی دانلود نیست"
+        reason == DownloadManager.ERROR_FILE_ERROR || reason == DownloadManager.ERROR_DEVICE_NOT_FOUND ->
+            "خطا در ذخیره‌ی فایل"
+        reason == DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "لینک دانلود معتبر نیست"
+        reason in 400..599 -> "سرور فایل را رد کرد (کد $reason)"
+        else -> "دانلود ناموفق بود"
+    }
+
+    private fun pausedMessage(reason: Int): String = when (reason) {
+        DownloadManager.PAUSED_WAITING_FOR_NETWORK -> "در انتظار اینترنت..."
+        DownloadManager.PAUSED_QUEUED_FOR_WIFI -> "در انتظار وای‌فای..."
+        DownloadManager.PAUSED_WAITING_TO_RETRY -> "در انتظار تلاش مجدد..."
+        else -> "متوقف شد"
     }
 }
