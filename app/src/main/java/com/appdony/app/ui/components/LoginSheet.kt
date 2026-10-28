@@ -22,6 +22,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.ui.graphics.Color
+import com.appdony.app.ui.theme.AppdonyGreenLight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -125,155 +131,152 @@ fun LoginSheet(
         }
     }
 
-    Dialog(
-        onDismissRequest = { if (!isLoading) onDismiss() },
-        properties = DialogProperties(
-            dismissOnBackPress = !isLoading,
-            dismissOnClickOutside = !isLoading,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        // پس‌زمینه: تیره + بلور واقعی (اندروید ۱۲ به بالا)
-        val view = LocalView.current
-        SideEffect {
-            val window = (view.parent as? DialogWindowProvider)?.window
-            if (window != null) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window.setDimAmount(0.4f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                    val params = window.attributes
-                    params.blurBehindRadius = 28
-                    window.attributes = params
-                }
-            }
-        }
-
-        // کارت شناور: از هر چهار طرف فاصله دارد
-        Surface(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-            shadowElevation = 24.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    FloatingDialog(onDismiss = onDismiss, dismissible = !isLoading) {
+        val fieldColors = loginFieldColors()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 22.dp, vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "ورود به اپدونی",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = { if (!isLoading) onDismiss() }) {
-                        Icon(Icons.Default.Close, contentDescription = "بستن")
-                    }
-                }
-
-                Text(
-                    text = "با حساب سایت اپدونی وارد شو",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("نام کاربری یا ایمیل") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(16.dp),
-                    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("رمز عبور") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = if (passwordVisible) "پنهان کردن رمز" else "نمایش رمز"
-                            )
-                        }
-                    },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(16.dp),
-                    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { doLogin() }),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                val error = errorText
-                if (error != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                val trace = errorTrace
-                if (trace != null) {
-                    TextButton(
-                        onClick = {
-                            clipboard.setText(AnnotatedString(trace))
-                            traceCopied = true
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Button(
-                    onClick = { doLogin() },
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Text("ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "ورود به اپدونی",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { if (!isLoading) onDismiss() }) {
+                Icon(Icons.Default.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
+
+        Text(
+            text = "با حساب سایت اپدونی وارد شو",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("نام کاربری یا ایمیل") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+            singleLine = true,
+            enabled = !isLoading,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("رمز عبور") },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (passwordVisible) "پنهان کردن رمز" else "نمایش رمز"
+                    )
+                }
+            },
+            singleLine = true,
+            enabled = !isLoading,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { doLogin() }),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        val error = errorText
+        if (error != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        val trace = errorTrace
+        if (trace != null) {
+            TextButton(
+                onClick = {
+                    clipboard.setText(AnnotatedString(trace))
+                    traceCopied = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { doLogin() },
+            enabled = !isLoading,
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                disabledContentColor = Color.White
+            ),
+            modifier = Modifier.fillMaxWidth().height(52.dp)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.White
+                )
+            } else {
+                Text("ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
     }
+}
+
+/** رنگ‌های یکدست فیلدهای ورود: بوردر ملایم، فوکوس فیروزه‌ای، متن و لیبل خوانا. */
+@Composable
+private fun loginFieldColors(): TextFieldColors {
+    val scheme = MaterialTheme.colorScheme
+    val accent = AppdonyGreenLight
+    val container = scheme.surfaceVariant.copy(alpha = 0.55f)
+    return OutlinedTextFieldDefaults.colors(
+        focusedTextColor = scheme.onSurface,
+        unfocusedTextColor = scheme.onSurface,
+        disabledTextColor = scheme.onSurface.copy(alpha = 0.5f),
+        focusedContainerColor = container,
+        unfocusedContainerColor = container,
+        disabledContainerColor = container,
+        focusedBorderColor = accent,
+        unfocusedBorderColor = scheme.onSurface.copy(alpha = 0.14f),
+        disabledBorderColor = scheme.onSurface.copy(alpha = 0.08f),
+        focusedLabelColor = accent,
+        unfocusedLabelColor = scheme.onSurfaceVariant,
+        disabledLabelColor = scheme.onSurfaceVariant.copy(alpha = 0.6f),
+        focusedLeadingIconColor = accent,
+        unfocusedLeadingIconColor = scheme.onSurfaceVariant,
+        focusedTrailingIconColor = accent,
+        unfocusedTrailingIconColor = scheme.onSurfaceVariant,
+        cursorColor = accent,
+        selectionColors = TextSelectionColors(handleColor = accent, backgroundColor = accent.copy(alpha = 0.3f))
+    )
 }
