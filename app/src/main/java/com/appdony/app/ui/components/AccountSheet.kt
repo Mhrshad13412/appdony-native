@@ -1,8 +1,8 @@
 package com.appdony.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,18 +15,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,48 +34,128 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد. */
 @Composable
 fun AccountSheet(
     displayName: String, username: String, onDismiss: () -> Unit,
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
     onHelp: () -> Unit, onAbout: () -> Unit, onLogout: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.background, dragHandle = null) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onDismiss() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onBackground)
-                }
+    FloatingDialog(onDismiss = onDismiss) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "حساب کاربری",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Box(
+                modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onSurface)
             }
-            Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                    Text(text = displayName.firstOrNull()?.uppercase() ?: "U", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(text = displayName, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            AccountRow(Icons.Default.Download, "دانلودها", onDownloads)
-            AccountRow(Icons.Default.Info, "راهنما", onHelp)
-            AccountRow(Icons.Default.Settings, "تنظیمات", onSettings)
-            AccountRow(Icons.Default.Star, "علاقه‌مندی‌ها", onFavorites)
-            AccountRow(Icons.Default.Info, "درباره اپدونی", onAbout)
-            AccountRow(Icons.AutoMirrored.Filled.ExitToApp, "خروج از حساب", onLogout)
         }
+        Spacer(Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = displayName.firstOrNull()?.uppercase() ?: "U",
+                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(text = displayName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        AccountRow(Icons.Outlined.Download, "دانلودها") { onDismiss(); onDownloads() }
+        AccountRow(Icons.Outlined.StarBorder, "علاقه‌مندی‌ها") { onDismiss(); onFavorites() }
+        AccountRow(Icons.Outlined.Settings, "تنظیمات") { onDismiss(); onSettings() }
+        AccountRow(Icons.Outlined.Info, "راهنما") { onDismiss(); onHelp() }
+        AccountRow(Icons.Outlined.Info, "درباره اپدونی") { onDismiss(); onAbout() }
+        AccountRow(
+            Icons.AutoMirrored.Outlined.Logout, "خروج از حساب",
+            tint = MaterialTheme.colorScheme.error
+        ) { onDismiss(); onLogout() }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
 @Composable
-private fun AccountRow(icon: ImageVector, title: String, onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick() }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.width(12.dp))
-        Text(text = title, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+private fun AccountRow(
+    icon: ImageVector,
+    title: String,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(vertical = 13.dp, horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                .background(tint.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(text = title, color = tint, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** درباره اپدونی: کارت شناور ساده. */
+@Composable
+fun AboutDialog(versionName: String, onDismiss: () -> Unit) {
+    FloatingDialog(onDismiss = onDismiss) {
+        Spacer(Modifier.height(8.dp))
+        PlagueDoctorAvatar(sizeDp = 72)
+        Spacer(Modifier.height(18.dp))
+        Text("اپدونی", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text("نسخه $versionName", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "دانلود برنامه و بازی اندروید با لینک مستقیم و پشتیبانی فارسی",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("باشه", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+        Spacer(Modifier.height(4.dp))
     }
 }
