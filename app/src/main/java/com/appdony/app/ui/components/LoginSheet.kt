@@ -3,7 +3,6 @@ package com.appdony.app.ui.components
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -41,9 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import com.appdony.app.data.api.LoginException
 import com.appdony.app.data.api.WordPressLogin
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.session.CredentialsManager
@@ -71,22 +74,28 @@ fun LoginSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val clipboard = LocalClipboardManager.current
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var errorTrace by remember { mutableStateOf<String?>(null) }
+    var traceCopied by remember { mutableStateOf(false) }
 
     fun doLogin() {
         if (isLoading) return
         if (username.isBlank() || password.isBlank()) {
             errorText = "نام کاربری (یا ایمیل) و رمز عبور را وارد کن."
+            errorTrace = null
             return
         }
         focusManager.clearFocus()
         isLoading = true
         errorText = null
+        errorTrace = null
+        traceCopied = false
 
         val typedUser = username.trim()
         val typedPass = password
@@ -110,6 +119,7 @@ fun LoginSheet(
                 }
                 .onFailure { error ->
                     errorText = error.message ?: "ورود انجام نشد."
+                    errorTrace = (error as? LoginException)?.trace
                 }
             isLoading = false
         }
@@ -230,7 +240,20 @@ fun LoginSheet(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                val trace = errorTrace
+                if (trace != null) {
+                    TextButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(trace))
+                            traceCopied = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Button(
                     onClick = { doLogin() },
