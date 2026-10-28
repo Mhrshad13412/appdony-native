@@ -8,14 +8,15 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 object AiApi {
-    private val API_URL = "https://api.llm7.io/v1/chat/completions"
-    
-    // کلید API خود را اینجا قرار دهید (ترجیحاً از token.llm7.io دریافت کنید)
-    private val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
-    
+
+    // درخواست به سایت خودمون می‌ره و سرور سایت به هوش مصنوعی وصل می‌شه
+    private const val API_URL = "https://appdony.ir/wp-json/appdony/v1/ai"
+
     private val SYSTEM_PROMPT = """
         تو "دکتر طاعون" هستی، دستیار هوشمند و بسیار باحال اپلیکیشن "اپدونی".
         اپدونی یک مرجع دانلود بازی و برنامه برای اندروید است.
@@ -30,9 +31,9 @@ object AiApi {
     """.trimIndent()
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(70, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
     suspend fun sendMessage(
@@ -40,64 +41,43 @@ object AiApi {
         history: List<Pair<String, String>> = emptyList()
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val messagesArray = JSONArray()
-
-            val systemMsgObj = JSONObject().apply {
-                put("role", "system")
-                put("content", SYSTEM_PROMPT)
-            }
-            messagesArray.put(systemMsgObj)
-
+            val messages = JSONArray()
+            messages.put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
             history.forEach { (role, content) ->
-                val msgObj = JSONObject().apply {
-                    put("role", role)
-                    put("content", content)
-                }
-                messagesArray.put(msgObj)
+                messages.put(JSONObject().put("role", role).put("content", content))
             }
+            messages.put(JSONObject().put("role", "user").put("content", userMessage))
 
-            val userMsgObj = JSONObject().apply {
-                put("role", "user")
-                put("content", userMessage)
-            }
-            messagesArray.put(userMsgObj)
-
-            // ✅ مدل به "fast" تغییر کرد تا با LLM7 سازگار باشد
-            val requestBodyJson = JSONObject().apply {
-                put("model", "fast") 
-                put("messages", messagesArray)
-                put("temperature", 0.7)
-            }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val body = requestBodyJson.toString().toRequestBody(mediaType)
+            val body = JSONObject().put("messages", messages).toString()
+                .toRequestBody("application/json; charset=utf-8".toMediaType())
 
             val request = Request.Builder()
                 .url(API_URL)
-                .addHeader("Authorization", "Bearer $API_KEY")
-                .addHeader("Content-Type", "application/json")
                 .post(body)
                 .build()
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string()
 
-            if (!response.isSuccessful || responseBody == null) {
-                return@withContext Result.failure(Exception("HTTP Error: ${response.code}"))
+                if (response.code == 429) {
+                    return@withContext Result.failure(Exception("تعداد پیام‌ها زیاده. یه دقیقه صبر کن و دوباره بپرس."))
+                }
+                if (!response.isSuccessful || text.isNullOrBlank()) {
+                    return@withContext Result.failure(Exception("سرویس هوش مصنوعی الان در دسترس نیست (کد ${response.code})."))
+                }
+
+                val reply = JSONObject(text).optString("reply", "")
+                if (reply.isBlank()) {
+                    return@withContext Result.failure(Exception("پاسخی دریافت نشد. دوباره امتحان کن."))
+                }
+                Result.success(reply)
             }
-
-            val jsonResponse = JSONObject(responseBody)
-            val choices = jsonResponse.getJSONArray("choices")
-            if (choices.length() == 0) {
-                return@withContext Result.failure(Exception("No choices found"))
-            }
-
-            val messageObj = choices.getJSONObject(0).getJSONObject("message")
-            val content = messageObj.getString("content")
-
-            Result.success(content)
+        } catch (e: UnknownHostException) {
+            Result.failure(Exception("اتصال به اینترنت برقرار نیست."))
+        } catch (e: SocketTimeoutException) {
+            Result.failure(Exception("پاسخ دیر رسید. دوباره امتحان کن."))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception("مشکلی پیش اومد. دوباره امتحان کن."))
         }
     }
 }
