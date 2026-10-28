@@ -1,14 +1,20 @@
 package com.appdony.app.ui.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,6 +32,54 @@ import com.appdony.app.ui.screens.SearchScreen
 import com.appdony.app.ui.screens.SettingsScreen
 import com.appdony.app.ui.screens.UpdatesScreen
 
+// ───── انیمیشن تب‌ها: صفحه مثل یک نوار افقی به چپ/راست «غُل می‌خورد» ─────
+// چیدمان RTL است: تب‌های با اندیس بیشتر سمت چپ‌اند؛ پس رفتن به آن‌ها یعنی ورود از چپ.
+private const val TAB_ANIM_MS = 420
+private val TabEasing = FastOutSlowInEasing
+
+private fun tabIndexOf(route: String?): Int =
+    bottomNavItems.indexOfFirst { it.route == route?.substringBefore('?') }
+
+/** +1: مقصد سمت چپ است (ورود از چپ)؛ -1: مقصد سمت راست؛ 0: انتقال بین تب‌ها نیست */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabDirection(): Int {
+    val from = tabIndexOf(initialState.destination.route)
+    val to = tabIndexOf(targetState.destination.route)
+    if (from < 0 || to < 0 || from == to) return 0
+    return if (to > from) 1 else -1
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnter(): EnterTransition =
+    when (tabDirection()) {
+        0 -> fadeIn(tween(300)) + scaleIn(initialScale = 0.95f, animationSpec = tween(300))
+        else -> {
+            val dir = tabDirection()
+            slideInHorizontally(tween(TAB_ANIM_MS, easing = TabEasing)) { full -> -dir * full } +
+                fadeIn(tween(TAB_ANIM_MS, easing = TabEasing)) +
+                scaleIn(initialScale = 0.92f, animationSpec = tween(TAB_ANIM_MS, easing = TabEasing))
+        }
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExit(): ExitTransition =
+    when (tabDirection()) {
+        0 -> fadeOut(tween(300))
+        else -> {
+            val dir = tabDirection()
+            slideOutHorizontally(tween(TAB_ANIM_MS, easing = TabEasing)) { full -> dir * full } +
+                fadeOut(tween(TAB_ANIM_MS / 2)) +
+                scaleOut(targetScale = 0.92f, animationSpec = tween(TAB_ANIM_MS, easing = TabEasing))
+        }
+    }
+
+private fun NavGraphBuilder.tabComposable(route: String, content: @Composable (NavBackStackEntry) -> Unit) {
+    composable(
+        route = route,
+        enterTransition = { tabEnter() },
+        exitTransition = { tabExit() },
+        popEnterTransition = { tabEnter() },
+        popExitTransition = { tabExit() }
+    ) { content(it) }
+}
+
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -39,19 +93,19 @@ fun AppNavGraph(
         popEnterTransition = { fadeIn(tween(300)) + scaleIn(initialScale = 0.95f, animationSpec = tween(300)) },
         popExitTransition = { fadeOut(tween(300)) }
     ) {
-        composable("games") {
+        tabComposable("games") {
             GamesScreen(
                 onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") },
                 onCategoryClick = { id, name -> navController.navigate("category/$id/${Uri.encode(name)}") }
             )
         }
-        composable("apps") {
+        tabComposable("apps") {
             AppsScreen(
                 onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") },
                 onCategoryClick = { id, name -> navController.navigate("category/$id/${Uri.encode(name)}") }
             )
         }
-        composable("blog") {
+        tabComposable("blog") {
             BlogScreen(
                 onPostClick = { id -> navController.navigate("detail/$id?isBlog=true") }, // 👈 اینجا true میشه
                 onCategoryClick = { id, name -> navController.navigate("category/$id/${Uri.encode(name)}") }
@@ -63,7 +117,7 @@ fun AppNavGraph(
         composable("favorites") { FavoritesScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
         composable("chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
         composable("ai_chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
-        composable("downloads") { DownloadsScreen() }
+        tabComposable("downloads") { DownloadsScreen() }
 
         composable(
             route = "category/{categoryId}/{categoryName}",
