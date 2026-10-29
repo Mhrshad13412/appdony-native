@@ -7,6 +7,7 @@ import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.util.AppInfo
 import com.appdony.app.util.ContentBlock
 import com.appdony.app.util.HtmlParser
+import com.appdony.app.util.InstallLinkFinder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,7 +62,34 @@ class DetailViewModel(
                         ?: emptyList()
                 } else emptyList()
 
-                _state.value = DetailUiState.Success(post, info, similar, blocks)
+                if (isBlog) {
+                    _state.value = DetailUiState.Success(post, info, similar, blocks)
+                    return@onSuccess
+                }
+
+                // اول محتوا نشون داده می‌شه، لینک «نصب کردن» از صفحه‌ی اصلی سایت جدا می‌آد
+                _state.value = DetailUiState.Success(post, info.copy(linksChecked = false), similar, blocks)
+
+                val found = InstallLinkFinder.find(post.id, post.link)
+                val current = _state.value as? DetailUiState.Success ?: return@onSuccess
+                found.onSuccess { r ->
+                    val merged = (r.links + current.info.downloadLinks).distinctBy { it.url }
+                    _state.value = current.copy(
+                        info = current.info.copy(
+                            downloadLinks = merged,
+                            linksChecked = true,
+                            linkError = null,
+                            linkDebug = r.debug
+                        )
+                    )
+                }.onFailure { e ->
+                    _state.value = current.copy(
+                        info = current.info.copy(
+                            linksChecked = true,
+                            linkError = "اتصال به سایت برقرار نشد (${e.message ?: "خطا"})"
+                        )
+                    )
+                }
             }.onFailure {
                 _state.value = DetailUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
             }
