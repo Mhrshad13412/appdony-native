@@ -223,4 +223,98 @@ object HtmlParser {
             "(?:حجم|Size)\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
             RegexOption.IGNORE_CASE
         ).find(text)
-        if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupVal
+        if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupValues[2]}"
+        return null
+    }
+
+    private fun extractAndroidReq(text: String): String? {
+        val m = Regex(
+            "(?:اندروید|Android)[^0-9]{0,25}([0-9]+(?:\\.[0-9]+)*\\+?)",
+            RegexOption.IGNORE_CASE
+        ).find(text) ?: return null
+        return m.groupValues[1].trim()
+    }
+
+    private fun extractDeveloper(lines: String): String? {
+        val m = Regex(
+            "(?:سازنده|توسعه\\s*دهنده|Developer)\\s*[:：]\\s*([^\\n\\r]{2,60})",
+            RegexOption.IGNORE_CASE
+        ).find(lines) ?: return null
+        return m.groupValues[1].trim().ifBlank { null }
+    }
+
+    private fun extensionOf(url: String): String =
+        url.substringBefore("?").substringBefore("#").substringAfterLast('/', "")
+            .substringAfterLast('.', "").lowercase()
+
+    private fun isBlockedHost(host: String): Boolean {
+        val h = host.lowercase()
+        if (ALLOWED_HOSTS.any { h == it }) return false
+        return BLOCKED_DOMAINS.any { h == it || h.endsWith(".$it") }
+    }
+
+    private fun extractDownloadLinks(doc: Document): List<DownloadLink> {
+        val result = mutableListOf<DownloadLink>()
+        val seenUrls = mutableSetOf<String>()
+        var inSource = false
+        var inDownload = false
+        val root = doc.body()
+
+        for (el in root.select("h1,h2,h3,h4,h5,h6,a[href]")) {
+            val tag = el.tagName().lowercase()
+            if (tag != "a") {
+                val headText = el.text()
+                inSource = SOURCE_HEAD.containsMatchIn(headText)
+                inDownload = !inSource && DOWNLOAD_HEAD.containsMatchIn(headText)
+                continue
+            }
+            if (inSource) continue
+
+            val abs = absolute(el.attr("href")) ?: continue
+            val httpUrl = abs.toHttpUrlOrNull() ?: continue
+            if (isBlockedHost(httpUrl.host)) continue
+
+            val path = httpUrl.encodedPath
+            val ext = extensionOf(abs)
+            if (ext in IMAGE_EXTS) continue
+
+            val text = normalizeDigits(el.text().replace("\u00A0", " ").trim())
+            val lowerText = text.lowercase()
+            val isFile = ext in FILE_EXTS
+            val isShare = SHARE_PATH.containsMatchIn(path)
+            val isDlPath = DL_PATH.containsMatchIn(path.trimStart('/'))
+            val hasWord = DOWNLOAD_WORDS.any { lowerText.contains(it.lowercase()) }
+
+            if (!(isFile || isShare || isDlPath || hasWord || inDownload)) continue
+            if (!seenUrls.add(abs)) continue
+
+            val sizeSource = if (SIZE_REGEX.containsMatchIn(text)) text
+            else normalizeDigits(el.parent()?.text().orEmpty().take(200))
+            val sizeMatch = SIZE_REGEX.find(sizeSource)
+            val size = sizeMatch?.let { "${it.groupValues[1]} ${it.groupValues[2]}" }
+
+            result.add(
+                DownloadLink(
+                    title = text.ifBlank { "دانلود" }.take(60),
+                    url = abs,
+                    size = size
+                )
+            )
+            if (result.size >= 12) break
+        }
+        return result
+    }
+
+    private fun extractScreenshots(doc: Document): List<String> {
+        val urls = LinkedHashSet<String>()
+        for (img in doc.body().select("img")) {
+            if (img.parents().any { it.tagName().lowercase() in setOf("header", "footer", "nav", "aside") }) continue
+            val url = imageUrl(img) ?: continue
+            if (isJunkImage(url)) continue
+            if (extensionOf(url) !in IMAGE_EXTS) continue
+            urls.add(url)
+            if (urls.size >= 12) break
+        }
+        return urls.toList()
+    }
+}
