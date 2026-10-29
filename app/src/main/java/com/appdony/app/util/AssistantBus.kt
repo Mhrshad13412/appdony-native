@@ -9,6 +9,9 @@ enum class SayKind { TIP, SEARCH, DOWNLOAD, DONE, FAIL, PLUS, SUGGEST }
 
 data class AssistantSay(val text: String, val kind: SayKind = SayKind.TIP)
 
+/** مراحل دکمه‌ی دانلود: در حال بررسی لینک ← آماده / ناموفق */
+enum class DownloadPhase { CHECKING, READY, FAILED }
+
 /** پل بین بخش‌های اپ (مثل دانلود) و دکتر طاعون؛ و حافظه‌ی «چیزهایی که دکتر گفته» برای هوش مصنوعی */
 object AssistantBus {
 
@@ -17,6 +20,17 @@ object AssistantBus {
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val events: SharedFlow<AssistantSay> = _events.asSharedFlow()
+
+    private val _download = MutableSharedFlow<DownloadPhase>(
+        extraBufferCapacity = 4,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val download: SharedFlow<DownloadPhase> = _download.asSharedFlow()
+
+    /** صفحه‌ی جزئیات موقع زدن دکمه‌ی دانلود صدا می‌زنه تا دکتر نمایش بطری‌ها رو اجرا کنه */
+    fun downloadPhase(phase: DownloadPhase) {
+        _download.tryEmit(phase)
+    }
 
     private val shown = ArrayDeque<String>()
 
