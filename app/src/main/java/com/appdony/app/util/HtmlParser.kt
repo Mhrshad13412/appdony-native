@@ -1,320 +1,98 @@
-package com.appdony.app.util
+package com.appdony.app.ui.screens
 
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.appdony.app.data.model.Post
+import com.appdony.app.data.repository.AppRepository
+import com.appdony.app.util.AppInfo
+import com.appdony.app.util.ContentBlock
+import com.appdony.app.util.HtmlParser
+import com.appdony.app.util.InstallLinkFinder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-data class DownloadLink(
-    val title: String,
-    val url: String,
-    val size: String? = null
-)
-
-data class AppInfo(
-    val version: String? = null,
-    val size: String? = null,
-    val androidReq: String? = null,
-    val developer: String? = null,
-    val downloadLinks: List<DownloadLink> = emptyList(),
-    val screenshots: List<String> = emptyList(),
-    val cleanDescription: String = "",
-    val allLinks: List<String> = emptyList()
-)
-
-sealed class ContentBlock {
-    data class Header(val text: String, val level: Int) : ContentBlock()
-    data class Paragraph(val text: String) : ContentBlock()
-    data class Image(val url: String) : ContentBlock()
-    data class Quote(val text: String) : ContentBlock()
-    data class ListBlock(val items: List<String>, val isOrdered: Boolean) : ContentBlock()
+sealed class DetailUiState {
+    object Loading : DetailUiState()
+    data class Success(
+        val post: Post,
+        val info: AppInfo,
+        val similar: List<Post>,
+        val contentBlocks: List<ContentBlock>
+    ) : DetailUiState()
+    data class Error(val message: String) : DetailUiState()
 }
 
-object HtmlParser {
+class DetailViewModel(
+    private val postId: Int,
+    private val isBlog: Boolean
+) : ViewModel() {
 
-    private const val BASE = "https://appdony.ir/"
+    private val repo = AppRepository()
+    private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
+    val state: StateFlow<DetailUiState> = _state.asStateFlow()
 
-    private val BLOCKED_DOMAINS = listOf(
-        "google.com", "doubleclick.net", "googlesyndication.com", "google-analytics.com", "facebook.com",
-        "t.me", "telegram.me", "telegram.org", "twitter.com", "x.com", "pinterest.com",
-        "youtube.com", "youtu.be", "aparat.com", "instagram.com", "whatsapp.com", "wa.me",
-        "linkedin.com", "tiktok.com", "apple.com", "cafebazaar.ir", "myket.ir",
-        "gamerant.com", "ign.com", "wikipedia.org", "reddit.com"
-    )
-    private val ALLOWED_HOSTS = setOf("drive.google.com", "docs.google.com")
-    private val DOWNLOAD_HEAD = Regex(
-        "نصب|دانلود|download|لینک|نسخه|مود|اصلی|مستقیم|سرور|mod|apk|obb|دیتا|داده",
-        RegexOption.IGNORE_CASE
-    )
-    private val SOURCE_HEAD = Regex(
-        "منبع|منابع|مرجع|source|reference|مطالب مرتبط|مطالب پیشنهادی|بیشتر بخوانید|مشابه|related|برچسب|tags|دیدگاه|نظرات|comment",
-        RegexOption.IGNORE_CASE
-    )
-    private val SHARE_PATH = Regex("/(o/public|public|file|files|f|d|s|dl)/[^/]+")
-    private val FILE_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z", "obb")
-    private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "webp", "gif")
-    private val DOWNLOAD_WORDS = listOf(
-        "دانلود", "download", "نصب", "لینک مستقیم", "دریافت", "نسخه مود", "mod apk", "مگابایت", "گیگابایت"
-    )
-    private val JUNK_IMAGE = listOf("emoji", "avatar", "gravatar", "logo", "icon", "wp-includes", "/themes/", "sprite")
-    private val DL_PATH = Regex("(^|/)(dl|download|downloads|get|getfile|file|files)(/|$)")
-    private val SIZE_REGEX = Regex(
-        "([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
-        RegexOption.IGNORE_CASE
-    )
+    init {
+        load()
+    }
 
-    private fun normalizeDigits(s: String): String = buildString(s.length) {
-        for (c in s) {
-            append(
-                when (c) {
-                    in '\u06F0'..'\u06F9' -> '0' + (c - '\u06F0')
-                    in '\u0660'..'\u0669' -> '0' + (c - '\u0660')
-                    else -> c
+    fun load() {
+        viewModelScope.launch {
+            _state.value = DetailUiState.Loading
+
+            val postResult = if (isBlog) repo.getBlogPost(postId) else repo.getPost(postId)
+
+            postResult.onSuccess { post ->
+                val rawHtml = post.content?.rendered ?: ""
+
+                // پارس HTML سنگینه؛ خارج از ترد اصلی انجام می‌شه
+                val (blocks, info) = withContext(Dispatchers.Default) {
+                    Pair(HtmlParser.parseContent(rawHtml), HtmlParser.parsePostContent(rawHtml))
                 }
-            )
-        }
-    }
 
-    private fun absolute(raw: String): String? {
-        val u = raw.trim()
-        if (u.isBlank() || u.startsWith("#") || u.startsWith("javascript:") ||
-            u.startsWith("mailto:") || u.startsWith("tel:") || u.startsWith("data:")
-        ) return null
-        return try {
-            when {
-                u.startsWith("//") -> "https:$u"
-                u.startsWith("http") -> u
-                else -> BASE.toHttpUrlOrNull()?.resolve(u)?.toString()
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
+                val catId = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.id
+                val similar = if (!isBlog && catId != null) {
+                    repo.getPostsByCategory(catId, perPage = 8)
+                        .getOrNull()
+                        ?.filter { it.id != post.id }
+                        ?.take(6)
+                        ?: emptyList()
+                } else emptyList()
 
-    private fun bestFromSrcset(srcset: String): String {
-        if (srcset.isBlank()) return ""
-        return srcset.split(",")
-            .map { it.trim().split(Regex("\\s+")) }
-            .lastOrNull { it.isNotEmpty() }
-            ?.firstOrNull()
-            .orEmpty()
-    }
-
-    private fun imageUrl(img: Element): String? {
-        val srcset = img.attr("data-srcset").ifBlank { img.attr("srcset") }
-        val candidates = listOf(
-            img.attr("data-src"), img.attr("data-lazy-src"), img.attr("data-original"),
-            bestFromSrcset(srcset), img.attr("src")
-        )
-        for (raw in candidates) {
-            val abs = absolute(raw)
-            if (abs != null) return abs
-        }
-        return null
-    }
-
-    private fun isJunkImage(url: String): Boolean {
-        val lower = url.lowercase()
-        return JUNK_IMAGE.any { lower.contains(it) }
-    }
-
-    fun parseContent(html: String): List<ContentBlock> {
-        val blocks = mutableListOf<ContentBlock>()
-        if (html.isBlank()) return blocks
-        val doc = Jsoup.parse(html, BASE)
-        val seen = mutableSetOf<String>()
-        for (element in doc.body().children()) {
-            parseElement(element, blocks, seen)
-        }
-        return blocks
-    }
-
-    private fun addImage(img: Element, blocks: MutableList<ContentBlock>, seen: MutableSet<String>) {
-        val url = imageUrl(img) ?: return
-        if (isJunkImage(url)) return
-        if (seen.add(url)) blocks.add(ContentBlock.Image(url))
-    }
-
-    private fun parseElement(element: Element, blocks: MutableList<ContentBlock>, seen: MutableSet<String>) {
-        when (element.tagName().lowercase()) {
-            "script", "style", "noscript", "iframe", "form", "button", "nav", "header", "footer", "aside", "svg" -> return
-
-            "h1", "h2", "h3", "h4", "h5", "h6" -> {
-                val text = element.text().trim()
-                if (text.isNotEmpty()) {
-                    blocks.add(ContentBlock.Header(text, element.tagName().substring(1).toIntOrNull() ?: 2))
+                if (isBlog) {
+                    _state.value = DetailUiState.Success(post, info, similar, blocks)
+                    return@onSuccess
                 }
-            }
 
-            "p" -> {
-                val text = element.text().trim()
-                val linkText = element.select("a").text().trim()
-                val onlyLinks = linkText.isNotEmpty() && text == linkText
-                if (text.isNotEmpty() && !onlyLinks) blocks.add(ContentBlock.Paragraph(text))
-                element.select("img").forEach { addImage(it, blocks, seen) }
-            }
+                // اول محتوا نشون داده می‌شه، لینک «نصب کردن» از صفحه‌ی اصلی سایت جدا می‌آد
+                _state.value = DetailUiState.Success(post, info.copy(linksChecked = false), similar, blocks)
 
-            "img" -> addImage(element, blocks, seen)
-
-            "a" -> element.select("img").forEach { addImage(it, blocks, seen) }
-
-            "blockquote" -> {
-                val text = element.text().trim()
-                if (text.isNotEmpty()) blocks.add(ContentBlock.Quote(text))
-            }
-
-            "ul", "ol" -> {
-                val items = element.select("li").map { it.text().trim() }.filter { it.isNotEmpty() }
-                if (items.isNotEmpty()) blocks.add(ContentBlock.ListBlock(items, element.tagName() == "ol"))
-            }
-
-            "table" -> {
-                val rows = element.select("tr")
-                    .map { tr -> tr.select("th,td").joinToString(" : ") { it.text().trim() } }
-                    .filter { it.isNotBlank() }
-                if (rows.isNotEmpty()) blocks.add(ContentBlock.ListBlock(rows, false))
-            }
-
-            "figure" -> {
-                element.select("img").forEach { addImage(it, blocks, seen) }
-                val caption = element.select("figcaption").text().trim()
-                if (caption.isNotEmpty()) blocks.add(ContentBlock.Paragraph(caption))
-            }
-
-            else -> {
-                val own = element.ownText().trim()
-                if (own.length > 1) blocks.add(ContentBlock.Paragraph(own))
-                element.children().forEach { parseElement(it, blocks, seen) }
+                val found = InstallLinkFinder.find(post.id, post.link)
+                val current = _state.value as? DetailUiState.Success ?: return@onSuccess
+                found.onSuccess { r ->
+                    val merged = (r.links + current.info.downloadLinks).distinctBy { it.url }
+                    _state.value = current.copy(
+                        info = current.info.copy(
+                            downloadLinks = merged,
+                            linksChecked = true,
+                            linkError = null,
+                            linkDebug = r.debug
+                        )
+                    )
+                }.onFailure { e ->
+                    _state.value = current.copy(
+                        info = current.info.copy(
+                            linksChecked = true,
+                            linkError = "اتصال به سایت برقرار نشد (${e.message ?: "خطا"})"
+                        )
+                    )
+                }
+            }.onFailure {
+                _state.value = DetailUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
             }
         }
-    }
-
-    fun parsePostContent(html: String): AppInfo {
-        val doc = Jsoup.parse(html, BASE)
-        val text = normalizeDigits(doc.text())
-        val lines = normalizeDigits(doc.wholeText())
-
-        return AppInfo(
-            version = extractVersion(text),
-            size = extractSize(text),
-            androidReq = extractAndroidReq(text),
-            developer = extractDeveloper(lines),
-            downloadLinks = extractDownloadLinks(doc),
-            screenshots = extractScreenshots(doc),
-            cleanDescription = doc.text().replace("\u00A0", " ").trim(),
-            allLinks = doc.select("a[href]").take(40).map { "${it.text().trim().take(40)} -> ${it.attr("href")}" }
-        )
-    }
-
-    private fun extractVersion(text: String): String? {
-        val patterns = listOf(
-            Regex("نسخه\\s*[:：]?\\s*([0-9][0-9A-Za-z.\\-]*)"),
-            Regex("[Vv]ersion\\s*[:：]?\\s*([0-9][0-9A-Za-z.\\-]*)")
-        )
-        for (p in patterns) {
-            val m = p.find(text)
-            if (m != null) return m.groupValues[1].trim()
-        }
-        return null
-    }
-
-    private fun extractSize(text: String): String? {
-        val labeled = Regex(
-            "(?:حجم|Size)\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
-            RegexOption.IGNORE_CASE
-        ).find(text)
-        if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupValues[2]}"
-        return null
-    }
-
-    private fun extractAndroidReq(text: String): String? {
-        val m = Regex(
-            "(?:اندروید|Android)[^0-9]{0,25}([0-9]+(?:\\.[0-9]+)*\\+?)",
-            RegexOption.IGNORE_CASE
-        ).find(text) ?: return null
-        return m.groupValues[1].trim()
-    }
-
-    private fun extractDeveloper(lines: String): String? {
-        val m = Regex(
-            "(?:سازنده|توسعه\\s*دهنده|Developer)\\s*[:：]\\s*([^\\n\\r]{2,60})",
-            RegexOption.IGNORE_CASE
-        ).find(lines) ?: return null
-        return m.groupValues[1].trim().ifBlank { null }
-    }
-
-    private fun extensionOf(url: String): String =
-        url.substringBefore("?").substringBefore("#").substringAfterLast('/', "")
-            .substringAfterLast('.', "").lowercase()
-
-    private fun isBlockedHost(host: String): Boolean {
-        val h = host.lowercase()
-        if (ALLOWED_HOSTS.any { h == it }) return false
-        return BLOCKED_DOMAINS.any { h == it || h.endsWith(".$it") }
-    }
-
-    private fun extractDownloadLinks(doc: Document): List<DownloadLink> {
-        val result = mutableListOf<DownloadLink>()
-        val seenUrls = mutableSetOf<String>()
-        var inSource = false
-        var inDownload = false
-        val root = doc.body()
-
-        for (el in root.select("h1,h2,h3,h4,h5,h6,a[href]")) {
-            val tag = el.tagName().lowercase()
-            if (tag != "a") {
-                val headText = el.text()
-                inSource = SOURCE_HEAD.containsMatchIn(headText)
-                inDownload = !inSource && DOWNLOAD_HEAD.containsMatchIn(headText)
-                continue
-            }
-            if (inSource) continue
-
-            val abs = absolute(el.attr("href")) ?: continue
-            val httpUrl = abs.toHttpUrlOrNull() ?: continue
-            if (isBlockedHost(httpUrl.host)) continue
-
-            val path = httpUrl.encodedPath
-            val ext = extensionOf(abs)
-            if (ext in IMAGE_EXTS) continue
-
-            val text = normalizeDigits(el.text().replace("\u00A0", " ").trim())
-            val lowerText = text.lowercase()
-            val isFile = ext in FILE_EXTS
-            val isShare = SHARE_PATH.containsMatchIn(path)
-            val isDlPath = DL_PATH.containsMatchIn(path.trimStart('/'))
-            val hasWord = DOWNLOAD_WORDS.any { lowerText.contains(it.lowercase()) }
-
-            if (!(isFile || isShare || isDlPath || hasWord || inDownload)) continue
-            if (!seenUrls.add(abs)) continue
-
-            val sizeSource = if (SIZE_REGEX.containsMatchIn(text)) text
-            else normalizeDigits(el.parent()?.text().orEmpty().take(200))
-            val sizeMatch = SIZE_REGEX.find(sizeSource)
-            val size = sizeMatch?.let { "${it.groupValues[1]} ${it.groupValues[2]}" }
-
-            result.add(
-                DownloadLink(
-                    title = text.ifBlank { "دانلود" }.take(60),
-                    url = abs,
-                    size = size
-                )
-            )
-            if (result.size >= 12) break
-        }
-        return result
-    }
-
-    private fun extractScreenshots(doc: Document): List<String> {
-        val urls = LinkedHashSet<String>()
-        for (img in doc.body().select("img")) {
-            if (img.parents().any { it.tagName().lowercase() in setOf("header", "footer", "nav", "aside") }) continue
-            val url = imageUrl(img) ?: continue
-            if (isJunkImage(url)) continue
-            if (extensionOf(url) !in IMAGE_EXTS) continue
-            urls.add(url)
-            if (urls.size >= 12) break
-        }
-        return urls.toList()
     }
 }
