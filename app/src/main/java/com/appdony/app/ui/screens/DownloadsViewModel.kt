@@ -36,6 +36,10 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     private val _items = MutableStateFlow<List<DownloadItem>>(emptyList())
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
+    // تا اولین بارگذاری تموم نشده، اسکلت براق نشون داده می‌شه
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     init {
         viewModelScope.launch {
             // هر تغییر زنده‌ی موتور دانلود (درصد/حجم) فوراً توی لیست دیده می‌شه
@@ -44,8 +48,10 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            delay(450L)
             while (isActive) {
                 withContext(Dispatchers.IO) { refreshOnce() }
+                _loaded.value = true
                 delay(3000L)
             }
         }
