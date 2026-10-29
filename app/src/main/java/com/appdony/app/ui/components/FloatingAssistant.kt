@@ -597,7 +597,8 @@ fun FloatingAssistant(
                                                     (motion.offY.value + drag.y).coerceIn(topLimit, bottomLimit)
                                                 )
                                             }
-                                            val target = (drag.x * 1.6f).coerceIn(-16f, 16f)
+                                            // اینرسی: بالای گربه عقب می‌مونه، پس خلاف جهت کشیدن کج می‌شه
+                                            val target = (-drag.x * 1.6f).coerceIn(-16f, 16f)
                                             if (abs(target - motion.lastLean) > 1.5f) {
                                                 motion.lastLean = target
                                                 scope.launch { motion.lean(target) }
