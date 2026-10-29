@@ -254,6 +254,8 @@ fun MainContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             AppNavGraph(navController = navController)
 
+            com.appdony.app.ui.components.AppBannerHost(modifier = Modifier.align(Alignment.TopCenter))
+
             if (showAiAssistant && isMainRoute) {
                 Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
                     FloatingAssistant(
