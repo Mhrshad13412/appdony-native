@@ -12,7 +12,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -45,16 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.R
 
 private val AssistantShape = RoundedCornerShape(24.dp)
 
-/** دستیار شناور؛ هم‌سبک با منوی پایین: سطح هم‌رنگ سطح، بوردر فیروزه‌ای، آیکن‌های خطی. */
 @Composable
 fun FloatingAssistant(
     onSearchClick: () -> Unit,
@@ -73,7 +68,6 @@ fun FloatingAssistant(
     )
 
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Bottom) {
-        // حباب پیام
         AnimatedVisibility(
             visible = !isExpanded,
             enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.8f),
@@ -96,10 +90,9 @@ fun FloatingAssistant(
             }
         }
 
-        // آیتم‌های منو؛ هرکدام با تأخیر کوچک، از پایین و با فنر وارد می‌شوند
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items.forEachIndexed { index, (icon, label, action) ->
-                val enterOrder = items.size - 1 - index // نزدیک‌ترین آیتم به دکمه اول وارد شود
+                val enterOrder = items.size - 1 - index
                 AnimatedVisibility(
                     visible = isExpanded,
                     enter = fadeIn(tween(180, delayMillis = enterOrder * 45)) +
@@ -141,14 +134,11 @@ fun FloatingAssistant(
                         modifier = Modifier.size(26.dp).rotate(rotation)
                     )
                 } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.plague_doctor),
+                    Icon(
+                        imageVector = PlagueDoctorIcon,
                         contentDescription = "دستیار",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                        tint = primary,
+                        modifier = Modifier.size(34.dp)
                     )
                 }
             }
