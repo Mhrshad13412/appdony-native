@@ -19,6 +19,7 @@ data class InstallResult(val links: List<DownloadLink>, val debug: String)
  */
 object InstallLinkFinder {
 
+    const val LOCKED_TITLE = "لینک دانلود در دسترس نیست"
     private const val BASE = "https://appdony.ir/"
     private const val UA =
         "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
@@ -79,7 +80,8 @@ object InstallLinkFinder {
             if (html.isBlank()) return@withContext Result.failure(Exception("صفحه خالی بود"))
 
             val doc = Jsoup.parse(html, finalUrl)
-            Result.success(extract(doc, finalUrl))
+            val result = extract(doc, finalUrl)
+            Result.success(result)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -95,9 +97,14 @@ object InstallLinkFinder {
         }
 
         val listLinks = LinkedHashMap<String, String>()
-        for (a in doc.select("#downloads .download-list a[href]")) {
+        val lockedTitles = mutableListOf<String>()
+        val listAnchors = doc.select("#downloads .download-list a")
+        for (a in listAnchors) {
             val title = norm(a.text()).ifBlank { "دانلود" }.take(60)
+            val before = listLinks.size
             addUrl(resolveUrl(a.attr("href"), pageUrl), title, pageUrl, listLinks)
+            // دکمه هست ولی لینک واقعی نداره (مثلاً سایت لینکش رو نیاورده) = قفل
+            if (listLinks.size == before && resolveUrl(a.attr("href"), pageUrl) == null) lockedTitles.add(title)
         }
         for ((url, title) in listLinks) {
             when {
@@ -129,7 +136,14 @@ object InstallLinkFinder {
             val size = SIZE_REGEX.find(title)?.let { "${it.groupValues[1]} ${it.groupValues[2]}" }
             DownloadLink(title = title, url = url, size = size)
         }
-        return InstallResult(links, buildDebug(doc, pageUrl, installBtns + candidates))
+        // قفل: url خالی یعنی دکمه‌ی قفل‌شده (کلیک نمی‌خوره و وارد صف دانلود نمی‌شه)
+        val locked = if (links.isEmpty()) {
+            val hasButtons = installBtns.isNotEmpty() || listAnchors.isNotEmpty()
+            if (hasButtons) listOf(DownloadLink(title = LOCKED_TITLE, url = "")) else emptyList()
+        } else {
+            lockedTitles.distinct().filter { it != "دانلود" }.map { DownloadLink(title = "$it (قفل)", url = "") }
+        }
+        return InstallResult(links + locked, buildDebug(doc, pageUrl, installBtns + candidates))
     }
 
     private fun collectFromButton(c: Element, doc: Document, pageUrl: String, out: MutableMap<String, String>) {
