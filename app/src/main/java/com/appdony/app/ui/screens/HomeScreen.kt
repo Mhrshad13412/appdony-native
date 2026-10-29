@@ -57,6 +57,11 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.produceState
+import com.appdony.app.ui.components.FeaturedGameCard
+import com.appdony.app.util.HtmlParser
 
 @Composable
 fun HomeScreen(
@@ -160,51 +165,30 @@ private fun FeaturedBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
 
 @Composable
 private fun FeaturedCard(post: Post, onClick: () -> Unit) {
-    val context = LocalContext.current
-    val image = post.safeImage()
+    val icon = post.safeImage()
     val category = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
-
-    Column(
-        modifier = Modifier
-            .width(300.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(AppdonyCardBg)
-            .clickable { onClick() }
-            .padding(bottom = 12.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxWidth().height(170.dp)) {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context).data(image).size(600, 340).crossfade(true).build(),
-                contentDescription = post.cleanTitle(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
-                error = { Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
-                success = { SubcomposeAsyncImageContent() }
-            )
-        }
-        // متن بلافاصله نشون داده می‌شه، حتی قبل از رسیدن عکس
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            if (!category.isNullOrBlank()) {
-                Text(
-                    text = category,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-            Text(
-                text = post.cleanTitle(),
-                color = AppdonyTextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
-            )
-        }
+    // اسکرین‌شات از توی متن پست پیدا می‌شه (پشت صحنه، تا اسکرول سنگین نشه)
+    val screenshot by produceState<String?>(initialValue = null, key1 = post.id) {
+        value = withContext(Dispatchers.Default) { post.firstScreenshot(icon) }
     }
+    FeaturedGameCard(
+        title = post.cleanTitle(),
+        category = category,
+        screenshotUrl = screenshot,
+        iconUrl = icon,
+        onClick = onClick
+    )
+}
+
+private fun shotName(url: String): String =
+    url.substringBefore('?').substringAfterLast('/').replace(Regex("-\\d+x\\d+(?=\\.)"), "").lowercase()
+
+/** اولین عکس متن پست که همون تصویر شاخص (آیکن) نباشه */
+private fun Post.firstScreenshot(featured: String?): String? = try {
+    val featuredName = featured?.let { shotName(it) }
+    HtmlParser.parsePostContent(content.rendered).screenshots.firstOrNull { shotName(it) != featuredName }
+} catch (e: Exception) {
+    null
 }
 
 // ───────────── ردیف‌های دسته‌بندی ─────────────
