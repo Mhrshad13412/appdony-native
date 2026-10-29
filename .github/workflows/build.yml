@@ -53,6 +53,8 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           AI_KEY: ${{ secrets.AI_KEY }}
+          SUPA_URL: ${{ secrets.SUPA_URL }}
+          SUPA_KEY: ${{ secrets.SUPA_KEY }}
         run: |
           set -o pipefail
           ./gradlew assembleRelease --stacktrace 2>&1 | tee build-log.txt
