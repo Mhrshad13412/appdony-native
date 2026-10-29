@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
+import com.appdony.app.ui.theme.AppdonyGreen
 
 // ───────────────────────── رسم گربه ─────────────────────────
 
@@ -26,7 +27,8 @@ internal class CatPose(
     val lookY: Float,    // نگاه بالا/پایین
     val scare: Float,    // بغل گرفته شدن: چشم درشت‌تر و گوش خوابیده
     val happy: Float,    // چشم‌های خندون ^ ^
-    val wiggle: Float    // قل خوردن گلوله‌ی کاموای کنار پا
+    val wiggle: Float,   // قل خوردن گلوله‌ی کاموای کنار پا
+    val yarn: Color = AppdonyGreen // رنگ کاموا؛ پیش‌فرض رنگ تم برنامه
 )
 
 internal fun DrawScope.drawCat(p: CatPose) {
@@ -59,8 +61,8 @@ internal fun DrawScope.drawCat(p: CatPose) {
                 moveTo((17.4f + k * 0.9f) * u, y * u)
                 quadraticBezierTo(30f * u, (y + 5f) * u, (42.6f - k * 0.9f) * u, y * u)
             }
-            drawPath(wrap, lerp(CatYarn, Color.Black, 0.22f), style = Stroke(width = 2.6f * u, cap = StrokeCap.Round))
-            drawPath(wrap, CatYarn, style = Stroke(width = 1.8f * u, cap = StrokeCap.Round))
+            drawPath(wrap, lerp(p.yarn, Color.Black, 0.22f), style = Stroke(width = 2.6f * u, cap = StrokeCap.Round))
+            drawPath(wrap, p.yarn, style = Stroke(width = 1.8f * u, cap = StrokeCap.Round))
         }
 
         // ── گلوله‌ی کاموای کنار پا + نخی که به بدن وصله ──
@@ -69,8 +71,8 @@ internal fun DrawScope.drawCat(p: CatPose) {
             moveTo(40.5f * u, 49f * u)
             quadraticBezierTo(47f * u, 47f * u, ballC.x, ballC.y - 4.5f * u)
         }
-        drawPath(link, CatYarn, style = Stroke(width = 1.5f * u, cap = StrokeCap.Round))
-        drawYarnBall(ballC, 5.2f * u, CatYarn, p.wiggle * 70f)
+        drawPath(link, p.yarn, style = Stroke(width = 1.5f * u, cap = StrokeCap.Round))
+        drawYarnBall(ballC, 5.2f * u, p.yarn, p.wiggle * 70f)
 
         // ── پنجه‌ها ──
         val dangle = p.scare * 3f
