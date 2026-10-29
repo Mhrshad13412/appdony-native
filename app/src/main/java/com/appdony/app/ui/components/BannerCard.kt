@@ -37,7 +37,7 @@ fun BannerCard(title: String, imageUrl: String?, onClick: () -> Unit, modifier: 
     val context = LocalContext.current
     val imageRequest = ImageRequest.Builder(context).data(imageUrl).size(500, 300).crossfade(true).build()
 
-    Box(modifier = modifier.width(220.dp).height(130.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg).clickable { onClick() }) {
+    Box(modifier = modifier.width(220.dp).height(130.dp).appdonyCard().clickable { onClick() }) {
         SubcomposeAsyncImage(
             model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
             loading = { Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
