@@ -16,6 +16,13 @@ android {
         versionCode = 2935
         versionName = "2.9.35"
 
+        // توکن هوش مصنوعی از متغیر محیطی AI_KEY (GitHub Secret) یا از local.properties می‌آد؛ توی ریپو نمی‌مونه
+        val aiKey = System.getenv("AI_KEY")
+            ?: rootProject.file("local.properties").takeIf { it.exists() }
+                ?.readLines()?.firstOrNull { it.startsWith("AI_KEY=") }?.removePrefix("AI_KEY=")
+            ?: ""
+        buildConfigField("String", "AI_KEY", "\"${aiKey.trim()}\"")
+
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
@@ -90,14 +97,3 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    ksp("androidx.room:room-compiler:$roomVersion")
-
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("org.jsoup:jsoup:1.18.3")
-}
