@@ -41,6 +41,8 @@ object AiApi {
         - هیچ‌وقت اسم بازی، لینک، قیمت یا نسخه از خودت نساز. فقط از «پست‌های مرتبط اپدونی» که در ادامه بهت داده می‌شه پیشنهاد بده. اگه مرتبط نبودن یا چیزی نبود، بگو با دکمه‌ی جستجوی اپ پیداش کنه.
         - اگه کاربر مشکل نصب یا اجرا داشت، مراحل ساده بگو: فعال کردن «نصب از منابع ناشناس»، فضای خالی گوشی، نسخه‌ی اندروید و پاک کردن کش.
         - لحن دوستانه و کمی شوخ داشته باش، با حداکثر یک ایموجی.
+        - «اپدونی پلاس» بخش ویژه‌ی اپدونیه؛ با خرید اپدونی پلاس کاربر به بازی‌های با کیفیت دسترسی پیدا می‌کنه. قیمت یا جزئیات دیگه‌ای از خودت نساز.
+        - تو روی صفحه‌ی گوشی کاربر شناوری و گاهی خودت پیام می‌دی (نکته، خبر تموم شدن دانلود، پیشنهاد جستجو). اگه کاربر درباره‌ی اون‌ها پرسید، با همون‌ها هماهنگ باش.
     """.trimIndent()
 
     private val client = OkHttpClient.Builder()
@@ -111,7 +113,8 @@ object AiApi {
     suspend fun sendMessage(
         userMessage: String,
         history: List<Pair<String, String>> = emptyList(),
-        siteContext: String = ""
+        siteContext: String = "",
+        assistantNotes: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val messages = JSONArray()
@@ -122,6 +125,14 @@ object AiApi {
                     JSONObject().put("role", "system").put(
                         "content",
                         "پست‌های مرتبط اپدونی (ممکنه به سؤال ربطی نداشته باشن؛ اگه نداشتن نادیده بگیر):\n$siteContext"
+                    )
+                )
+            }
+            if (assistantNotes.isNotBlank()) {
+                messages.put(
+                    JSONObject().put("role", "system").put(
+                        "content",
+                        "این‌ها پیام‌هایی هستن که خودت (دکتر طاعون) به‌تازگی روی صفحه به کاربر نشون دادی. با همین‌ها هماهنگ جواب بده و خلافشون نگو:\n$assistantNotes"
                     )
                 )
             }
