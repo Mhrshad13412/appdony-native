@@ -55,9 +55,10 @@ class AiChatViewModel : ViewModel() {
             result.onSuccess { response ->
                 _isOffline.value = false
                 _messages.value = _messages.value + ChatMessage(response, false)
-            }.onFailure {
+            }.onFailure { error ->
                 _isOffline.value = true
-                val reply = LocalDoctor.reply(text)
+                val reply = LocalDoctor.reply(text) +
+                    "\n\n⚠️ ${error.message.orEmpty()}\n(${AiApi.lastDebug})"
                 _messages.value = _messages.value + ChatMessage(reply, false, excludeFromContext = true)
             }
             _isLoading.value = false
