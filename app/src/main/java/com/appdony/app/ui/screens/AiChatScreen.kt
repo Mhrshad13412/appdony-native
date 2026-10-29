@@ -1,31 +1,69 @@
 package com.appdony.app.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdony.app.ui.components.PlagueDoctorAvatar
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val QuickReplies = listOf(
+    "یه بازی پیشنهاد بده 🎮",
+    "نصب نمیشه، کمک کن",
+    "دانلود گیر کرده",
+    "یه برنامه‌ی خوب معرفی کن"
+)
+
 @Composable
 fun AiChatScreen(
     onBack: () -> Unit,
@@ -33,115 +71,230 @@ fun AiChatScreen(
 ) {
     val messages by viewModel.messages.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isOffline by viewModel.isOffline.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    val primary = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(messages.size, isLoading) {
+        val count = messages.size + if (isLoading) 1 else 0
+        if (count > 0) listState.animateScrollToItem(count - 1)
+    }
+
+    fun send(text: String) {
+        if (text.isNotBlank() && !isLoading) {
+            viewModel.sendMessage(text)
+            inputText = ""
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("چت با دکتر طاعون", color = MaterialTheme.colorScheme.onBackground) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = MaterialTheme.colorScheme.onBackground)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.clearChat() }) {
-                        Icon(Icons.Default.Delete, contentDescription = "پاک کردن", tint = MaterialTheme.colorScheme.error)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background).imePadding()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .imePadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { onBack() },
+                contentAlignment = Alignment.Center
             ) {
-                items(messages) { msg ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
-                    ) {
-                        if (!msg.isUser) {
-                            PlagueDoctorAvatar(sizeDp = 40)
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            PlagueDoctorAvatar(sizeDp = 42, hasShadow = false)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("دکتر طاعون", color = MaterialTheme.colorScheme.onBackground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isOffline) Color(0xFFF5A623) else Color(0xFF34C759))
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (isOffline) "حالت آفلاین" else "آماده‌ی کمک",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { viewModel.clearChat() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.DeleteOutline, "پاک کردن", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(messages) { msg -> MessageRow(msg) }
+            if (isLoading) {
+                item {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        PlagueDoctorAvatar(sizeDp = 36, hasShadow = false)
+                        Spacer(Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (msg.isUser) 16.dp else 4.dp, bottomEnd = if (msg.isUser) 4.dp else 16.dp))
-                                .background(if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(12.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
                         ) {
-                            Text(
-                                text = msg.text,
-                                color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                lineHeight = 22.sp
-                            )
-                        }
-                    }
-                }
-                if (isLoading) {
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PlagueDoctorAvatar(sizeDp = 40)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
+                            TypingDots()
                         }
                     }
                 }
             }
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+        if (messages.size <= 2 && !isLoading) {
+            androidx.compose.foundation.lazy.LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { inputText = "یه بازی پیشنهاد بده" },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Email, contentDescription = "پیشنهاد", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                items(QuickReplies) { reply ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .border(BorderStroke(1.dp, primary.copy(alpha = 0.7f)), RoundedCornerShape(18.dp))
+                            .background(primary.copy(alpha = 0.10f))
+                            .clickable { send(reply) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(reply, color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp)
+                    }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) },
-                    shape = RoundedCornerShape(24.dp),
-                    maxLines = 4,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) },
+                shape = RoundedCornerShape(26.dp),
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { send(inputText) }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = primary
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            val canSend = inputText.isNotBlank() && !isLoading
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(if (canSend) primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = canSend) { send(inputText) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "ارسال",
+                    tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageRow(msg: ChatMessage) {
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        if (!msg.isUser) {
+            PlagueDoctorAvatar(sizeDp = 36, hasShadow = false)
+            Spacer(Modifier.width(8.dp))
+        }
+        Box(
+            modifier = Modifier
+                .widthIn(max = 290.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (msg.isUser) 18.dp else 5.dp,
+                        bottomEnd = if (msg.isUser) 5.dp else 18.dp
                     )
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary).clickable {
-                        if (inputText.isNotBlank() && !isLoading) {
-                            viewModel.sendMessage(inputText)
-                            inputText = ""
-                        }
+                .background(if (msg.isUser) primary else MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = msg.text,
+                color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                lineHeight = 23.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun TypingDots() {
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { index ->
+            val a by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 0.25f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 1000
+                        0.25f at (index * 150)
+                        1f at (index * 150 + 250)
+                        0.25f at (index * 150 + 500)
                     },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "ارسال", tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-            }
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "dot$index"
+            )
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .alpha(a)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant)
+            )
         }
     }
 }
