@@ -147,22 +147,18 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
 }
 
 private suspend fun startAppDownload(context: Context, link: DownloadLink, post: Post) {
-    Toast.makeText(context, "در حال آماده‌سازی لینک دانلود...", Toast.LENGTH_SHORT).show()
+    if (link.url.isBlank()) {
+        Toast.makeText(context, "این لینک قفله و هنوز لینک دانلود واقعی نداره", Toast.LENGTH_SHORT).show()
+        return
+    }
+    Toast.makeText(context, "در حال بررسی لینک...", Toast.LENGTH_SHORT).show()
     DownloadHelper.startDownload(context, link.url, post.cleanTitle(), post.featuredImageUrl())
         .onSuccess {
             Toast.makeText(context, "دانلود شروع شد ✓ از بخش «دانلودها» دنبالش کن", Toast.LENGTH_LONG).show()
         }
         .onFailure {
-            // لینک مستقیم فایل پیدا نشد؛ صفحه‌ی دانلود خود سایت رو توی مرورگر باز می‌کنیم
-            try {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-                Toast.makeText(context, "صفحه‌ی دانلود توی مرورگر باز شد", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, it.message ?: "خطا در دریافت لینک", Toast.LENGTH_LONG).show()
-            }
+            // لینک خراب وارد صف دانلود نمی‌شه؛ فقط دلیلش رو نشون می‌دیم
+            Toast.makeText(context, it.message ?: "این لینک کار نمی‌کنه", Toast.LENGTH_LONG).show()
         }
 }
 
@@ -265,26 +261,43 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
             }
         } else {
             info.downloadLinks.forEachIndexed { index, link ->
+                val locked = link.url.isBlank()
+                val isPrimary = index == 0 && !locked
                 Button(
                     onClick = { onDownload(link) },
+                    enabled = !locked,
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (index == 0) primary else AppdonyCardBg)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPrimary) primary else AppdonyCardBg,
+                        disabledContainerColor = AppdonyCardBg.copy(alpha = 0.6f)
+                    )
                 ) {
-                    Icon(Icons.Default.Download, null, tint = if (index == 0) Color.White else AppdonyTextPrimary)
+                    Icon(
+                        if (locked) Icons.Default.Lock else Icons.Default.Download, null,
+                        tint = when {
+                            locked -> AppdonyTextMuted
+                            isPrimary -> Color.White
+                            else -> AppdonyTextPrimary
+                        }
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = link.title,
-                        color = if (index == 0) Color.White else AppdonyTextPrimary,
+                        color = when {
+                            locked -> AppdonyTextMuted
+                            isPrimary -> Color.White
+                            else -> AppdonyTextPrimary
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    if (link.size != null) {
+                    if (link.size != null && !locked) {
                         Spacer(Modifier.width(8.dp))
-                        Text(link.size, color = if (index == 0) Color.White.copy(alpha = 0.8f) else AppdonyTextMuted, fontSize = 12.sp)
+                        Text(link.size, color = if (isPrimary) Color.White.copy(alpha = 0.8f) else AppdonyTextMuted, fontSize = 12.sp)
                     }
                 }
             }
