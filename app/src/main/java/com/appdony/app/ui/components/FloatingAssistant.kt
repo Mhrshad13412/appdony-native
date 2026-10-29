@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -87,6 +88,8 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -117,54 +120,85 @@ private val GoldColor = Color(0xFFFFB300)
 private val GreenColor = Color(0xFF34C759)
 private val RedColor = Color(0xFFFF6B6B)
 
-// ───────────────────────── آیکن دکتر طاعون: کلاه و سر جدا از هم ─────────────────────────
+// ───────────────────────── رسم دکتر طاعون (سر با منقار بلند) ─────────────────────────
 
-private val DoctorHatIcon: ImageVector by lazy {
-    ImageVector.Builder("DoctorHat", 24.dp, 24.dp, 24f, 24f).apply {
-        path(
-            fill = null,
-            stroke = SolidColor(Color.Black),
-            strokeLineWidth = 1.8f,
-            strokeLineCap = StrokeCap.Round,
-            strokeLineJoin = StrokeJoin.Round
-        ) {
-            moveTo(4f, 8f)
-            horizontalLineTo(20f)
-            moveTo(7.5f, 8f)
-            verticalLineTo(5.5f)
-            quadTo(7.5f, 3.5f, 9.5f, 3.5f)
-            horizontalLineTo(14.5f)
-            quadTo(16.5f, 3.5f, 16.5f, 5.5f)
-            verticalLineTo(8f)
-        }
-    }.build()
-}
+/**
+ * دکتر طاعون روی بوم ۶۰×۶۰ رسم می‌شه و منقارش جون داره:
+ * موقع حرف زدن باز و بسته می‌شه، موقع بیرون آوردن بطری‌ها باز می‌شه
+ * و بطری رو سر منقار نگه می‌داره. [face] جهت نگاهه (۱ راست، ‎-۱ چپ).
+ */
+private fun DrawScope.drawDoctor(
+    face: Float,
+    openDeg: Float,
+    ink: Color,
+    fill: Color,
+    potionAlpha: Float,
+    wave: Float
+) {
+    val u = 1.dp.toPx()
+    val sw = 1.8f * u
+    fun pt(x: Float, y: Float) = Offset(x * u, y * u)
 
-private val DoctorHeadIcon: ImageVector by lazy {
-    ImageVector.Builder("DoctorHead", 24.dp, 24.dp, 24f, 24f).apply {
-        path(
-            fill = null,
-            stroke = SolidColor(Color.Black),
-            strokeLineWidth = 1.8f,
-            strokeLineCap = StrokeCap.Round,
-            strokeLineJoin = StrokeJoin.Round
-        ) {
-            moveTo(8.5f, 8f)
-            verticalLineTo(11f)
-            quadTo(8.5f, 12f, 7.5f, 12.8f)
-            lineTo(3f, 17.5f)
-            lineTo(9.5f, 16.3f)
-            quadTo(11.5f, 18f, 13.5f, 17.8f)
-            quadTo(16.5f, 17f, 16.5f, 13.5f)
-            verticalLineTo(8f)
-        }
-        path(fill = SolidColor(Color.Black)) {
-            moveTo(11.5f, 11.5f)
-            arcToRelative(1.1f, 1.1f, 0f, true, false, 2.2f, 0f)
-            arcToRelative(1.1f, 1.1f, 0f, true, false, -2.2f, 0f)
+    withTransform({ scale(face, 1f, pt(30f, 30f)) }) {
+        // یقه‌ی ردا
+        val collar = androidx.compose.ui.graphics.Path().apply {
+            moveTo(12f * u, 58f * u)
+            lineTo(19f * u, 44f * u)
+            quadraticBezierTo(27f * u, 49f * u, 35f * u, 44f * u)
+            lineTo(42f * u, 58f * u)
             close()
         }
-    }.build()
+        drawPath(collar, fill)
+        drawPath(collar, ink, style = Stroke(width = sw, join = StrokeJoin.Round))
+
+        // سر
+        drawOval(fill, pt(14f, 17f), Size(24f * u, 28f * u))
+        drawOval(ink, pt(14f, 17f), Size(24f * u, 28f * u), style = Stroke(width = sw))
+
+        // چشم
+        drawCircle(ink, 3.4f * u, pt(29.5f, 27f), style = Stroke(width = 1.5f * u))
+        drawCircle(ink, 1.3f * u, pt(30f, 27f))
+
+        // فک پایین (می‌چرخه و باز می‌شه)
+        withTransform({ rotate(openDeg, pt(33f, 37f)) }) {
+            val lower = androidx.compose.ui.graphics.Path().apply {
+                moveTo(33f * u, 36.5f * u)
+                cubicTo(40f * u, 39f * u, 46f * u, 43f * u, 51f * u, 48f * u)
+                cubicTo(44f * u, 47f * u, 38f * u, 44f * u, 33f * u, 41f * u)
+                close()
+            }
+            drawPath(lower, fill)
+            drawPath(lower, ink, style = Stroke(width = sw * 0.85f, join = StrokeJoin.Round))
+        }
+
+        // منقار بالا
+        val upper = androidx.compose.ui.graphics.Path().apply {
+            moveTo(32f * u, 24f * u)
+            cubicTo(42f * u, 23f * u, 51f * u, 30f * u, 56f * u, 44f * u)
+            cubicTo(48f * u, 42f * u, 40f * u, 39f * u, 33f * u, 36f * u)
+            close()
+        }
+        drawPath(upper, fill)
+        drawPath(upper, ink, style = Stroke(width = sw, join = StrokeJoin.Round))
+        drawCircle(ink, 0.9f * u, pt(40f, 30.5f))
+
+        // کلاه
+        val crown = androidx.compose.ui.graphics.Path().apply {
+            moveTo(16f * u, 19f * u)
+            lineTo(16f * u, 11f * u)
+            quadraticBezierTo(16f * u, 8.5f * u, 18.5f * u, 8.5f * u)
+            lineTo(31.5f * u, 8.5f * u)
+            quadraticBezierTo(34f * u, 8.5f * u, 34f * u, 11f * u)
+            lineTo(34f * u, 19f * u)
+        }
+        drawPath(crown, fill)
+        drawPath(crown, ink, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawLine(ink, pt(16f, 15.5f), pt(34f, 15.5f), strokeWidth = 1.2f * u)
+        drawLine(ink, pt(11f, 19f), pt(39f, 19f), strokeWidth = 2.2f * u, cap = StrokeCap.Round)
+
+        // بطری سر منقار
+        drawPotion(pt(50f, 24f), 16f * u, ink, potionAlpha, wave)
+    }
 }
 
 // ───────────────────────── حرکت‌ها ─────────────────────────
@@ -174,57 +208,22 @@ private class AvatarMotion {
     val offY = Animatable(0f)
     val hideShift = Animatable(0f)
     val tilt = Animatable(0f)
-    val hatAngle = Animatable(0f)
-    val hatX = Animatable(0f)
-    val hatY = Animatable(0f)
-    val hop = Animatable(0f)
 
-    // کلاه وقتی از سر جدا شده (مختصات روی صفحه)
-    val wx = Animatable(0f)
-    val wy = Animatable(0f)
-    val wAngle = Animatable(0f)
-
-    // پیشرفت باز شدن چهار بطری منو
+    // پیشرفت باز شدن بطری‌های منو
     val menuProg = List(3) { Animatable(0f) }
 
-    // مسیر بطری‌ها موقع بررسی لینک: ۰ بالای صفحه، ۱ کشیده‌شده پایین، ۲ غلتیده سمت راست، ۳ برگشته تو جیب
+    // مسیر بطری‌ها موقع بررسی لینک: ۰ بالای صفحه، ۱ کشیده‌شده پایین، ۲ غلتیده سمت راست، ۳ برگشته تو منقار
     val dlPos = List(3) { Animatable(0f) }
     var dlJob: Job? = null
 
-    var hatDown = false
-    var hatJob: Job? = null
-    var retrieveJob: Job? = null
-    var busy = false
-    var ignoreDrag = false
-    var fastCount = 0
     var lastLean = 0f
 
-    suspend fun lean(target: Float) = coroutineScope {
-        launch { tilt.animateTo(target, spring(0.8f, Spring.StiffnessLow)) }
-        launch { hatAngle.animateTo(-target * 1.9f, spring(0.55f, Spring.StiffnessVeryLow)) }
-        launch { hatY.animateTo(-abs(target) * 0.3f, spring(0.6f, Spring.StiffnessLow)) }
+    suspend fun lean(target: Float) {
+        tilt.animateTo(target, spring(0.8f, Spring.StiffnessLow))
     }
 
-    suspend fun relax() = coroutineScope {
-        launch { tilt.animateTo(0f, spring(0.35f, Spring.StiffnessLow)) }
-        launch { hatAngle.animateTo(0f, spring(0.28f, Spring.StiffnessVeryLow)) }
-        launch { hatY.animateTo(0f, spring(0.4f, Spring.StiffnessLow)) }
-    }
-
-    suspend fun dropHat(dir: Float, sidePx: Float, fallPx: Float) = coroutineScope {
-        launch { hatX.animateTo(dir * sidePx, spring(0.55f, Spring.StiffnessLow)) }
-        launch { hatAngle.animateTo(dir * 68f, spring(0.45f, Spring.StiffnessLow)) }
-        launch { hatY.animateTo(fallPx, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
-    }
-
-    suspend fun pickUpHat(hopPx: Float) = coroutineScope {
-        launch {
-            hop.animateTo(-hopPx, spring(0.5f, Spring.StiffnessMedium))
-            hop.animateTo(0f, spring(0.45f, Spring.StiffnessLow))
-        }
-        launch { hatX.animateTo(0f, spring(0.7f, Spring.StiffnessLow)) }
-        launch { hatAngle.animateTo(0f, spring(0.5f, Spring.StiffnessLow)) }
-        launch { hatY.animateTo(0f, spring(0.55f, Spring.StiffnessLow)) }
+    suspend fun relax() {
+        tilt.animateTo(0f, spring(0.35f, Spring.StiffnessLow))
     }
 }
 
@@ -240,7 +239,7 @@ private object AssistantPhrases {
         "هر وقت خواستی با من چت کن؛ نسخه‌ی بازی هم می‌پیچم!",
         "فضای گوشیت پره؟ قبل از نصب بازی‌های بزرگ یه نگاهی بهش بنداز.",
         "اگه نصب نشد، گزینه‌ی «نصب از منابع ناشناس» رو چک کن.",
-        "منو بگیر و هر جا خواستی ببر؛ ناراحت نمی‌شم 😉 فقط خیلی تند نبر، کلاهم می‌افته!",
+        "منو بگیر و هر جا خواستی ببر؛ ناراحت نمی‌شم 😉",
         "از تنظیمات می‌تونی رنگ برنامه و اندازه‌ی نوشته‌ها رو عوض کنی.",
         "اگه مزاحمتم، از تنظیمات می‌تونی منو مخفی کنی... ولی دلم برات تنگ می‌شه.",
         "علاقه‌مندی‌هات رو از منوی حساب کاربری پیدا می‌کنی.",
@@ -466,7 +465,6 @@ fun FloatingAssistant(
     var showMenu by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
-    var hatDetached by remember { mutableStateOf(false) }
     var bubbleSay by remember { mutableStateOf<AssistantSay?>(null) }
     var lastSay by remember { mutableStateOf(AssistantSay("")) }
     var activity by remember { mutableIntStateOf(0) }
@@ -498,127 +496,6 @@ fun FloatingAssistant(
             val bottomLimit = (hPx - bottomInset - barPx - sizePx - with(density) { 6.dp.toPx() })
                 .coerceAtLeast(topLimit)
 
-            val hopPx = with(density) { 8.dp.toPx() }
-            val sidePx = with(density) { 46.dp.toPx() }
-            val fallPx = with(density) { 42.dp.toPx() }
-            val iconPx = with(density) { 34.dp.toPx() }
-            val iconInsetPx = with(density) { 13.dp.toPx() }
-
-            fun dropHatNow() {
-                motion.hatJob?.cancel()
-                motion.hatJob = scope.launch {
-                    motion.hatDown = true
-                    motion.dropHat(if (onRight) -1f else 1f, sidePx, fallPx)
-                    delay(1500)
-                    motion.pickUpHat(hopPx)
-                    motion.hatDown = false
-                }
-            }
-
-            fun pickUpNow() {
-                if (!motion.hatDown) return
-                motion.hatJob?.cancel()
-                motion.hatJob = scope.launch {
-                    motion.pickUpHat(hopPx)
-                    motion.hatDown = false
-                }
-            }
-
-            /**
-             * حرکت خیلی تند: کلاه می‌پره، می‌افته روی نوار پایینی (یا پایین صفحه)،
-             * بعد دکتر می‌دوه و برش می‌داره و برمی‌گرده کنار صفحه.
-             */
-            fun flingHat(dirX: Float) {
-                if (motion.busy) return
-                motion.hatJob?.cancel()
-                motion.hatDown = false
-                motion.busy = true
-                motion.retrieveJob = scope.launch {
-                    expanded = false
-                    bubbleSay = null
-
-                    val startX = motion.offX.value + motion.hideShift.value + iconInsetPx
-                    val startY = motion.offY.value + iconInsetPx
-                    motion.wx.snapTo(startX)
-                    motion.wy.snapTo(startY)
-                    motion.wAngle.snapTo(motion.hatAngle.value)
-                    motion.hatX.snapTo(0f)
-                    motion.hatY.snapTo(0f)
-                    motion.hatAngle.snapTo(0f)
-                    hatDetached = true
-
-                    // کف: روی نوار پایینی، یا نزدیک پایین صفحه
-                    val floorY = if (barVisible) {
-                        hPx - bottomInset - barPx - iconPx * 0.33f
-                    } else {
-                        hPx - bottomInset - with(density) { 30.dp.toPx() }
-                    }
-                    val flyX = (70..150).random() * density.density
-                    val targetX = (startX + dirX * flyX).coerceIn(marginPx, wPx - iconPx - marginPx)
-                    val up = with(density) { 50.dp.toPx() }
-                    val bounce1 = with(density) { 16.dp.toPx() }
-                    val bounce2 = with(density) { 6.dp.toPx() }
-
-                    coroutineScope {
-                        launch { motion.wx.animateTo(targetX, tween(950, easing = LinearOutSlowInEasing)) }
-                        launch {
-                            motion.wAngle.animateTo(
-                                motion.wAngle.value + dirX * 540f,
-                                tween(950, easing = LinearOutSlowInEasing)
-                            )
-                        }
-                        launch {
-                            motion.wy.animateTo((startY - up).coerceAtLeast(0f), tween(260, easing = LinearOutSlowInEasing))
-                            motion.wy.animateTo(floorY, tween(620, easing = FastOutLinearInEasing))
-                            motion.wy.animateTo(floorY - bounce1, tween(150, easing = LinearOutSlowInEasing))
-                            motion.wy.animateTo(floorY, tween(150, easing = FastOutLinearInEasing))
-                            motion.wy.animateTo(floorY - bounce2, tween(90, easing = LinearOutSlowInEasing))
-                            motion.wy.animateTo(floorY, tween(90, easing = FastOutLinearInEasing))
-                        }
-                    }
-
-                    delay(500)
-                    while (dragging) delay(60)
-
-                    // دکتر می‌دوه کنار کلاه
-                    hidden = false
-                    val hatCenterX = motion.wx.value + iconPx / 2f
-                    val myCenterX = motion.offX.value + sizePx / 2f
-                    val runDir = if (hatCenterX >= myCenterX) 1f else -1f
-                    val standX = (hatCenterX - sizePx / 2f - runDir * sizePx * 0.55f).coerceIn(0f, wPx - sizePx)
-                    coroutineScope {
-                        launch { motion.tilt.animateTo(runDir * 12f, spring(0.6f, Spring.StiffnessMedium)) }
-                        launch { motion.offX.animateTo(standX, spring(0.9f, Spring.StiffnessLow)) }
-                        launch { motion.offY.animateTo(bottomLimit, spring(0.8f, Spring.StiffnessMediumLow)) }
-                    }
-                    launch { motion.tilt.animateTo(0f, spring(0.35f, Spring.StiffnessLow)) }
-
-                    // کلاه رو برمی‌داره
-                    val ax = motion.offX.value
-                    val ay = motion.offY.value
-                    var ang = motion.wAngle.value % 360f
-                    if (ang > 180f) ang -= 360f
-                    if (ang < -180f) ang += 360f
-                    motion.hatX.snapTo(motion.wx.value - (ax + iconInsetPx))
-                    motion.hatY.snapTo(motion.wy.value - (ay + iconInsetPx))
-                    motion.hatAngle.snapTo(ang)
-                    hatDetached = false
-                    motion.pickUpHat(hopPx)
-                    delay(300)
-
-                    // برمی‌گرده کنار صفحه
-                    val right = motion.offX.value + sizePx / 2f > wPx / 2f
-                    onRight = right
-                    lowerHalf = motion.offY.value + sizePx / 2f > hPx / 2f
-                    motion.offX.animateTo(
-                        if (right) wPx - sizePx - marginPx else marginPx,
-                        spring(0.65f, Spring.StiffnessLow)
-                    )
-                    motion.busy = false
-                    activity++
-                }
-            }
-
             // جای اولیه: پایین-چپ، بالای نوار پایینی
             LaunchedEffect(wPx, hPx) {
                 if (!ready && wPx > 0f && hPx > 0f) {
@@ -633,7 +510,7 @@ fun FloatingAssistant(
             }
 
             LaunchedEffect(ready, topLimit, bottomLimit) {
-                if (ready && !motion.busy) {
+                if (ready) {
                     val ty = motion.offY.value.coerceIn(topLimit, bottomLimit)
                     if (ty != motion.offY.value) {
                         motion.offY.animateTo(ty, spring(0.8f, Spring.StiffnessLow))
@@ -642,7 +519,7 @@ fun FloatingAssistant(
                 }
             }
             LaunchedEffect(ready, wPx) {
-                if (ready && !motion.busy) {
+                if (ready) {
                     motion.offX.snapTo(if (onRight) wPx - sizePx - marginPx else marginPx)
                 }
             }
@@ -655,7 +532,7 @@ fun FloatingAssistant(
             val bodyAlpha by animateFloatAsState(if (hidden) 0.38f else 1f, tween(500), label = "assistant_alpha")
 
             LaunchedEffect(activity, expanded, bubbleSay, dragging, hidden, ready, visible) {
-                if (ready && visible && !expanded && bubbleSay == null && !dragging && !hidden && !motion.busy) {
+                if (ready && visible && !expanded && bubbleSay == null && !dragging && !hidden) {
                     delay(12_000)
                     hidden = true
                 }
@@ -687,7 +564,7 @@ fun FloatingAssistant(
             LaunchedEffect(ready) {
                 if (!ready) return@LaunchedEffect
                 AssistantBus.events.collect { say ->
-                    if (visibleNow && !dragging && !motion.busy) {
+                    if (visibleNow && !dragging) {
                         expanded = false
                         speak(say, 9_000)
                     }
@@ -701,7 +578,7 @@ fun FloatingAssistant(
                 AssistantBus.download.collect { phase ->
                     when (phase) {
                         DownloadPhase.CHECKING -> {
-                            if (!visibleNow || dragging || motion.busy) return@collect
+                            if (!visibleNow || dragging) return@collect
                             motion.dlJob?.cancel()
                             hidden = false
                             expanded = false
@@ -782,7 +659,7 @@ fun FloatingAssistant(
                 if (!ready) return@LaunchedEffect
                 delay(7_000)
                 while (true) {
-                    if (visibleNow && !expanded && !dragging && !motion.busy && bubbleSay == null) {
+                    if (visibleNow && !expanded && !dragging && bubbleSay == null) {
                         val say = if (Random.nextFloat() < 0.15f) {
                             fetchSuggestion() ?: AssistantPhrases.next(routeNow)
                         } else {
@@ -814,9 +691,15 @@ fun FloatingAssistant(
                 label = "speak"
             )
             val upW by animateFloatAsState(
-                targetValue = if (dragging || hatDetached) 1f else 0f,
+                targetValue = if (dragging) 1f else 0f,
                 animationSpec = spring(0.6f, Spring.StiffnessLow),
                 label = "hands_up"
+            )
+            // جهت نگاه: همیشه به داخل صفحه؛ موقع عوض شدن طرف، نرم برمی‌گرده
+            val face by animateFloatAsState(
+                targetValue = if (onRight) -1f else 1f,
+                animationSpec = spring(0.7f, Spring.StiffnessLow),
+                label = "face"
             )
             val bobPx = with(density) { 4.dp.toPx() }
             val talkPx = with(density) { 5.dp.toPx() }
@@ -916,33 +799,26 @@ fun FloatingAssistant(
                                     detectTapGestures(
                                         onTap = {
                                             activity++
-                                            pickUpNow()
                                             if (hidden) {
                                                 hidden = false
-                                            } else if (!motion.busy) {
+                                            } else {
                                                 bubbleSay = null
                                                 expanded = !expanded
                                             }
                                         }
                                     )
                                 }
-                                .pointerInput(wPx, hPx, topLimit, bottomLimit, barVisible) {
+                                .pointerInput(wPx, hPx, topLimit, bottomLimit) {
                                     detectDragGestures(
                                         onDragStart = {
-                                            motion.ignoreDrag = motion.busy
-                                            if (!motion.ignoreDrag) {
-                                                dragging = true
-                                                expanded = false
-                                                bubbleSay = null
-                                                hidden = false
-                                                activity++
-                                                motion.fastCount = 0
-                                                pickUpNow()
-                                            }
+                                            dragging = true
+                                            expanded = false
+                                            bubbleSay = null
+                                            hidden = false
+                                            activity++
                                         },
                                         onDrag = { change, drag ->
                                             change.consume()
-                                            if (motion.ignoreDrag) return@detectDragGestures
                                             scope.launch {
                                                 motion.offX.snapTo(
                                                     (motion.offX.value + drag.x).coerceIn(0f, wPx - sizePx)
@@ -956,28 +832,11 @@ fun FloatingAssistant(
                                                 motion.lastLean = target
                                                 scope.launch { motion.lean(target) }
                                             }
-
-                                            // سرعت: چند رویداد پشت‌سرهم خیلی تند ← کلاه می‌پره
-                                            val dt = (change.uptimeMillis - change.previousUptimeMillis).coerceAtLeast(1L)
-                                            val speedDpMs = drag.getDistance() / dt / density.density
-                                            if (speedDpMs > 2.5f) motion.fastCount++ else motion.fastCount = 0
-                                            if (motion.fastCount >= 3 && !motion.busy) {
-                                                flingHat(if (drag.x >= 0f) 1f else -1f)
-                                            }
                                         },
                                         onDragEnd = {
-                                            if (motion.ignoreDrag) {
-                                                motion.ignoreDrag = false
-                                                return@detectDragGestures
-                                            }
                                             dragging = false
                                             activity++
                                             motion.lastLean = 0f
-                                            if (motion.busy) {
-                                                // برنامه‌ی «برداشتن کلاه» خودش جای دکتر رو مرتب می‌کنه
-                                                scope.launch { motion.tilt.animateTo(0f, spring(0.35f, Spring.StiffnessLow)) }
-                                                return@detectDragGestures
-                                            }
                                             scope.launch {
                                                 launch { motion.relax() }
                                                 val right = motion.offX.value + sizePx / 2f > wPx / 2f
@@ -985,18 +844,11 @@ fun FloatingAssistant(
                                                 val tx = if (right) wPx - sizePx - marginPx else marginPx
                                                 val ty = motion.offY.value.coerceIn(topLimit, bottomLimit)
                                                 lowerHalf = ty + sizePx / 2f > hPx / 2f
-                                                val touchedBar = barVisible &&
-                                                    ty >= bottomLimit - with(density) { 14.dp.toPx() }
                                                 launch { motion.offX.animateTo(tx, spring(0.65f, Spring.StiffnessLow)) }
                                                 launch { motion.offY.animateTo(ty, spring(0.75f, Spring.StiffnessMediumLow)) }
-                                                if (touchedBar) dropHatNow()
                                             }
                                         },
                                         onDragCancel = {
-                                            if (motion.ignoreDrag) {
-                                                motion.ignoreDrag = false
-                                                return@detectDragGestures
-                                            }
                                             dragging = false
                                             motion.lastLean = 0f
                                             scope.launch { motion.relax() }
@@ -1011,10 +863,11 @@ fun FloatingAssistant(
                                         alpha = bodyAlpha
                                         transformOrigin = TransformOrigin(0.5f, 1f)
                                         rotationZ = motion.tilt.value
-                                        translationY = bob * bobPx - jelly.value * jellyPx + motion.hop.value
+                                        translationY = bob * bobPx - jelly.value * jellyPx
                                         scaleY = 1f + 0.12f * jelly.value
                                         scaleX = 1f - 0.08f * jelly.value
-                                    },
+                                    }
+                                    .semantics { contentDescription = "دستیار" },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Surface(
@@ -1025,47 +878,9 @@ fun FloatingAssistant(
                                     shadowElevation = 10.dp,
                                     content = {}
                                 )
-                                Icon(
-                                    imageVector = DoctorHeadIcon,
-                                    contentDescription = "دستیار",
-                                    tint = primary,
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .graphicsLayer { translationY = -6.dp.toPx() }
-                                )
 
-                                // ── دست‌ها (و بطری معجون موقع حرف زدن) ──
+                                // دکتر طاعون؛ منقارش با حرف زدن و بیرون آوردن بطری‌ها باز و بسته می‌شه
                                 Canvas(modifier = Modifier.matchParentSize()) {
-                                    val u = 1.dp.toPx()
-                                    val offerRight = !onRight
-                                    val shoulderL = Offset(24.3f * u, 41.5f * u)
-                                    val shoulderR = Offset(35.7f * u, 41.5f * u)
-                                    val sway = (bob - 0.5f) * 2f * 1.2f * u
-                                    val w = (talk - 0.5f) * 2f
-
-                                    // بدنه (ردا) زیر سر؛ دست‌ها از کنارش بیرون میان و به سر نمی‌چسبن
-                                    val robe = androidx.compose.ui.graphics.Path().apply {
-                                        moveTo(25.5f * u, 37f * u)
-                                        lineTo(34.5f * u, 37f * u)
-                                        lineTo(39f * u, 54f * u)
-                                        lineTo(21f * u, 54f * u)
-                                        close()
-                                    }
-                                    drawPath(robe, surfaceColor)
-                                    drawPath(
-                                        robe, primary,
-                                        style = Stroke(width = 1.6f * u, join = StrokeJoin.Round)
-                                    )
-
-                                    // جیب ردا
-                                    drawRoundRect(
-                                        color = primary.copy(alpha = 0.85f),
-                                        topLeft = Offset(27.5f * u, 45f * u),
-                                        size = Size(7.5f * u, 6.5f * u),
-                                        cornerRadius = CornerRadius(1.5f * u),
-                                        style = Stroke(width = 1.2f * u)
-                                    )
-                                    // هر بار که بطری‌ای از جیب درمیاد، دست راست می‌ره سراغ جیب
                                     var reach = 0f
                                     motion.menuProg.forEach { p ->
                                         val v = p.value
@@ -1074,84 +889,22 @@ fun FloatingAssistant(
                                             if (r > reach) reach = r
                                         }
                                     }
-                                    val pocketHand = Offset(33f * u, 47.5f * u)
-
-                                    val restL = Offset(16f * u, 50f * u + sway)
-                                    val restR = Offset(44f * u, 50f * u - sway)
-                                    val offerPoint = Offset(
-                                        (if (offerRight) 51f else 9f) * u,
-                                        (37f - 1.5f * talk) * u
+                                    val open = maxOf(talk * speakAmt * 16f, reach * 14f, upW * 10f)
+                                    drawDoctor(
+                                        face = face,
+                                        openDeg = open,
+                                        ink = primary,
+                                        fill = surfaceColor,
+                                        potionAlpha = speakAmt * (1f - upW),
+                                        wave = bob
                                     )
-                                    val upL = Offset(9f * u, (31f + w * 3f) * u)
-                                    val upR = Offset(51f * u, (31f - w * 3f) * u)
-
-                                    var handL = mix(restL, if (!offerRight) offerPoint else restL, speakAmt)
-                                    var handR = mix(restR, if (offerRight) offerPoint else restR, speakAmt)
-                                    handR = mix(handR, pocketHand, reach)
-                                    handL = mix(handL, upL, upW)
-                                    handR = mix(handR, upR, upW)
-
-                                    // بطری توی دستِ سمت کاربر
-                                    val offerHand = if (offerRight) handR else handL
-                                    drawPotion(
-                                        center = Offset(
-                                            offerHand.x + (if (offerRight) 4.5f else -4.5f) * u,
-                                            offerHand.y - 8f * u
-                                        ),
-                                        size = 16f * u,
-                                        color = primary,
-                                        alpha = speakAmt * (1f - upW)
-                                    )
-
-                                    fun arm(shoulder: Offset, hand: Offset) {
-                                        drawLine(
-                                            color = primary,
-                                            start = shoulder,
-                                            end = hand,
-                                            strokeWidth = 2.2f * u,
-                                            cap = StrokeCap.Round
-                                        )
-                                        drawCircle(surfaceColor, 2.7f * u, hand)
-                                        drawCircle(primary, 2.7f * u, hand, style = Stroke(width = 1.6f * u))
-                                    }
-                                    arm(shoulderL, handL)
-                                    arm(shoulderR, handR)
                                 }
-
-                                Icon(
-                                    imageVector = DoctorHatIcon,
-                                    contentDescription = null,
-                                    tint = primary,
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .graphicsLayer {
-                                            alpha = if (hatDetached) 0f else 1f
-                                            transformOrigin = TransformOrigin(0.5f, 0.28f)
-                                            translationX = motion.hatX.value
-                                            translationY = motion.hatY.value - 6.dp.toPx() - jelly.value * 2f * density.density
-                                            rotationZ = motion.hatAngle.value
-                                        }
-                                )
                             }
-                        }
-
-                        // ── کلاهِ افتاده روی نوار پایینی ──
-                        if (hatDetached) {
-                            Icon(
-                                imageVector = DoctorHatIcon,
-                                contentDescription = null,
-                                tint = primary,
-                                modifier = Modifier
-                                    .layoutId("hat")
-                                    .size(34.dp)
-                                    .graphicsLayer { rotationZ = motion.wAngle.value }
-                            )
                         }
                     }
                 ) { measurables, constraints ->
                     val avatarM = measurables.first { it.layoutId == "avatar" }
                     val extrasM = measurables.first { it.layoutId == "extras" }
-                    val hatM = measurables.firstOrNull { it.layoutId == "hat" }
                     val avatarSizeInt = sizePx.roundToInt()
                     val marginInt = marginPx.roundToInt()
                     val gapInt = with(density) { 10.dp.roundToPx() }
@@ -1163,7 +916,6 @@ fun FloatingAssistant(
 
                     val avatarP = avatarM.measure(Constraints.fixed(avatarSizeInt, avatarSizeInt))
                     val extrasP = extrasM.measure(Constraints(maxWidth = maxExtrasW))
-                    val hatP = hatM?.measure(Constraints())
                     val itemPs = List(3) { i ->
                         measurables.firstOrNull { it.layoutId == "item$i" }
                             ?.measure(Constraints(maxWidth = itemMaxW))
@@ -1193,9 +945,9 @@ fun FloatingAssistant(
 
                         avatarP.place(baseX + motion.hideShift.value.roundToInt(), ay)
 
-                        // بطری‌ها از جیبِ ردا شروع می‌کنن، کمی بالا میان و بعد می‌رن سرجاشون
-                        val pocketX = baseX + with(density) { 31.25.dp.toPx() }
-                        val pocketY = ay + with(density) { 48.25.dp.toPx() }
+                        // بطری‌ها از سر منقار شروع می‌کنن، کمی بالا میان و بعد می‌رن سرجاشون
+                        val pocketX = baseX + with(density) { (30f + 25f * face).dp.toPx() }
+                        val pocketY = ay + with(density) { 42.dp.toPx() }
                         val liftPx = with(density) { 24.dp.toPx() }
                         itemPs.forEachIndexed { i, p ->
                             if (p != null) {
@@ -1244,7 +996,6 @@ fun FloatingAssistant(
                             }
                         }
 
-                        hatP?.place(motion.wx.value.roundToInt(), motion.wy.value.roundToInt())
                     }
                 }
             }
