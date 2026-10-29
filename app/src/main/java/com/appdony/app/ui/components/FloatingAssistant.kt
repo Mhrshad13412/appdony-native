@@ -182,7 +182,7 @@ private class AvatarMotion {
     val wAngle = Animatable(0f)
 
     // پیشرفت باز شدن چهار بطری منو
-    val menuProg = List(4) { Animatable(0f) }
+    val menuProg = List(3) { Animatable(0f) }
 
     var hatDown = false
     var hatJob: Job? = null
@@ -447,11 +447,12 @@ fun FloatingAssistant(
     // ترتیب: چت، راهنما، دانلودها، جستجو  ←  زاویه‌ی هر بطری نسبت به جهت «داخل صفحه»
     val items = listOf(
         Triple(Icons.Outlined.ChatBubbleOutline, "چت با دکتر", onChatClick),
-        Triple(Icons.Outlined.Info, "راهنما", onHelpClick),
         Triple(Icons.Outlined.Download, "دانلودها", onDownloadsClick),
         Triple(Icons.Outlined.Search, "جستجو", onSearchClick)
     )
-    val angles = listOf(-35f, 35f, 90f, -90f)
+    // رنگ مایع هر بطری (آیکن‌ها با رنگ متن می‌شینن و همیشه خوانان)
+    val potionColors = listOf(Color(0xFF4FC3F7), Color(0xFF66BB6A), Color(0xFFFFB300))
+    val angles = listOf(0f, 62f, -62f)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -637,8 +638,8 @@ fun FloatingAssistant(
                 coroutineScope {
                     motion.menuProg.forEachIndexed { i, a ->
                         launch {
-                            delay(if (expanded) i * 55L else (3 - i) * 30L)
-                            a.animateTo(if (expanded) 1f else 0f, spring(0.55f, Spring.StiffnessMediumLow))
+                            delay(if (expanded) 120L + i * 230L else (2 - i) * 120L)
+                            a.animateTo(if (expanded) 1f else 0f, spring(0.62f, Spring.StiffnessLow))
                         }
                     }
                 }
@@ -762,6 +763,7 @@ fun FloatingAssistant(
                                     PotionButton(
                                         icon = icon,
                                         label = label,
+                                        tint = potionColors[i],
                                         progress = { motion.menuProg[i].value },
                                         bob = { bob },
                                         flip = if (i % 2 == 0) 1f else -1f,
@@ -927,6 +929,25 @@ fun FloatingAssistant(
                                         style = Stroke(width = 1.6f * u, join = StrokeJoin.Round)
                                     )
 
+                                    // جیب ردا
+                                    drawRoundRect(
+                                        color = primary.copy(alpha = 0.85f),
+                                        topLeft = Offset(27.5f * u, 45f * u),
+                                        size = Size(7.5f * u, 6.5f * u),
+                                        cornerRadius = CornerRadius(1.5f * u),
+                                        style = Stroke(width = 1.2f * u)
+                                    )
+                                    // هر بار که بطری‌ای از جیب درمیاد، دست راست می‌ره سراغ جیب
+                                    var reach = 0f
+                                    motion.menuProg.forEach { p ->
+                                        val v = p.value
+                                        if (v > 0f && v < 0.45f) {
+                                            val r = sin(Math.PI * v / 0.45).toFloat()
+                                            if (r > reach) reach = r
+                                        }
+                                    }
+                                    val pocketHand = Offset(33f * u, 47.5f * u)
+
                                     val restL = Offset(16f * u, 50f * u + sway)
                                     val restR = Offset(44f * u, 50f * u - sway)
                                     val offerPoint = Offset(
@@ -938,6 +959,7 @@ fun FloatingAssistant(
 
                                     var handL = mix(restL, if (!offerRight) offerPoint else restL, speakAmt)
                                     var handR = mix(restR, if (offerRight) offerPoint else restR, speakAmt)
+                                    handR = mix(handR, pocketHand, reach)
                                     handL = mix(handL, upL, upW)
                                     handR = mix(handR, upR, upW)
 
@@ -1014,7 +1036,7 @@ fun FloatingAssistant(
                     val avatarP = avatarM.measure(Constraints.fixed(avatarSizeInt, avatarSizeInt))
                     val extrasP = extrasM.measure(Constraints(maxWidth = maxExtrasW))
                     val hatP = hatM?.measure(Constraints())
-                    val itemPs = List(4) { i ->
+                    val itemPs = List(3) { i ->
                         measurables.firstOrNull { it.layoutId == "item$i" }
                             ?.measure(Constraints(maxWidth = itemMaxW))
                     }
@@ -1030,24 +1052,6 @@ fun FloatingAssistant(
                         val radius = with(density) { 92.dp.toPx() }
                         val minYf = topInset
                         val maxYf = constraints.maxHeight - bottomInset
-                        itemPs.forEachIndexed { i, p ->
-                            if (p != null) {
-                                val rad = Math.toRadians(angles[i].toDouble())
-                                val tx0 = cx + dirIn * radius * cos(rad).toFloat()
-                                val ty0 = cy + radius * sin(rad).toFloat()
-                                val loX = marginInt + p.width / 2f
-                                val hiX = (constraints.maxWidth - marginInt - p.width / 2f).coerceAtLeast(loX)
-                                val loY = minYf + p.height / 2f
-                                val hiY = (maxYf - p.height / 2f).coerceAtLeast(loY)
-                                val tx = tx0.coerceIn(loX, hiX)
-                                val ty = ty0.coerceIn(loY, hiY)
-                                val prog = motion.menuProg[i].value
-                                val px = cx + (tx - cx) * prog
-                                val py = cy + (ty - cy) * prog
-                                p.place((px - p.width / 2f).roundToInt(), (py - p.height / 2f).roundToInt())
-                            }
-                        }
-
                         // پیام (بالن)
                         val rawX = if (onRight) baseX + avatarP.width - extrasP.width else baseX
                         val maxX = (constraints.maxWidth - marginInt - extrasP.width).coerceAtLeast(marginInt)
@@ -1060,6 +1064,28 @@ fun FloatingAssistant(
                         extrasP.place(ex, ey)
 
                         avatarP.place(baseX + motion.hideShift.value.roundToInt(), ay)
+
+                        // بطری‌ها از جیبِ ردا شروع می‌کنن، کمی بالا میان و بعد می‌رن سرجاشون
+                        val pocketX = baseX + with(density) { 31.25.dp.toPx() }
+                        val pocketY = ay + with(density) { 48.25.dp.toPx() }
+                        val liftPx = with(density) { 24.dp.toPx() }
+                        itemPs.forEachIndexed { i, p ->
+                            if (p != null) {
+                                val rad = Math.toRadians(angles[i].toDouble())
+                                val tx0 = cx + dirIn * radius * cos(rad).toFloat()
+                                val ty0 = cy + radius * sin(rad).toFloat()
+                                val loX = marginInt + p.width / 2f
+                                val hiX = (constraints.maxWidth - marginInt - p.width / 2f).coerceAtLeast(loX)
+                                val loY = minYf + p.height / 2f
+                                val hiY = (maxYf - p.height / 2f).coerceAtLeast(loY)
+                                val tx = tx0.coerceIn(loX, hiX)
+                                val ty = ty0.coerceIn(loY, hiY)
+                                val prog = motion.menuProg[i].value
+                                val px = pocketX + (tx - pocketX) * prog
+                                val py = pocketY + (ty - pocketY) * prog - sin(Math.PI * prog.coerceIn(0f, 1f)).toFloat() * liftPx
+                                p.place((px - p.width / 2f).roundToInt(), (py - p.height / 2f).roundToInt())
+                            }
+                        }
 
                         hatP?.place(motion.wx.value.roundToInt(), motion.wy.value.roundToInt())
                     }
@@ -1138,6 +1164,7 @@ private fun SpeechBubble(
 private fun PotionButton(
     icon: ImageVector,
     label: String,
+    tint: Color,
     progress: () -> Float,
     bob: () -> Float,
     flip: Float,
@@ -1149,8 +1176,8 @@ private fun PotionButton(
         modifier = Modifier
             .graphicsLayer {
                 val p = progress()
-                alpha = p.coerceIn(0f, 1f)
-                val s = 0.4f + 0.6f * p
+                alpha = (p * 3f).coerceIn(0f, 1f)
+                val s = 0.35f + 0.65f * p
                 scaleX = s
                 scaleY = s
                 val wave = (bob() - 0.5f) * 2f
@@ -1168,7 +1195,7 @@ private fun PotionButton(
                     drawPotion(
                         center = Offset(size.width / 2f, size.height / 2f),
                         size = size.minDimension,
-                        color = primary,
+                        color = tint,
                         alpha = 1f
                     )
                 },
@@ -1177,7 +1204,7 @@ private fun PotionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = primary,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .size(20.dp)
                     .padding(top = 0.dp)
