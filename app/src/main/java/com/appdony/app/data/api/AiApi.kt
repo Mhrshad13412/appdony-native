@@ -1,5 +1,6 @@
 package com.appdony.app.data.api
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,9 +17,13 @@ import javax.net.ssl.SSLException
 
 object AiApi {
 
+    private const val TAG = "AiApi"
     private const val BASE_URL = "https://api.llm7.io/v1"
 
-    private val API_KEY = "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
+    private const val API_KEY =
+        "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
+
+    private val KEYS = listOf(API_KEY, "unused")
 
     private val SYSTEM_PROMPT = """
         تو «دکتر طاعون» هستی، دستیار اپلیکیشن «اپدونی» (مرجع دانلود بازی و برنامه‌ی اندروید).
@@ -32,20 +37,26 @@ object AiApi {
     """.trimIndent()
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(70, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    // مدل‌های ضعیف و کوچک رو کنار می‌ذاریم و بهترین مدل موجود رو انتخاب می‌کنیم
     private val PREFERRED = listOf(
         "gpt-4.1", "gpt-4o", "gpt-oss-120b", "llama-3.3-70b", "llama-70b",
         "qwen", "mistral-large", "gpt-oss-20b"
     )
     private val WEAK_MARKS = listOf("nano", "mini", "lite", "tiny", "small", "1b", "3b", "7b", "8b")
 
+    private val SAFE_MODELS = listOf("default", "fast", "pro")
+
     @Volatile
     private var cachedModel: String? = null
+
+    @Volatile
+    private var workingKey: String? = null
+
+    private class ApiException(val code: Int, message: String) : Exception(message)
 
     private fun parseModelIds(text: String): List<String> {
         val array: JSONArray = if (text.trimStart().startsWith("[")) {
@@ -66,29 +77,26 @@ object AiApi {
         return ids
     }
 
-    private fun discoverModel(): String {
+    private fun discoverModel(key: String): String? {
         cachedModel?.let { return it }
-
-        val ids: List<String> = try {
+        return try {
             val request = Request.Builder()
                 .url("$BASE_URL/models")
-                .addHeader("Authorization", "Bearer $API_KEY")
+                .addHeader("Authorization", "Bearer $key")
                 .build()
-            client.newCall(request).execute().use { response ->
+            val ids = client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (response.isSuccessful && text.isNotBlank()) parseModelIds(text) else emptyList()
             }
+            val strong = ids.filter { id -> WEAK_MARKS.none { id.contains(it, ignoreCase = true) } }
+            val picked = PREFERRED.firstNotNullOfOrNull { pref ->
+                strong.firstOrNull { it.contains(pref, ignoreCase = true) }
+            }
+            if (picked != null) cachedModel = picked
+            picked
         } catch (e: Exception) {
-            emptyList()
+            null
         }
-
-        val strong = ids.filter { id -> WEAK_MARKS.none { id.contains(it, ignoreCase = true) } }
-        val picked = PREFERRED.firstNotNullOfOrNull { pref ->
-            strong.firstOrNull { it.contains(pref, ignoreCase = true) }
-        } ?: "default"
-
-        cachedModel = picked
-        return picked
     }
 
     suspend fun sendMessage(
@@ -114,14 +122,33 @@ object AiApi {
             }
             messages.put(JSONObject().put("role", "user").put("content", userMessage))
 
-            var result = requestOnce(discoverModel(), messages)
+            val keys = (listOfNotNull(workingKey) + KEYS).distinct()
+            var lastError: ApiException? = null
 
-            // اگه مدل انتخاب‌شده قبول نشد، با مدل امن‌تر دوباره امتحان می‌کنیم
-            if (result.isFailure && result.exceptionOrNull() is BadModelException) {
-                cachedModel = "fast"
-                result = requestOnce("fast", messages)
+            keyLoop@ for (key in keys) {
+                val models = (listOfNotNull(cachedModel, discoverModel(key)) + SAFE_MODELS).distinct()
+                for (model in models) {
+                    try {
+                        val reply = requestOnce(key, model, messages)
+                        workingKey = key
+                        cachedModel = if (model in SAFE_MODELS) cachedModel else model
+                        return@withContext Result.success(reply)
+                    } catch (e: ApiException) {
+                        lastError = e
+                        Log.w(TAG, "model=$model code=${e.code} msg=${e.message}")
+                        when (e.code) {
+                            401, 402, 403 -> continue@keyLoop
+                            429 -> break@keyLoop
+                            else -> {
+                                if (model == cachedModel) cachedModel = null
+                                continue
+                            }
+                        }
+                    }
+                }
             }
-            result
+
+            Result.failure(Exception(describe(lastError)))
         } catch (e: UnknownHostException) {
             Result.failure(Exception("اتصال به اینترنت یا DNS مشکل داره."))
         } catch (e: SocketTimeoutException) {
@@ -131,13 +158,20 @@ object AiApi {
         } catch (e: SSLException) {
             Result.failure(Exception("سرویس هوش مصنوعی از شبکه‌ی تو در دسترس نیست. با VPN امتحان کن."))
         } catch (e: Exception) {
+            Log.w(TAG, "unexpected", e)
             Result.failure(Exception("مشکلی پیش اومد. دوباره امتحان کن."))
         }
     }
 
-    private class BadModelException : Exception("bad model")
+    private fun describe(e: ApiException?): String = when (e?.code) {
+        401, 403 -> "کلید هوش مصنوعی معتبر نیست."
+        402 -> "سهمیه‌ی سرویس هوش مصنوعی تموم شده (کد 402)."
+        429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
+        null -> "مشکلی پیش اومد. دوباره امتحان کن."
+        else -> "سرویس هوش مصنوعی در دسترس نیست (کد ${e.code})."
+    }
 
-    private fun requestOnce(model: String, messages: JSONArray): Result<String> {
+    private fun requestOnce(key: String, model: String, messages: JSONArray): String {
         val json = JSONObject()
             .put("model", model)
             .put("messages", messages)
@@ -146,7 +180,7 @@ object AiApi {
 
         val request = Request.Builder()
             .url("$BASE_URL/chat/completions")
-            .addHeader("Authorization", "Bearer $API_KEY")
+            .addHeader("Authorization", "Bearer $key")
             .addHeader("Content-Type", "application/json")
             .post(json.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
@@ -154,28 +188,17 @@ object AiApi {
         client.newCall(request).execute().use { response ->
             val text = response.body?.string()
 
-            if (response.code == 400 || response.code == 404) {
-                return Result.failure(BadModelException())
+            if (!response.isSuccessful) {
+                throw ApiException(response.code, text.orEmpty().take(200))
             }
-            if (response.code == 401 || response.code == 403) {
-                return Result.failure(Exception("کلید هوش مصنوعی معتبر نیست."))
-            }
-            if (response.code == 429) {
-                return Result.failure(Exception("تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."))
-            }
-            if (!response.isSuccessful || text.isNullOrBlank()) {
-                return Result.failure(Exception("سرویس هوش مصنوعی در دسترس نیست (کد ${response.code})."))
-            }
+            if (text.isNullOrBlank()) throw ApiException(204, "empty body")
 
             val choices = JSONObject(text).optJSONArray("choices")
-            if (choices == null || choices.length() == 0) {
-                return Result.failure(Exception("پاسخی دریافت نشد. دوباره امتحان کن."))
-            }
-            val reply = choices.getJSONObject(0).getJSONObject("message").optString("content", "").trim()
-            if (reply.isBlank()) {
-                return Result.failure(Exception("پاسخی دریافت نشد. دوباره امتحان کن."))
-            }
-            return Result.success(reply)
+            if (choices == null || choices.length() == 0) throw ApiException(204, "no choices")
+
+            val reply = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim().orEmpty()
+            if (reply.isBlank()) throw ApiException(204, "blank reply")
+            return reply
         }
     }
 }
