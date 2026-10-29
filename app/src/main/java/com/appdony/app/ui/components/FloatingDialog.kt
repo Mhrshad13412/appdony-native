@@ -1,5 +1,35 @@
 package com.appdony.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility as BannerAnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically as bannerSlideIn
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp as bannerDp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -93,6 +123,102 @@ fun FloatingDialog(
                             .padding(horizontal = 20.dp, vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         content = content
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+// ───────────── اعلان داخل اپ (جای Toast) ─────────────
+// زرد = در حال بررسی / هشدار ، سبز = موفق (فایل پیدا شد) ، قرمز = خطا
+
+enum class BannerKind { CHECKING, WARNING, SUCCESS, ERROR }
+
+data class BannerMsg(val kind: BannerKind, val text: String, val seq: Long)
+
+object AppBanner {
+    private val _msg = MutableStateFlow<BannerMsg?>(null)
+    val msg: StateFlow<BannerMsg?> = _msg.asStateFlow()
+    private var seq = 0L
+    private var hideAfter = 3200L
+
+    val duration: Long get() = hideAfter
+
+    fun show(kind: BannerKind, text: String, durationMs: Long = 3200L) {
+        hideAfter = durationMs
+        _msg.value = BannerMsg(kind, text, ++seq)
+    }
+
+    fun dismiss() {
+        _msg.value = null
+    }
+}
+
+private val BannerYellow = Color(0xFFFFC53D)
+private val BannerGreen = Color(0xFF34C77B)
+private val BannerRed = Color(0xFFFF5C5C)
+
+@Composable
+fun AppBannerHost(modifier: Modifier = Modifier) {
+    val current by AppBanner.msg.collectAsState()
+    var last by remember { mutableStateOf<BannerMsg?>(null) }
+    SideEffect { if (current != null) last = current }
+    val shown = current ?: last
+
+    LaunchedEffect(current?.seq) {
+        val m = current ?: return@LaunchedEffect
+        delay(AppBanner.duration)
+        if (AppBanner.msg.value?.seq == m.seq) AppBanner.dismiss()
+    }
+
+    BannerAnimatedVisibility(
+        visible = current != null,
+        enter = bannerSlideIn(tween(260)) { -it } + fadeIn(tween(200)),
+        exit = slideOutVertically(tween(220)) { -it } + fadeOut(tween(160)),
+        modifier = modifier
+    ) {
+        val m = shown ?: return@BannerAnimatedVisibility
+        val accent = when (m.kind) {
+            BannerKind.CHECKING, BannerKind.WARNING -> BannerYellow
+            BannerKind.SUCCESS -> BannerGreen
+            BannerKind.ERROR -> BannerRed
+        }
+        val icon = when (m.kind) {
+            BannerKind.CHECKING -> Icons.Default.Info
+            BannerKind.WARNING -> Icons.Default.Warning
+            BannerKind.SUCCESS -> Icons.Default.CheckCircle
+            BannerKind.ERROR -> Icons.Default.Error
+        }
+        Box(modifier = Modifier.statusBarsPadding().padding(horizontal = 16.bannerDp, vertical = 8.bannerDp)) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().clickable { AppBanner.dismiss() },
+                shape = RoundedCornerShape(14.bannerDp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.bannerDp, accent.copy(alpha = 0.55f)),
+                shadowElevation = 10.bannerDp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.bannerDp, vertical = 10.bannerDp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.bannerDp)
+                            .clip(RoundedCornerShape(10.bannerDp))
+                            .background(accent.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.bannerDp))
+                    }
+                    Spacer(Modifier.width(10.bannerDp))
+                    Text(
+                        text = m.text,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
