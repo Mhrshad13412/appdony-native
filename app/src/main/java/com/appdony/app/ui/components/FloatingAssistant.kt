@@ -154,10 +154,6 @@ private val DoctorHeadIcon: ImageVector by lazy {
             quadTo(11.5f, 18f, 13.5f, 17.8f)
             quadTo(16.5f, 17f, 16.5f, 13.5f)
             verticalLineTo(8f)
-            moveTo(10f, 18.3f)
-            lineTo(7.5f, 21f)
-            moveTo(15f, 18f)
-            lineTo(17.5f, 21f)
         }
         path(fill = SolidColor(Color.Black)) {
             moveTo(11.5f, 11.5f)
@@ -711,6 +707,20 @@ fun FloatingAssistant(
             )
             val bobPx = with(density) { 4.dp.toPx() }
             val talkPx = with(density) { 5.dp.toPx() }
+            val jellyPx = with(density) { 7.dp.toPx() }
+
+            // پرش نرم و ژله‌ای وقتی دکتر حرف می‌زنه
+            val jelly = remember { Animatable(0f) }
+            LaunchedEffect(bubbleSay != null) {
+                if (bubbleSay != null) {
+                    while (true) {
+                        jelly.animateTo(1f, spring(0.3f, Spring.StiffnessLow))
+                        jelly.animateTo(0f, spring(0.3f, Spring.StiffnessLow))
+                    }
+                } else {
+                    jelly.animateTo(0f, spring(0.4f, Spring.StiffnessLow))
+                }
+            }
 
             if (ready && visible) {
                 Layout(
@@ -871,9 +881,9 @@ fun FloatingAssistant(
                                         alpha = bodyAlpha
                                         transformOrigin = TransformOrigin(0.5f, 1f)
                                         rotationZ = motion.tilt.value
-                                        translationY = bob * bobPx - talk * speakAmt * talkPx + motion.hop.value
-                                        scaleY = 1f + 0.035f * talk * speakAmt
-                                        scaleX = 1f - 0.02f * talk * speakAmt
+                                        translationY = bob * bobPx - jelly.value * jellyPx + motion.hop.value
+                                        scaleY = 1f + 0.12f * jelly.value
+                                        scaleX = 1f - 0.08f * jelly.value
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -889,26 +899,42 @@ fun FloatingAssistant(
                                     imageVector = DoctorHeadIcon,
                                     contentDescription = "دستیار",
                                     tint = primary,
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .graphicsLayer { translationY = -6.dp.toPx() }
                                 )
 
                                 // ── دست‌ها (و بطری معجون موقع حرف زدن) ──
                                 Canvas(modifier = Modifier.matchParentSize()) {
                                     val u = 1.dp.toPx()
                                     val offerRight = !onRight
-                                    val shoulderL = Offset(25f * u, 33f * u)
-                                    val shoulderR = Offset(36.5f * u, 33f * u)
+                                    val shoulderL = Offset(24.3f * u, 41.5f * u)
+                                    val shoulderR = Offset(35.7f * u, 41.5f * u)
                                     val sway = (bob - 0.5f) * 2f * 1.2f * u
                                     val w = (talk - 0.5f) * 2f
 
-                                    val restL = Offset(20.5f * u, 42f * u + sway)
-                                    val restR = Offset(40.5f * u, 42f * u - sway)
+                                    // بدنه (ردا) زیر سر؛ دست‌ها از کنارش بیرون میان و به سر نمی‌چسبن
+                                    val robe = androidx.compose.ui.graphics.Path().apply {
+                                        moveTo(25.5f * u, 37f * u)
+                                        lineTo(34.5f * u, 37f * u)
+                                        lineTo(39f * u, 54f * u)
+                                        lineTo(21f * u, 54f * u)
+                                        close()
+                                    }
+                                    drawPath(robe, surfaceColor)
+                                    drawPath(
+                                        robe, primary,
+                                        style = Stroke(width = 1.6f * u, join = StrokeJoin.Round)
+                                    )
+
+                                    val restL = Offset(16f * u, 50f * u + sway)
+                                    val restR = Offset(44f * u, 50f * u - sway)
                                     val offerPoint = Offset(
                                         (if (offerRight) 51f else 9f) * u,
-                                        (28f - 1.5f * talk) * u
+                                        (37f - 1.5f * talk) * u
                                     )
-                                    val upL = Offset(17f * u, (23f + w * 3f) * u)
-                                    val upR = Offset(43f * u, (23f - w * 3f) * u)
+                                    val upL = Offset(9f * u, (31f + w * 3f) * u)
+                                    val upR = Offset(51f * u, (31f - w * 3f) * u)
 
                                     var handL = mix(restL, if (!offerRight) offerPoint else restL, speakAmt)
                                     var handR = mix(restR, if (offerRight) offerPoint else restR, speakAmt)
@@ -952,7 +978,7 @@ fun FloatingAssistant(
                                             alpha = if (hatDetached) 0f else 1f
                                             transformOrigin = TransformOrigin(0.5f, 0.28f)
                                             translationX = motion.hatX.value
-                                            translationY = motion.hatY.value - talk * speakAmt * 1.5f * density.density
+                                            translationY = motion.hatY.value - 6.dp.toPx() - jelly.value * 2f * density.density
                                             rotationZ = motion.hatAngle.value
                                         }
                                 )
