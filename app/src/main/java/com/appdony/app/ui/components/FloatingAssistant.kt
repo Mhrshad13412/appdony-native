@@ -125,6 +125,7 @@ fun FloatingAssistant(
     val scope = rememberCoroutineScope()
     val primary = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val yarnColors = remember(primary) { yarnPalette(primary) }
     val motion = remember { AvatarMotion() }
     val routeNow by rememberUpdatedState(currentRoute)
     val visibleNow by rememberUpdatedState(visible)
@@ -296,7 +297,7 @@ fun FloatingAssistant(
                             dlActive = true
                             startMs = System.currentTimeMillis()
                             scope.launch {
-                                val say = AssistantSay("تا لینک رو چک می‌کنم، بیا با کاموا بازی کنیم 🧶", SayKind.DOWNLOAD)
+                                val say = AssistantSay("این کاموا رو بگیر و باهاش بازی کن، تا لینکت رو چک کنم 🧶", SayKind.DOWNLOAD)
                                 AssistantBus.noteShown(say.text)
                                 speak(say, 6_000)
                             }
@@ -304,9 +305,8 @@ fun FloatingAssistant(
                                 motion.dlPos.forEachIndexed { i, a ->
                                     launch {
                                         delay(i * 260L)
-                                        a.animateTo(1f, tween(1300, easing = FastOutSlowInEasing))
-                                        delay(350)
-                                        a.animateTo(2f, tween(1100, easing = FastOutSlowInEasing))
+                                        // قل می‌خوره بیرون و کنار گربه می‌مونه تا بازی کنه
+                                        a.animateTo(1f, tween(1100, easing = FastOutSlowInEasing))
                                     }
                                 }
                             }
@@ -321,6 +321,7 @@ fun FloatingAssistant(
                                     motion.dlPos.forEachIndexed { i, a ->
                                         launch {
                                             delay(i * 380L)
+                                            if (a.value < 2f) a.snapTo(2f)
                                             a.animateTo(3f, tween(900, easing = FastOutSlowInEasing))
                                         }
                                     }
@@ -335,7 +336,7 @@ fun FloatingAssistant(
                                 showMenu = true
                                 motion.menuProg.forEach { it.snapTo(0f) }
                                 scope.launch {
-                                    val say = AssistantSay("بیا، این کاموا تو رو می‌بره بخش دانلودها 🧶", SayKind.DOWNLOAD)
+                                    val say = AssistantSay("این کاموا رو بگیر، تو رو می‌بره بخش دانلودها 🧶", SayKind.DOWNLOAD)
                                     AssistantBus.noteShown(say.text)
                                     speak(say, 9_000)
                                 }
@@ -483,7 +484,7 @@ fun FloatingAssistant(
                                     quadraticBezierTo((ax + bx) / 2f, (ay + by) / 2f + sag, bx, by)
                                 }
                                 drawPath(
-                                    path, YarnColors[i].copy(alpha = a),
+                                    path, yarnColors[i].copy(alpha = a),
                                     style = Stroke(width = 1.7f * u, cap = StrokeCap.Round)
                                 )
                             }
@@ -526,7 +527,7 @@ fun FloatingAssistant(
                                         YarnButton(
                                             icon = icon,
                                             label = label,
-                                            tint = YarnColors[i],
+                                            tint = yarnColors[i],
                                             progress = {
                                                 if (dlActive) dlAlpha(motion.dlPos[i].value)
                                                 else motion.menuProg[i].value
@@ -673,7 +674,8 @@ fun FloatingAssistant(
                                         lookY = -0.8f * playAmt + scare * 0.4f,
                                         scare = scare,
                                         happy = happyAmt,
-                                        wiggle = (bob - 0.5f) * 2f * (1f + playAmt)
+                                        wiggle = (bob - 0.5f) * 2f * (1f + playAmt),
+                                        yarn = primary
                                     )
                                     drawCat(pose)
                                 }
@@ -750,45 +752,28 @@ fun FloatingAssistant(
                                 var dx: Float
                                 var dy: Float
                                 if (dlActive) {
-                                    // ۰→۱ از بالای صفحه آویزون می‌شه و بازیگوشانه می‌پره،
-                                    // ۱→۲ قل می‌خوره سمت راست، ۲→۳ برمی‌گرده پیش گربه
+                                    // ۰→۱ از کنار پنجه‌ی گربه قل می‌خوره بیرون و می‌ره سرجای بازی،
+                                    // ۱→۲ همون‌جا بازیگوشانه می‌پره، ۲→۳ برمی‌گرده پیش گربه
                                     val q = motion.dlPos[i].value
-                                    val topX = constraints.maxWidth * (0.25f + 0.25f * i)
-                                    val pullY = topInset + with(density) { 150.dp.toPx() }
-                                    val startY = -p.height.toFloat()
-                                    val rightX = constraints.maxWidth - marginInt - p.width / 2f
-                                    val rightY = pullY + i * (p.height + with(density) { 6.dp.toPx() })
-                                    val bounceH = with(density) { 46.dp.toPx() }
-                                    when {
-                                        q <= 1f -> {
-                                            dx = topX + sin(q * Math.PI * 4.0).toFloat() * with(density) { 10.dp.toPx() } * (1f - q)
-                                            dy = startY + (pullY - startY) * q - dlBounce(q) * bounceH
-                                        }
-                                        q <= 2f -> {
-                                            val f = q - 1f
-                                            dx = topX + (rightX - topX) * f
-                                            dy = pullY + (rightY - pullY) * f
-                                        }
-                                        else -> {
-                                            val f = q - 2f
-                                            dx = rightX + (pawX - rightX) * f
-                                            dy = rightY + (pawY - rightY) * f
-                                        }
-                                    }
-                                    // نخ: اول از بالای صفحه آویزونه، آخر مسیر به گربه وصله
-                                    val hangAlpha = if (q <= 0f) 0f else (1f - (q - 1f) * 2f).coerceIn(0f, 1f)
-                                    val returnAlpha = ((q - 2f)).coerceIn(0f, 1f) * dlAlpha(q)
-                                    if (hangAlpha > 0f) {
-                                        threadData[i * 6 + 2] = topX
-                                        threadData[i * 6 + 3] = -with(density) { 20.dp.toPx() }
-                                        threadData[i * 6 + 4] = hangAlpha
-                                        threadData[i * 6 + 5] = 0f
-                                    } else if (returnAlpha > 0f) {
-                                        threadData[i * 6 + 2] = pawX
-                                        threadData[i * 6 + 3] = pawY
-                                        threadData[i * 6 + 4] = returnAlpha
-                                        threadData[i * 6 + 5] = sagMenu
-                                    }
+                                    val outP = q.coerceIn(0f, 1f)
+                                    val back = (q - 2f).coerceIn(0f, 1f)
+                                    val e = if (q <= 1f) outP else 1f - back
+                                    val wob = ((q - 0.7f) / 0.3f).coerceIn(0f, 1f) * (1f - back)
+                                    val wave = (bob - 0.5f) * 2f
+                                    val flipI = if (i % 2 == 0) 1f else -1f
+                                    val bounceH = with(density) { 30.dp.toPx() }
+                                    val wobX = with(density) { 10.dp.toPx() }
+                                    val wobY = with(density) { 10.dp.toPx() }
+                                    dx = pawX + (tx - pawX) * e + wave * wobX * flipI * wob
+                                    dy = pawY + (ty - pawY) * e -
+                                        sin(Math.PI * e).toFloat() * liftPx -
+                                        dlBounce(outP) * bounceH -
+                                        swat * wobY * wob
+                                    // نخ همیشه به پنجه‌ی گربه وصله
+                                    threadData[i * 6 + 2] = pawX
+                                    threadData[i * 6 + 3] = pawY
+                                    threadData[i * 6 + 4] = (outP * 3f).coerceIn(0f, 1f) * 0.9f * dlAlpha(q)
+                                    threadData[i * 6 + 5] = sagMenu
                                 } else {
                                     val prog = motion.menuProg[i].value
                                     dx = pawX + (tx - pawX) * prog
