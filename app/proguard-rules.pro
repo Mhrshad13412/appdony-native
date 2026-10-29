@@ -100,3 +100,4 @@
 -keep class com.appdony.app.util.** { *; }
 -keep class com.appdony.app.data.session.** { *; }
 -keep class com.appdony.app.data.preferences.** { *; }
+-keep class com.appdony.app.data.preferences.DownloadRecord { *; }
