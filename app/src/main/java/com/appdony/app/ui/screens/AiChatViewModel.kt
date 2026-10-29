@@ -6,6 +6,7 @@ import com.appdony.app.data.api.AiApi
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
+import com.appdony.app.util.AssistantBus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -50,7 +51,7 @@ class AiChatViewModel : ViewModel() {
                 .map { (if (it.isUser) "user" else "assistant") to it.text }
 
             val context = loadSiteContext(text)
-            val result = AiApi.sendMessage(text, history, context)
+            val result = AiApi.sendMessage(text, history, context, AssistantBus.recentNotes())
 
             result.onSuccess { response ->
                 _isOffline.value = false
