@@ -30,6 +30,7 @@ import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.BlogCardSkeleton
+import com.appdony.app.ui.components.appdonyCard
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -129,9 +130,9 @@ fun BlogScreen(
 private fun BlogPostCard(post: Post, context: android.content.Context, onClick: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(18.dp)).background(AppdonyCardBg).clickable { onClick() }.padding(bottom = 14.dp)
+            .appdonyCard().clickable { onClick() }.padding(bottom = 14.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+        Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             val img = post.featuredImageUrl()
             if (!img.isNullOrBlank()) {
                 AsyncImage(
