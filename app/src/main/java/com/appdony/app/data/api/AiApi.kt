@@ -19,6 +19,13 @@ object AiApi {
 
     private const val TAG = "AiApi"
     private const val BASE_URL = "https://api.llm7.io/v1"
+    private const val USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 13; Appdony) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36"
+
+    /** آخرین دلیل خطا برای نمایش در چت (کد HTTP یا نوع خطای شبکه) */
+    @Volatile
+    var lastDebug: String = ""
+        private set
 
     private const val API_KEY =
         "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
@@ -83,6 +90,8 @@ object AiApi {
             val request = Request.Builder()
                 .url("$BASE_URL/models")
                 .addHeader("Authorization", "Bearer $key")
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", USER_AGENT)
                 .build()
             val ids = client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
@@ -135,6 +144,7 @@ object AiApi {
                         return@withContext Result.success(reply)
                     } catch (e: ApiException) {
                         lastError = e
+                        lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
                         Log.w(TAG, "model=$model code=${e.code} msg=${e.message}")
                         when (e.code) {
                             401, 402, 403 -> continue@keyLoop
@@ -150,21 +160,26 @@ object AiApi {
 
             Result.failure(Exception(describe(lastError)))
         } catch (e: UnknownHostException) {
+            lastDebug = "UnknownHost"
             Result.failure(Exception("اتصال به اینترنت یا DNS مشکل داره."))
         } catch (e: SocketTimeoutException) {
+            lastDebug = "Timeout"
             Result.failure(Exception("پاسخ دیر رسید. دوباره امتحان کن."))
         } catch (e: ConnectException) {
+            lastDebug = "Connect: ${e.message.orEmpty().take(60)}"
             Result.failure(Exception("سرویس هوش مصنوعی از شبکه‌ی تو در دسترس نیست. با VPN امتحان کن."))
         } catch (e: SSLException) {
+            lastDebug = "SSL: ${e.message.orEmpty().take(60)}"
             Result.failure(Exception("سرویس هوش مصنوعی از شبکه‌ی تو در دسترس نیست. با VPN امتحان کن."))
         } catch (e: Exception) {
             Log.w(TAG, "unexpected", e)
+            lastDebug = "${e.javaClass.simpleName}: ${e.message.orEmpty().take(60)}"
             Result.failure(Exception("مشکلی پیش اومد. دوباره امتحان کن."))
         }
     }
 
     private fun describe(e: ApiException?): String = when (e?.code) {
-        401, 403 -> "کلید هوش مصنوعی معتبر نیست."
+        401, 403 -> "کلید هوش مصنوعی رد شد (کد ${e.code})."
         402 -> "سهمیه‌ی سرویس هوش مصنوعی تموم شده (کد 402)."
         429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
         null -> "مشکلی پیش اومد. دوباره امتحان کن."
@@ -182,6 +197,8 @@ object AiApi {
             .url("$BASE_URL/chat/completions")
             .addHeader("Authorization", "Bearer $key")
             .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("User-Agent", USER_AGENT)
             .post(json.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
