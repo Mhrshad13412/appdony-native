@@ -12,7 +12,13 @@ data class DownloadRecord(
     val createdAt: Long,
     val completed: Boolean = false,
     val localUri: String? = null,
-    val totalBytes: Long = 0L
+    val totalBytes: Long = 0L,
+    // وضعیت خودمون (همون عددهای DownloadManager.STATUS_*): 1=صف 2=در حال دانلود 4=متوقف 8=کامل 16=خطا
+    val status: Int = 0,
+    val bytes: Long = 0L,
+    val message: String? = null,
+    val filePath: String? = null,
+    val wifiOnly: Boolean = false
 )
 
 class DownloadStore(context: Context) {
