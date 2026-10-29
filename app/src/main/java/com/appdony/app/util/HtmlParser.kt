@@ -19,7 +19,7 @@ data class AppInfo(
     val downloadLinks: List<DownloadLink> = emptyList(),
     val screenshots: List<String> = emptyList(),
     val cleanDescription: String = "",
-    val allLinks: List<String> = emptyList() // فقط برای گزارش فنی
+    val allLinks: List<String> = emptyList()
 )
 
 sealed class ContentBlock {
@@ -34,17 +34,27 @@ object HtmlParser {
 
     private const val BASE = "https://appdony.ir/"
 
-    private val BLOCKED = listOf(
-        "google.com", "doubleclick", "googlesyndication", "google-analytics", "facebook.com",
-        "t.me/", "telegram.me/", "telegram.org", "twitter.com", "x.com/", "pinterest.com",
+    private val BLOCKED_DOMAINS = listOf(
+        "google.com", "doubleclick.net", "googlesyndication.com", "google-analytics.com", "facebook.com",
+        "t.me", "telegram.me", "telegram.org", "twitter.com", "x.com", "pinterest.com",
         "youtube.com", "youtu.be", "aparat.com", "instagram.com", "whatsapp.com", "wa.me",
-        "linkedin.com", "tiktok.com", "play.google.com", "apps.apple.com",
-        "cafebazaar.ir", "myket.ir", "gamerant", "ign.com"
+        "linkedin.com", "tiktok.com", "apple.com", "cafebazaar.ir", "myket.ir",
+        "gamerant.com", "ign.com", "wikipedia.org", "reddit.com"
     )
+    private val ALLOWED_HOSTS = setOf("drive.google.com", "docs.google.com")
+    private val DOWNLOAD_HEAD = Regex(
+        "نصب|دانلود|download|لینک|نسخه|مود|اصلی|مستقیم|سرور|mod|apk|obb|دیتا|داده",
+        RegexOption.IGNORE_CASE
+    )
+    private val SOURCE_HEAD = Regex(
+        "منبع|منابع|مرجع|source|reference|مطالب مرتبط|مطالب پیشنهادی|بیشتر بخوانید|مشابه|related|برچسب|tags|دیدگاه|نظرات|comment",
+        RegexOption.IGNORE_CASE
+    )
+    private val SHARE_PATH = Regex("/(o/public|public|file|files|f|d|s|dl)/[^/]+")
     private val FILE_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z", "obb")
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "webp", "gif")
     private val DOWNLOAD_WORDS = listOf(
-        "دانلود", "download", "لینک مستقیم", "دریافت", "نسخه مود", "mod apk", "مگابایت", "گیگابایت"
+        "دانلود", "download", "نصب", "لینک مستقیم", "دریافت", "نسخه مود", "mod apk", "مگابایت", "گیگابایت"
     )
     private val JUNK_IMAGE = listOf("emoji", "avatar", "gravatar", "logo", "icon", "wp-includes", "/themes/", "sprite")
     private val DL_PATH = Regex("(^|/)(dl|download|downloads|get|getfile|file|files)(/|$)")
@@ -52,8 +62,6 @@ object HtmlParser {
         "([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
         RegexOption.IGNORE_CASE
     )
-
-    // ───────────── ابزارهای کمکی ─────────────
 
     private fun normalizeDigits(s: String): String = buildString(s.length) {
         for (c in s) {
@@ -92,7 +100,6 @@ object HtmlParser {
             .orEmpty()
     }
 
-    // عکس‌های lazy-load هم پشتیبانی می‌شن
     private fun imageUrl(img: Element): String? {
         val srcset = img.attr("data-srcset").ifBlank { img.attr("srcset") }
         val candidates = listOf(
@@ -110,8 +117,6 @@ object HtmlParser {
         val lower = url.lowercase()
         return JUNK_IMAGE.any { lower.contains(it) }
     }
-
-    // ───────────── محتوای متنی (توضیحات / وبلاگ) ─────────────
 
     fun parseContent(html: String): List<ContentBlock> {
         val blocks = mutableListOf<ContentBlock>()
@@ -184,8 +189,6 @@ object HtmlParser {
         }
     }
 
-    // ───────────── اطلاعات بازی/برنامه ─────────────
-
     fun parsePostContent(html: String): AppInfo {
         val doc = Jsoup.parse(html, BASE)
         val text = normalizeDigits(doc.text())
@@ -220,84 +223,4 @@ object HtmlParser {
             "(?:حجم|Size)\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
             RegexOption.IGNORE_CASE
         ).find(text)
-        if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupValues[2]}"
-        val any = SIZE_REGEX.find(text) ?: return null
-        return "${any.groupValues[1]} ${any.groupValues[2]}"
-    }
-
-    private fun extractAndroidReq(text: String): String? {
-        val m = Regex("(?:اندروید|Android)\\s*([0-9]+(?:\\.[0-9]+)?)", RegexOption.IGNORE_CASE).find(text)
-            ?: return null
-        return "اندروید ${m.groupValues[1]} به بالا"
-    }
-
-    private fun extractDeveloper(text: String): String? {
-        val m = Regex("(?:سازنده|توسعه\\s*دهنده|Developer)\\s*[:：]\\s*([^\\n|،,]{2,40})").find(text)
-            ?: return null
-        return m.groupValues[1].trim()
-    }
-
-    // فقط لینک‌هایی که واقعاً دانلود هستن؛ لینک دسته‌بندی و پست‌های داخلی سایت حذف می‌شن
-    private fun extractDownloadLinks(doc: Document): List<DownloadLink> {
-        val result = LinkedHashMap<String, DownloadLink>()
-        val candidates = doc.select("a[href], [data-href], [data-url], [data-link], [data-download]")
-
-        for (el in candidates) {
-            val raw = listOf(
-                el.attr("href"), el.attr("data-href"), el.attr("data-url"),
-                el.attr("data-link"), el.attr("data-download")
-            ).firstOrNull { it.isNotBlank() } ?: continue
-
-            val url = absolute(raw) ?: continue
-            val http = url.toHttpUrlOrNull() ?: continue
-            val host = http.host.lowercase()
-            val path = http.encodedPath.lowercase()
-
-            if (BLOCKED.any { url.contains(it, ignoreCase = true) }) continue
-
-            val ext = path.substringAfterLast('.', "")
-            if (ext in IMAGE_EXTS) continue
-
-            val text = el.text().trim()
-            val hasFileExt = ext in FILE_EXTS
-            val isInternal = host == "appdony.ir" || host == "www.appdony.ir"
-            val pathLooksDl = DL_PATH.containsMatchIn(path)
-            val hostLooksDl = host.startsWith("dl") || host.contains("download") ||
-                host.contains("files") || host.contains("cdn")
-            val textLooksDl = DOWNLOAD_WORDS.any { text.contains(it, ignoreCase = true) }
-
-            val internalContent = isInternal && !hasFileExt && !pathLooksDl
-            val isDownload = !internalContent && (hasFileExt || hostLooksDl || pathLooksDl || textLooksDl)
-            if (!isDownload) continue
-
-            val fileName = path.substringAfterLast('/').takeIf { it.contains('.') }
-            val title = text.ifBlank { fileName ?: "لینک دانلود" }
-                .replace(Regex("\\s+"), " ")
-                .take(60)
-            val size = SIZE_REGEX.find(normalizeDigits(text))?.value
-
-            if (!result.containsKey(url)) result[url] = DownloadLink(title, url, size)
-        }
-        return result.values.take(10)
-    }
-
-    private fun extractScreenshots(doc: Document): List<String> {
-        val result = LinkedHashSet<String>()
-        for (img in doc.select("img")) {
-            // اگه عکس داخل لینکِ عکس بزرگ بود، همون نسخه‌ی بزرگ رو برمی‌داریم
-            val parentHref = img.parent()?.takeIf { it.tagName() == "a" }?.attr("href").orEmpty()
-            val parentExt = parentHref.substringBefore('?').substringAfterLast('.', "").lowercase()
-            val url = if (parentExt in IMAGE_EXTS) absolute(parentHref) else imageUrl(img)
-            if (url == null || isJunkImage(url)) continue
-
-            val w = img.attr("width").toIntOrNull()
-            val h = img.attr("height").toIntOrNull()
-            if ((w != null && w in 1..99) || (h != null && h in 1..99)) continue
-
-            val ext = url.substringBefore('?').substringAfterLast('.', "").lowercase()
-            if (ext !in IMAGE_EXTS && !url.lowercase().contains("/wp-content/uploads/")) continue
-            result.add(url)
-        }
-        return result.take(10)
-    }
-}
+        if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupVal
