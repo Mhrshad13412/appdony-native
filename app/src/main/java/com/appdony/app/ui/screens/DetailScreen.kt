@@ -54,8 +54,10 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.AppInfo
+import com.appdony.app.util.AssistantBus
 import com.appdony.app.util.ContentBlock
 import com.appdony.app.util.DownloadHelper
+import com.appdony.app.util.DownloadPhase
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.util.DownloadLink
@@ -154,11 +156,14 @@ private suspend fun startAppDownload(context: Context, link: DownloadLink, post:
         return
     }
     AppBanner.show(BannerKind.CHECKING, "در حال بررسی لینک...", 15000L)
+    AssistantBus.downloadPhase(DownloadPhase.CHECKING)
     DownloadHelper.startDownload(context, link.url, post.cleanTitle(), post.featuredImageUrl())
         .onSuccess {
+            AssistantBus.downloadPhase(DownloadPhase.READY)
             AppBanner.show(BannerKind.SUCCESS, "فایل پیدا شد و دانلود شروع شد؛ از بخش «دانلودها» دنبالش کن", 4000L)
         }
         .onFailure {
+            AssistantBus.downloadPhase(DownloadPhase.FAILED)
             // لینک خراب وارد صف دانلود نمی‌شه؛ فقط دلیلش رو نشون می‌دیم
             AppBanner.show(BannerKind.ERROR, it.message ?: "این لینک کار نمی‌کنه", 4500L)
         }
