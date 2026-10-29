@@ -77,6 +77,16 @@ fun AiChatScreen(
 
     val primary = MaterialTheme.colorScheme.primary
 
+    // دکتر بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
+    var speaking by remember { mutableStateOf(false) }
+    LaunchedEffect(messages.size) {
+        if (messages.size > 1 && !messages.last().isUser) {
+            speaking = true
+            kotlinx.coroutines.delay(2400)
+            speaking = false
+        }
+    }
+
     LaunchedEffect(messages.size, isLoading) {
         val count = messages.size + if (isLoading) 1 else 0
         if (count > 0) listState.animateScrollToItem(count - 1)
@@ -112,7 +122,7 @@ fun AiChatScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(12.dp))
-            PlagueDoctorAvatar(sizeDp = 42, hasShadow = false)
+            PlagueDoctorAvatar(sizeDp = 42, hasShadow = false, talking = isLoading || speaking)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("دکتر طاعون", color = MaterialTheme.colorScheme.onBackground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -153,7 +163,7 @@ fun AiChatScreen(
             if (isLoading) {
                 item {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        PlagueDoctorAvatar(sizeDp = 36, hasShadow = false)
+                        PlagueDoctorAvatar(sizeDp = 36, hasShadow = false, talking = true)
                         Spacer(Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
