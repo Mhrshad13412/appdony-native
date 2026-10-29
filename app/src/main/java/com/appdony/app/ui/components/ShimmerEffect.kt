@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
 fun ShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateAnim by transition.animateFloat(
-        initialValue = -600f,
-        targetValue = 1400f,
+        initialValue = -900f,
+        targetValue = 1700f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1100, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -33,14 +33,15 @@ fun ShimmerBrush(): Brush {
         label = "shimmer_translate"
     )
 
-    // نور براق: رنگ پایه + یه لایه‌ی روشن‌تر که از چپ به راست رد می‌شه
+    // نور براق: رنگ پایه + یه لایه‌ی روشن‌تر که مورب رد می‌شه
     val base = MaterialTheme.colorScheme.surfaceVariant
     val shine = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f).compositeOver(base)
 
     return Brush.linearGradient(
         colors = listOf(base, shine, base),
+        // مورب: نور براق کج (از بالا-چپ به پایین-راست) رد می‌شه
         start = Offset(translateAnim, 0f),
-        end = Offset(translateAnim + 450f, 0f)
+        end = Offset(translateAnim + 320f, 320f)
     )
 }
 
@@ -127,6 +128,34 @@ fun DetailSkeleton() {
             ShimmerBox(modifier = Modifier.fillMaxWidth().height(14.dp))
             Spacer(modifier = Modifier.height(8.dp))
             ShimmerBox(modifier = Modifier.fillMaxWidth(0.7f).height(14.dp))
+        }
+    }
+}
+
+@Composable
+fun DownloadCardSkeleton() {
+    androidx.compose.material3.Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        shadowElevation = 6.dp
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShimmerBox(modifier = Modifier.size(64.dp), cornerRadius = 32)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    ShimmerBox(modifier = Modifier.fillMaxWidth(0.85f).height(15.dp), cornerRadius = 6)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ShimmerBox(modifier = Modifier.fillMaxWidth(0.5f).height(11.dp), cornerRadius = 6)
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShimmerBox(modifier = Modifier.width(96.dp).height(36.dp), cornerRadius = 20)
+                ShimmerBox(modifier = Modifier.width(36.dp).height(36.dp), cornerRadius = 18)
+            }
         }
     }
 }
