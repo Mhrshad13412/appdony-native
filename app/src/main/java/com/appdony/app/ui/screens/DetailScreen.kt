@@ -56,6 +56,8 @@ import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.AppInfo
 import com.appdony.app.util.ContentBlock
 import com.appdony.app.util.DownloadHelper
+import com.appdony.app.ui.components.AppBanner
+import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.util.DownloadLink
 import kotlinx.coroutines.launch
 
@@ -148,17 +150,17 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
 
 private suspend fun startAppDownload(context: Context, link: DownloadLink, post: Post) {
     if (link.url.isBlank()) {
-        Toast.makeText(context, "این لینک قفله و هنوز لینک دانلود واقعی نداره", Toast.LENGTH_SHORT).show()
+        AppBanner.show(BannerKind.WARNING, "این لینک فعلاً در دسترس نیست")
         return
     }
-    Toast.makeText(context, "در حال بررسی لینک...", Toast.LENGTH_SHORT).show()
+    AppBanner.show(BannerKind.CHECKING, "در حال بررسی لینک...", 15000L)
     DownloadHelper.startDownload(context, link.url, post.cleanTitle(), post.featuredImageUrl())
         .onSuccess {
-            Toast.makeText(context, "دانلود شروع شد ✓ از بخش «دانلودها» دنبالش کن", Toast.LENGTH_LONG).show()
+            AppBanner.show(BannerKind.SUCCESS, "فایل پیدا شد و دانلود شروع شد؛ از بخش «دانلودها» دنبالش کن", 4000L)
         }
         .onFailure {
             // لینک خراب وارد صف دانلود نمی‌شه؛ فقط دلیلش رو نشون می‌دیم
-            Toast.makeText(context, it.message ?: "این لینک کار نمی‌کنه", Toast.LENGTH_LONG).show()
+            AppBanner.show(BannerKind.ERROR, it.message ?: "این لینک کار نمی‌کنه", 4500L)
         }
 }
 
@@ -256,7 +258,7 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
                         info.allLinks.joinToString("\n").ifBlank { "اطلاعاتی نبود" }
                     }
                     clipboard.setText(AnnotatedString(tech))
-                    Toast.makeText(context, "کپی شد", Toast.LENGTH_SHORT).show()
+                    AppBanner.show(BannerKind.SUCCESS, "اطلاعات فنی کپی شد")
                 }) { Text("کپی اطلاعات فنی", fontSize = 12.sp) }
             }
         } else {
