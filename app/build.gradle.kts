@@ -23,6 +23,15 @@ android {
             ?: ""
         buildConfigField("String", "AI_KEY", "\"${aiKey.trim()}\"")
 
+        // آدرس و کلید عمومی Supabase برای چت پشتیبانی (از GitHub Secret یا local.properties)
+        fun secret(name: String): String =
+            System.getenv(name)
+                ?: rootProject.file("local.properties").takeIf { it.exists() }
+                    ?.readLines()?.firstOrNull { it.startsWith("$name=") }?.removePrefix("$name=")
+                ?: ""
+        buildConfigField("String", "SUPA_URL", "\"${secret("SUPA_URL").trim()}\"")
+        buildConfigField("String", "SUPA_KEY", "\"${secret("SUPA_KEY").trim()}\"")
+
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
