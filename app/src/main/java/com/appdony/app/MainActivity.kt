@@ -2,10 +2,12 @@ package com.appdony.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -105,7 +108,6 @@ fun AppRoot() {
             val workRequest = PeriodicWorkRequestBuilder<BlogUpdateWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("BlogUpdateWork", ExistingPeriodicWorkPolicy.KEEP, workRequest)
         } catch (e: Exception) {
-            // ✅ جلوگیری از کرش برنامه در صورت خطای WorkManager
             e.printStackTrace()
         }
     }
@@ -117,8 +119,21 @@ fun AppRoot() {
     }
     val density = LocalDensity.current
 
+    val isDark = themeState.mode == ThemeMode.DARK
+    val primaryColor = ThemeManager.themeColors.getOrElse(themeState.colorIndex) { ThemeManager.themeColors[0] }
+
+    DisposableEffect(isDark) {
+        val activity = context as? ComponentActivity
+        val transparent = android.graphics.Color.TRANSPARENT
+        activity?.enableEdgeToEdge(
+            statusBarStyle = if (isDark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent),
+            navigationBarStyle = if (isDark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+        )
+        onDispose { }
+    }
+
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        AppdonyTheme(darkTheme = themeState.mode == ThemeMode.DARK) {
+        AppdonyTheme(darkTheme = isDark, primaryColor = primaryColor) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 if (showSplash) {
                     SplashScreen()
@@ -229,7 +244,7 @@ fun MainContent(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             AppNavGraph(navController = navController)
 
             if (showAiAssistant && isMainRoute) {
@@ -246,7 +261,6 @@ fun MainContent(
     }
 }
 
-/** رفتن به یکی از چهار تب اصلی، بدون انباشتن پشته (هر تب یک نمونه و حالتش ذخیره می‌شود). */
 fun NavController.navigateToTab(route: String) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
