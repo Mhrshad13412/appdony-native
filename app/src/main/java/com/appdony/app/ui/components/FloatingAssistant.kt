@@ -69,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -95,6 +97,7 @@ import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.util.AssistantBus
 import com.appdony.app.util.AssistantSay
+import com.appdony.app.util.DownloadPhase
 import com.appdony.app.util.SayKind
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -183,6 +186,10 @@ private class AvatarMotion {
 
     // پیشرفت باز شدن چهار بطری منو
     val menuProg = List(3) { Animatable(0f) }
+
+    // مسیر بطری‌ها موقع بررسی لینک: ۰ بالای صفحه، ۱ کشیده‌شده پایین، ۲ غلتیده سمت راست، ۳ برگشته تو جیب
+    val dlPos = List(3) { Animatable(0f) }
+    var dlJob: Job? = null
 
     var hatDown = false
     var hatJob: Job? = null
@@ -375,7 +382,7 @@ private fun kindColor(kind: SayKind, fallback: Color): Color = when (kind) {
 
 private fun mix(a: Offset, b: Offset, f: Float) = Offset(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f)
 
-private fun DrawScope.drawPotion(center: Offset, size: Float, color: Color, alpha: Float) {
+private fun DrawScope.drawPotion(center: Offset, size: Float, color: Color, alpha: Float, wave: Float = 0f) {
     if (alpha <= 0.01f) return
     val strokeW = size * 0.07f
     val bodyR = size * 0.34f
@@ -384,10 +391,30 @@ private fun DrawScope.drawPotion(center: Offset, size: Float, color: Color, alph
     val neckTop = center.y - size * 0.34f
     val neckBottom = bodyC.y - bodyR * 0.75f
 
-    // مایع داخل بطری
-    drawCircle(color.copy(alpha = 0.30f * alpha), bodyR, bodyC)
+    // مایع داخل بطری: سطحش موج می‌زنه و حباب داره
+    drawCircle(color.copy(alpha = 0.14f * alpha), bodyR, bodyC)
+    val circle = androidx.compose.ui.graphics.Path().apply { addOval(Rect(bodyC, bodyR)) }
+    clipPath(circle) {
+        val level = bodyC.y - bodyR * 0.45f
+        val amp = bodyR * 0.09f
+        val phase = (wave * 2f * Math.PI).toFloat()
+        val liquid = androidx.compose.ui.graphics.Path().apply {
+            val steps = 14
+            moveTo(bodyC.x - bodyR, level)
+            for (k in 0..steps) {
+                val x = bodyC.x - bodyR + 2f * bodyR * k / steps
+                lineTo(x, level + amp * sin(k * 0.9f + phase))
+            }
+            lineTo(bodyC.x + bodyR, bodyC.y + bodyR)
+            lineTo(bodyC.x - bodyR, bodyC.y + bodyR)
+            close()
+        }
+        drawPath(liquid, color.copy(alpha = 0.88f * alpha))
+        drawCircle(Color.White.copy(alpha = 0.45f * alpha), bodyR * 0.08f, Offset(bodyC.x - bodyR * 0.35f, level + bodyR * 0.55f))
+        drawCircle(Color.White.copy(alpha = 0.35f * alpha), bodyR * 0.06f, Offset(bodyC.x + bodyR * 0.30f, level + bodyR * 0.85f))
+    }
     drawRoundRect(
-        color.copy(alpha = 0.14f * alpha),
+        color.copy(alpha = 0.30f * alpha),
         topLeft = Offset(center.x - neckW / 2f, neckTop),
         size = Size(neckW, neckBottom - neckTop),
         cornerRadius = CornerRadius(neckW * 0.2f)
@@ -443,6 +470,8 @@ fun FloatingAssistant(
     var bubbleSay by remember { mutableStateOf<AssistantSay?>(null) }
     var lastSay by remember { mutableStateOf(AssistantSay("")) }
     var activity by remember { mutableIntStateOf(0) }
+    var dlActive by remember { mutableStateOf(false) }
+    var offerOnly by remember { mutableStateOf(false) }
 
     // ترتیب: چت، راهنما، دانلودها، جستجو  ←  زاویه‌ی هر بطری نسبت به جهت «داخل صفحه»
     val items = listOf(
@@ -451,7 +480,7 @@ fun FloatingAssistant(
         Triple(Icons.Outlined.Search, "جستجو", onSearchClick)
     )
     // رنگ مایع هر بطری (آیکن‌ها با رنگ متن می‌شینن و همیشه خوانان)
-    val potionColors = listOf(Color(0xFF4FC3F7), Color(0xFF66BB6A), Color(0xFFFFB300))
+    val potionColors = listOf(Color(0xFF2196F3), Color(0xFF2E9E5B), Color(0xFFE8890C))
     val angles = listOf(0f, 62f, -62f)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -634,7 +663,7 @@ fun FloatingAssistant(
 
             // بطری‌های منو: یکی‌یکی بیرون می‌پرن
             LaunchedEffect(expanded) {
-                if (expanded) showMenu = true
+                if (expanded) { offerOnly = false; showMenu = true }
                 coroutineScope {
                     motion.menuProg.forEachIndexed { i, a ->
                         launch {
@@ -661,6 +690,89 @@ fun FloatingAssistant(
                     if (visibleNow && !dragging && !motion.busy) {
                         expanded = false
                         speak(say, 9_000)
+                    }
+                }
+            }
+
+            // دکمه‌ی دانلود: بطری‌ها از بالا کشیده می‌شن، سمت راست می‌غلتن و آخرش فقط بطری دانلودها تعارف می‌شه
+            LaunchedEffect(ready) {
+                if (!ready) return@LaunchedEffect
+                var startMs = 0L
+                AssistantBus.download.collect { phase ->
+                    when (phase) {
+                        DownloadPhase.CHECKING -> {
+                            if (!visibleNow || dragging || motion.busy) return@collect
+                            motion.dlJob?.cancel()
+                            hidden = false
+                            expanded = false
+                            showMenu = false
+                            offerOnly = false
+                            bubbleSay = null
+                            motion.menuProg.forEach { it.snapTo(0f) }
+                            motion.dlPos.forEach { it.snapTo(0f) }
+                            dlActive = true
+                            startMs = System.currentTimeMillis()
+                            scope.launch {
+                                val say = AssistantSay("صبر کن، دارم لینک رو بررسی می‌کنم…", SayKind.DOWNLOAD)
+                                AssistantBus.noteShown(say.text)
+                                speak(say, 6_000)
+                            }
+                            coroutineScope {
+                                motion.dlPos.forEachIndexed { i, a ->
+                                    launch {
+                                        delay(i * 260L)
+                                        a.animateTo(1f, spring(0.55f, Spring.StiffnessVeryLow))
+                                        delay(350)
+                                        a.animateTo(2f, tween(1100, easing = FastOutSlowInEasing))
+                                    }
+                                }
+                            }
+                        }
+
+                        DownloadPhase.READY, DownloadPhase.FAILED -> {
+                            if (dlActive) {
+                                val wait = 3_500L - (System.currentTimeMillis() - startMs)
+                                if (wait > 0) delay(wait)
+                                // یکی‌یکی برمی‌گردن تو جیب
+                                coroutineScope {
+                                    motion.dlPos.forEachIndexed { i, a ->
+                                        launch {
+                                            delay(i * 380L)
+                                            a.animateTo(3f, tween(900, easing = FastOutSlowInEasing))
+                                        }
+                                    }
+                                }
+                                dlActive = false
+                                motion.dlPos.forEach { it.snapTo(0f) }
+                            }
+                            if (!visibleNow) return@collect
+                            if (phase == DownloadPhase.READY) {
+                                // فقط بطری «دانلودها» تعارف می‌شه
+                                offerOnly = true
+                                showMenu = true
+                                motion.menuProg.forEach { it.snapTo(0f) }
+                                scope.launch {
+                                    val say = AssistantSay("این بشر رو بخور تا بری بخش دانلودها 🧪", SayKind.DOWNLOAD)
+                                    AssistantBus.noteShown(say.text)
+                                    speak(say, 9_000)
+                                }
+                                motion.dlJob = scope.launch {
+                                    motion.menuProg[1].animateTo(1f, spring(0.55f, Spring.StiffnessLow))
+                                    delay(8_500)
+                                    if (offerOnly) {
+                                        motion.menuProg[1].animateTo(0f, spring(0.6f, Spring.StiffnessMediumLow))
+                                        offerOnly = false
+                                        showMenu = false
+                                    }
+                                }
+                            } else {
+                                scope.launch {
+                                    val say = AssistantSay("این لینک جواب نداد. یه لینک دیگه امتحان کن.", SayKind.FAIL)
+                                    AssistantBus.noteShown(say.text)
+                                    speak(say, 6_000)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -757,24 +869,40 @@ fun FloatingAssistant(
                         }
 
                         // ── بطری‌های معجون (منو) ──
-                        if (showMenu) {
+                        if (showMenu || dlActive) {
                             items.forEachIndexed { i, (icon, label, action) ->
-                                Box(modifier = Modifier.layoutId("item$i")) {
-                                    PotionButton(
-                                        icon = icon,
-                                        label = label,
-                                        tint = potionColors[i],
-                                        progress = { motion.menuProg[i].value },
-                                        bob = { bob },
-                                        flip = if (i % 2 == 0) 1f else -1f,
-                                        onClick = {
-                                            if (expanded) {
-                                                expanded = false
-                                                activity++
-                                                action()
+                                if (dlActive || !offerOnly || i == 1) {
+                                    Box(modifier = Modifier.layoutId("item$i")) {
+                                        PotionButton(
+                                            icon = icon,
+                                            label = label,
+                                            tint = potionColors[i],
+                                            progress = {
+                                                if (dlActive) dlAlpha(motion.dlPos[i].value)
+                                                else motion.menuProg[i].value
+                                            },
+                                            rotation = {
+                                                if (dlActive) dlRotation(motion.dlPos[i].value) else 0f
+                                            },
+                                            bob = { bob },
+                                            flip = if (i % 2 == 0) 1f else -1f,
+                                            onClick = {
+                                                if (!dlActive) {
+                                                    if (expanded) {
+                                                        expanded = false
+                                                        activity++
+                                                        action()
+                                                    } else if (offerOnly) {
+                                                        offerOnly = false
+                                                        showMenu = false
+                                                        scope.launch { motion.menuProg[1].snapTo(0f) }
+                                                        activity++
+                                                        action()
+                                                    }
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1080,10 +1208,39 @@ fun FloatingAssistant(
                                 val hiY = (maxYf - p.height / 2f).coerceAtLeast(loY)
                                 val tx = tx0.coerceIn(loX, hiX)
                                 val ty = ty0.coerceIn(loY, hiY)
-                                val prog = motion.menuProg[i].value
-                                val px = pocketX + (tx - pocketX) * prog
-                                val py = pocketY + (ty - pocketY) * prog - sin(Math.PI * prog.coerceIn(0f, 1f)).toFloat() * liftPx
-                                p.place((px - p.width / 2f).roundToInt(), (py - p.height / 2f).roundToInt())
+                                if (dlActive) {
+                                    // ۰→۱ از بالای صفحه کشیده می‌شه پایین، ۱→۲ می‌غلته سمت راست، ۲→۳ برمی‌گرده تو جیب
+                                    val q = motion.dlPos[i].value
+                                    val topX = constraints.maxWidth * (0.25f + 0.25f * i)
+                                    val pullY = topInset + with(density) { 150.dp.toPx() }
+                                    val startY = -p.height.toFloat()
+                                    val rightX = constraints.maxWidth - marginInt - p.width / 2f
+                                    val rightY = pullY + i * (p.height + with(density) { 6.dp.toPx() })
+                                    val dx: Float
+                                    val dy: Float
+                                    when {
+                                        q <= 1f -> {
+                                            dx = topX
+                                            dy = startY + (pullY - startY) * q
+                                        }
+                                        q <= 2f -> {
+                                            val f = q - 1f
+                                            dx = topX + (rightX - topX) * f
+                                            dy = pullY + (rightY - pullY) * f
+                                        }
+                                        else -> {
+                                            val f = q - 2f
+                                            dx = rightX + (pocketX - rightX) * f
+                                            dy = rightY + (pocketY - rightY) * f
+                                        }
+                                    }
+                                    p.place((dx - p.width / 2f).roundToInt(), (dy - p.height / 2f).roundToInt())
+                                } else {
+                                    val prog = motion.menuProg[i].value
+                                    val px = pocketX + (tx - pocketX) * prog
+                                    val py = pocketY + (ty - pocketY) * prog - sin(Math.PI * prog.coerceIn(0f, 1f)).toFloat() * liftPx
+                                    p.place((px - p.width / 2f).roundToInt(), (py - p.height / 2f).roundToInt())
+                                }
                             }
                         }
 
@@ -1159,6 +1316,20 @@ private fun SpeechBubble(
     }
 }
 
+/** غلتیدن: یک دور کامل موقع رفتن به راست و یک دور برعکس موقع برگشتن */
+private fun dlRotation(q: Float): Float = when {
+    q <= 1f -> 0f
+    q <= 2f -> (q - 1f) * 360f
+    else -> 360f - (q - 2f) * 360f
+}
+
+/** بطری تا وقتی کشیده نشده نامرئیه و آخر مسیر تو جیب محو می‌شه */
+private fun dlAlpha(q: Float): Float = when {
+    q <= 0f -> 0f
+    q < 2.6f -> 1f
+    else -> ((3f - q) / 0.4f).coerceIn(0f, 1f)
+}
+
 /** یه بطری معجون که آیکن و اسم هر گزینه توشه؛ انگار جنس‌های دکتره */
 @Composable
 private fun PotionButton(
@@ -1166,6 +1337,7 @@ private fun PotionButton(
     label: String,
     tint: Color,
     progress: () -> Float,
+    rotation: () -> Float = { 0f },
     bob: () -> Float,
     flip: Float,
     onClick: () -> Unit
@@ -1191,12 +1363,14 @@ private fun PotionButton(
         Box(
             modifier = Modifier
                 .size(58.dp)
+                .graphicsLayer { rotationZ = rotation() }
                 .drawBehind {
                     drawPotion(
                         center = Offset(size.width / 2f, size.height / 2f),
                         size = size.minDimension,
                         color = tint,
-                        alpha = 1f
+                        alpha = 1f,
+                        wave = bob()
                     )
                 },
             contentAlignment = Alignment.Center
@@ -1204,7 +1378,7 @@ private fun PotionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = Color.White,
                 modifier = Modifier
                     .size(20.dp)
                     .padding(top = 0.dp)
