@@ -27,10 +27,10 @@ object AiApi {
     var lastDebug: String = ""
         private set
 
-    private const val API_KEY =
-        "Pv77blYidBv5Ay2kBagJx/CEUqS3MeRdptv73csgaIjBcppfe70XQS5VAYa83b+Hni7VxeqYuMMU8NbIRWUlk0kHEP0Ja8Wkzu0Dc+dd5lFxm+baAhyWo4bjnBwaDain81yMfVMp2eI2OS5zbHS+eg=="
+    // توکن رایگان رو از https://token.llm7.io بگیر و این‌جا بذار (کلید قبلی باطل شده)
+    private const val API_KEY = ""
 
-    private val KEYS = listOf(API_KEY, "unused")
+    private val KEYS = listOf(API_KEY, "unused").filter { it.isNotBlank() }
 
     private val SYSTEM_PROMPT = """
         تو «دکتر طاعون» هستی، دستیار اپلیکیشن «اپدونی» (مرجع دانلود بازی و برنامه‌ی اندروید).
@@ -190,8 +190,8 @@ object AiApi {
     }
 
     private fun describe(e: ApiException?): String = when (e?.code) {
-        401, 403 -> "کلید هوش مصنوعی رد شد (کد ${e.code})."
-        402 -> "سهمیه‌ی سرویس هوش مصنوعی تموم شده (کد 402)."
+        401, 403 -> "دکتر الان نمی‌تونه جواب هوشمند بده. چند دقیقه‌ی دیگه امتحان کن."
+        402 -> "سهمیه‌ی دکتر تموم شده. کمی بعد دوباره بپرس."
         429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
         null -> "مشکلی پیش اومد. دوباره امتحان کن."
         else -> "سرویس هوش مصنوعی در دسترس نیست (کد ${e.code})."
