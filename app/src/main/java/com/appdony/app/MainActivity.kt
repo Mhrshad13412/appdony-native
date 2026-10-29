@@ -231,41 +231,45 @@ fun MainContent(
     val currentRoute = navBackStackEntry?.destination?.route ?: "games"
     val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
 
-    Scaffold(
-        topBar = {
-            if (isMainRoute) {
-                AppTopBar(
-                    isLoggedIn = isLoggedIn,
-                    userInitial = if (displayName.isNotBlank()) displayName else username,
-                    onSearchClick = { navController.navigate("search") },
-                    onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
-                )
-            }
-        },
-        bottomBar = {
-            if (isMainRoute) {
-                AppBottomNav(
-                    currentRoute = currentRoute,
-                    onTabSelected = { route -> navController.navigateToTab(route) }
-                )
-            }
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            AppNavGraph(navController = navController)
-
-            com.appdony.app.ui.components.AppBannerHost(modifier = Modifier.align(Alignment.TopCenter))
-
-            if (showAiAssistant && isMainRoute) {
-                Box(modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp, end = 16.dp)) {
-                    FloatingAssistant(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                if (isMainRoute) {
+                    AppTopBar(
+                        isLoggedIn = isLoggedIn,
+                        userInitial = if (displayName.isNotBlank()) displayName else username,
                         onSearchClick = { navController.navigate("search") },
-                        onDownloadsClick = { navController.navigateToTab("downloads") },
-                        onHelpClick = { navController.navigateToTab("blog") },
-                        onChatClick = { navController.navigate("ai_chat") }
+                        onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
+                    )
+                }
+            },
+            bottomBar = {
+                if (isMainRoute) {
+                    AppBottomNav(
+                        currentRoute = currentRoute,
+                        onTabSelected = { route -> navController.navigateToTab(route) }
                     )
                 }
             }
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                AppNavGraph(navController = navController)
+
+                com.appdony.app.ui.components.AppBannerHost(modifier = Modifier.align(Alignment.TopCenter))
+            }
+        }
+
+        // دکتر طاعون روی کل اپ (همه‌ی صفحه‌ها)، جز صفحه‌ی خود چت
+        if (showAiAssistant) {
+            FloatingAssistant(
+                currentRoute = currentRoute,
+                visible = currentRoute != "ai_chat" && currentRoute != "chat",
+                bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
+                onSearchClick = { navController.navigate("search") { launchSingleTop = true } },
+                onDownloadsClick = { navController.navigateToTab("downloads") },
+                onHelpClick = { navController.navigateToTab("blog") },
+                onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
+            )
         }
     }
 }
