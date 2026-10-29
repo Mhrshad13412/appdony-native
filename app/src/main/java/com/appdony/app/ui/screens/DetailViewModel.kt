@@ -73,7 +73,11 @@ class DetailViewModel(
                 val found = InstallLinkFinder.find(post.id, post.link)
                 val current = _state.value as? DetailUiState.Success ?: return@onSuccess
                 found.onSuccess { r ->
-                    val merged = (r.links + current.info.downloadLinks).distinctBy { it.url }
+                    val all = (r.links + current.info.downloadLinks).distinctBy { it.url.ifBlank { "locked:" + it.title } }
+                    val real = all.filter { it.url.isNotBlank() }
+                    val locked = all.filter { it.url.isBlank() }
+                    // دکمه‌ی قفل فقط وقتی نشون داده می‌شه که لینک واقعی نداریم، یا اسم مشخص داره
+                    val merged = real + if (real.isEmpty()) locked else locked.filter { it.title != InstallLinkFinder.LOCKED_TITLE }
                     _state.value = current.copy(
                         info = current.info.copy(
                             downloadLinks = merged,
