@@ -195,7 +195,7 @@ private fun DownloadCard(
 private fun statusText(item: DownloadItem): String = when (item.status) {
     DownloadManager.STATUS_SUCCESSFUL -> "دانلود کامل شد • ${formatSize(item.total)}"
     DownloadManager.STATUS_FAILED -> item.message ?: "دانلود ناموفق بود"
-    DownloadManager.STATUS_PENDING -> "در صف دانلود..."
+    DownloadManager.STATUS_PENDING -> item.message ?: "در صف دانلود..."
     DownloadManager.STATUS_PAUSED -> item.message ?: "متوقف شد"
     else -> if (item.total > 0) {
         "${item.progress}% • ${formatSize(item.bytes)} از ${formatSize(item.total)}"
@@ -213,17 +213,12 @@ private fun formatSize(bytes: Long): String {
 
 private fun openDownload(context: Context, item: DownloadItem) {
     try {
-        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        var uri: Uri? = try {
-            manager.getUriForDownloadedFile(item.id)
-        } catch (e: Exception) {
-            null
-        }
-
-        if (uri == null && !item.localUri.isNullOrBlank()) {
+        var uri: Uri? = null
+        if (!item.localUri.isNullOrBlank()) {
             val parsed = Uri.parse(item.localUri)
             uri = if (parsed.scheme == "file") {
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(parsed.path ?: ""))
+                val f = File(parsed.path ?: "")
+                if (f.exists()) FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f) else null
             } else {
                 parsed
             }
@@ -255,6 +250,6 @@ private fun openDownload(context: Context, item: DownloadItem) {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     } catch (e: Exception) {
-        Toast.makeText(context, "این فایل را با برنامه‌ی مدیریت فایل باز کن (پوشه‌ی Download/Appdony)", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "این فایل را با برنامه‌ی مدیریت فایل باز کن (پوشه‌ی Android/data/com.appdony.app/files/Download/Appdony)", Toast.LENGTH_LONG).show()
     }
 }
