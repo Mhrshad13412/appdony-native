@@ -9,6 +9,7 @@ import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.appdony.app.util.SayKind
@@ -28,9 +29,12 @@ internal val OutlineColor = Color(0xFF6B3E1E)
 internal val PinkColor = Color(0xFFFF8FA3)
 internal val EyeColor = Color(0xFF2A1A14)
 
-// رنگ کاموای هر دکمه (چت، دانلودها، جستجو) و کاموای خودِ گربه
-internal val YarnColors = listOf(Color(0xFFEC6B8E), Color(0xFF4DB6AC), Color(0xFFFFB74D))
-internal val CatYarn = Color(0xFFEC6B8E)
+// رنگ کاموای هر دکمه (چت، دانلودها، جستجو): همه از رنگ تم برنامه، با کمی روشن/تیره
+internal fun yarnPalette(base: Color): List<Color> = listOf(
+    base,
+    lerp(base, Color.White, 0.28f),
+    lerp(base, Color.Black, 0.22f)
+)
 
 internal fun kindIcon(kind: SayKind): ImageVector = when (kind) {
     SayKind.TIP -> Icons.Outlined.Lightbulb
