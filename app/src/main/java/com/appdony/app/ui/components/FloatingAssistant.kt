@@ -2,9 +2,7 @@ package com.appdony.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -23,7 +21,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -45,7 +42,6 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -67,12 +63,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
@@ -81,8 +76,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
@@ -120,84 +115,222 @@ private val GoldColor = Color(0xFFFFB300)
 private val GreenColor = Color(0xFF34C759)
 private val RedColor = Color(0xFFFF6B6B)
 
-// ───────────────────────── رسم دکتر طاعون (سر با منقار بلند) ─────────────────────────
+// رنگ‌های گربه
+private val FurColor = Color(0xFFFFB566)
+private val FurDark = Color(0xFFE48A3E)
+private val CreamColor = Color(0xFFFFF1DC)
+private val OutlineColor = Color(0xFF6B3E1E)
+private val PinkColor = Color(0xFFFF8FA3)
+private val EyeColor = Color(0xFF2A1A14)
 
-/**
- * دکتر طاعون روی بوم ۶۰×۶۰ رسم می‌شه و منقارش جون داره:
- * موقع حرف زدن باز و بسته می‌شه، موقع بیرون آوردن بطری‌ها باز می‌شه
- * و بطری رو سر منقار نگه می‌داره. [face] جهت نگاهه (۱ راست، ‎-۱ چپ).
- */
-private fun DrawScope.drawDoctor(
-    face: Float,
-    openDeg: Float,
-    ink: Color,
-    fill: Color,
-    potionAlpha: Float,
-    wave: Float
-) {
-    val u = 1.dp.toPx()
-    val sw = 1.8f * u
-    fun pt(x: Float, y: Float) = Offset(x * u, y * u)
+// رنگ کاموای هر دکمه (چت، دانلودها، جستجو) و کاموای خودِ گربه
+private val YarnColors = listOf(Color(0xFFEC6B8E), Color(0xFF4DB6AC), Color(0xFFFFB74D))
+private val CatYarn = Color(0xFFEC6B8E)
 
-    withTransform({ scale(face, 1f, pt(30f, 30f)) }) {
-        // یقه‌ی ردا
-        val collar = androidx.compose.ui.graphics.Path().apply {
-            moveTo(12f * u, 58f * u)
-            lineTo(19f * u, 44f * u)
-            quadraticBezierTo(27f * u, 49f * u, 35f * u, 44f * u)
-            lineTo(42f * u, 58f * u)
-            close()
-        }
-        drawPath(collar, fill)
-        drawPath(collar, ink, style = Stroke(width = sw, join = StrokeJoin.Round))
+// ───────────────────────── رسم کاموا ─────────────────────────
 
-        // سر
-        drawOval(fill, pt(14f, 17f), Size(24f * u, 28f * u))
-        drawOval(ink, pt(14f, 17f), Size(24f * u, 28f * u), style = Stroke(width = sw))
-
-        // چشم
-        drawCircle(ink, 3.4f * u, pt(29.5f, 27f), style = Stroke(width = 1.5f * u))
-        drawCircle(ink, 1.3f * u, pt(30f, 27f))
-
-        // فک پایین (می‌چرخه و باز می‌شه)
-        withTransform({ rotate(openDeg, pt(33f, 37f)) }) {
-            val lower = androidx.compose.ui.graphics.Path().apply {
-                moveTo(33f * u, 36.5f * u)
-                cubicTo(40f * u, 39f * u, 46f * u, 43f * u, 51f * u, 48f * u)
-                cubicTo(44f * u, 47f * u, 38f * u, 44f * u, 33f * u, 41f * u)
-                close()
+/** گلوله‌ی کاموا: چند دور نخ دور هم می‌پیچه و با [spin] می‌چرخه */
+private fun DrawScope.drawYarnBall(center: Offset, r: Float, color: Color, spin: Float) {
+    val dark = lerp(color, Color.Black, 0.28f)
+    val light = lerp(color, Color.White, 0.35f)
+    drawCircle(color, r, center)
+    val clip = Path().apply { addOval(Rect(center, r)) }
+    clipPath(clip) {
+        val sw = r * 0.09f
+        for (k in 0..4) {
+            withTransform({ rotate(spin + k * 36f, center) }) {
+                drawOval(
+                    color = if (k % 2 == 0) dark else light,
+                    topLeft = Offset(center.x - r * 1.05f, center.y - r * 0.42f),
+                    size = Size(r * 2.1f, r * 0.84f),
+                    style = Stroke(width = sw)
+                )
             }
-            drawPath(lower, fill)
-            drawPath(lower, ink, style = Stroke(width = sw * 0.85f, join = StrokeJoin.Round))
+        }
+    }
+    drawCircle(dark, r, center, style = Stroke(width = r * 0.07f))
+    drawCircle(Color.White.copy(alpha = 0.5f), r * 0.13f, Offset(center.x - r * 0.4f, center.y - r * 0.45f))
+}
+
+// ───────────────────────── رسم گربه ─────────────────────────
+
+/** حالت لحظه‌ای گربه؛ همه‌ی مقدارها بین ۰ و ۱ (یا ‎-۱ تا ۱) هستن */
+private class CatPose(
+    val face: Float,     // ۱ = دم و کاموا سمت راست، ‎-۱ = برعکس
+    val blink: Float,    // پلک
+    val ear: Float,      // تکون خوردن گوش
+    val tail: Float,     // تاب خوردن دم (‎-۱ تا ۱)
+    val mouth: Float,    // باز بودن دهن
+    val paw: Float,      // بالا آمدن پنجه
+    val lookX: Float,    // نگاه چپ/راست
+    val lookY: Float,    // نگاه بالا/پایین
+    val scare: Float,    // بغل گرفته شدن: چشم درشت‌تر و گوش خوابیده
+    val happy: Float,    // چشم‌های خندون ^ ^
+    val wiggle: Float    // قل خوردن گلوله‌ی کاموای کنار پا
+)
+
+private fun DrawScope.drawCat(p: CatPose) {
+    val u = 1.dp.toPx()
+    fun pt(x: Float, y: Float) = Offset(x * u, y * u)
+    val line = 1.5f * u
+
+    withTransform({ scale(p.face, 1f, pt(30f, 30f)) }) {
+
+        // ── دم (پشت بدن) ──
+        withTransform({ rotate(p.tail * 14f, pt(20f, 52f)) }) {
+            val tail = Path().apply {
+                moveTo(20f * u, 52f * u)
+                cubicTo(6f * u, 52f * u, 2f * u, 38f * u, 9f * u, 31f * u)
+            }
+            drawPath(tail, OutlineColor, style = Stroke(width = 7f * u, cap = StrokeCap.Round))
+            drawPath(tail, FurColor, style = Stroke(width = 4.6f * u, cap = StrokeCap.Round))
+            drawCircle(CreamColor, 2.3f * u, pt(9f, 31.2f))
         }
 
-        // منقار بالا
-        val upper = androidx.compose.ui.graphics.Path().apply {
-            moveTo(32f * u, 24f * u)
-            cubicTo(42f * u, 23f * u, 51f * u, 30f * u, 56f * u, 44f * u)
-            cubicTo(48f * u, 42f * u, 40f * u, 39f * u, 33f * u, 36f * u)
-            close()
-        }
-        drawPath(upper, fill)
-        drawPath(upper, ink, style = Stroke(width = sw, join = StrokeJoin.Round))
-        drawCircle(ink, 0.9f * u, pt(40f, 30.5f))
+        // ── بدن و شکم ──
+        drawOval(FurColor, pt(17f, 38f), Size(26f * u, 22f * u))
+        drawOval(OutlineColor, pt(17f, 38f), Size(26f * u, 22f * u), style = Stroke(width = line))
+        drawOval(CreamColor, pt(23f, 43f), Size(14f * u, 15f * u))
 
-        // کلاه
-        val crown = androidx.compose.ui.graphics.Path().apply {
-            moveTo(16f * u, 19f * u)
-            lineTo(16f * u, 11f * u)
-            quadraticBezierTo(16f * u, 8.5f * u, 18.5f * u, 8.5f * u)
-            lineTo(31.5f * u, 8.5f * u)
-            quadraticBezierTo(34f * u, 8.5f * u, 34f * u, 11f * u)
-            lineTo(34f * u, 19f * u)
+        // ── کاموا دور گربه: چند دور نخ دور بدن ──
+        for (k in 0..2) {
+            val y = 44f + k * 5f
+            val wrap = Path().apply {
+                moveTo((17.4f + k * 0.9f) * u, y * u)
+                quadraticBezierTo(30f * u, (y + 5f) * u, (42.6f - k * 0.9f) * u, y * u)
+            }
+            drawPath(wrap, lerp(CatYarn, Color.Black, 0.22f), style = Stroke(width = 2.6f * u, cap = StrokeCap.Round))
+            drawPath(wrap, CatYarn, style = Stroke(width = 1.8f * u, cap = StrokeCap.Round))
         }
-        drawPath(crown, fill)
-        drawPath(crown, ink, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        drawLine(ink, pt(16f, 15.5f), pt(34f, 15.5f), strokeWidth = 1.2f * u)
-        drawLine(ink, pt(11f, 19f), pt(39f, 19f), strokeWidth = 2.2f * u, cap = StrokeCap.Round)
 
-        // بطری سر منقار
-        drawPotion(pt(50f, 24f), 16f * u, ink, potionAlpha, wave)
+        // ── گلوله‌ی کاموای کنار پا + نخی که به بدن وصله ──
+        val ballC = pt(46f + p.wiggle * 1.2f, 55f)
+        val link = Path().apply {
+            moveTo(40.5f * u, 49f * u)
+            quadraticBezierTo(47f * u, 47f * u, ballC.x, ballC.y - 4.5f * u)
+        }
+        drawPath(link, CatYarn, style = Stroke(width = 1.5f * u, cap = StrokeCap.Round))
+        drawYarnBall(ballC, 5.2f * u, CatYarn, p.wiggle * 70f)
+
+        // ── پنجه‌ها ──
+        val dangle = p.scare * 3f
+        drawOval(CreamColor, pt(19f, 52.5f + dangle), Size(9f * u, 6.5f * u))
+        drawOval(OutlineColor, pt(19f, 52.5f + dangle), Size(9f * u, 6.5f * u), style = Stroke(width = 1.1f * u))
+        val px = 32f + p.paw * 4f
+        val py = 52.5f - p.paw * 9f + dangle * (1f - p.paw)
+        withTransform({ rotate(-p.paw * 25f, pt(px + 4.5f, py + 3f)) }) {
+            drawOval(CreamColor, pt(px, py), Size(9f * u, 6.5f * u))
+            drawOval(OutlineColor, pt(px, py), Size(9f * u, 6.5f * u), style = Stroke(width = 1.1f * u))
+        }
+
+        // ── گوش‌ها ──
+        val earL = p.ear * 10f - p.scare * 14f
+        val earR = p.scare * 14f
+        withTransform({ rotate(earL, pt(19f, 20f)) }) {
+            val ear = Path().apply {
+                moveTo(14f * u, 25f * u); lineTo(14.5f * u, 6.5f * u); lineTo(27.5f * u, 15f * u); close()
+            }
+            drawPath(ear, FurColor)
+            drawPath(ear, OutlineColor, style = Stroke(width = line, join = StrokeJoin.Round))
+            val inner = Path().apply {
+                moveTo(17.2f * u, 21.5f * u); lineTo(17.4f * u, 11.5f * u); lineTo(24f * u, 16f * u); close()
+            }
+            drawPath(inner, PinkColor)
+        }
+        withTransform({ rotate(earR, pt(41f, 20f)) }) {
+            val ear = Path().apply {
+                moveTo(46f * u, 25f * u); lineTo(45.5f * u, 6.5f * u); lineTo(32.5f * u, 15f * u); close()
+            }
+            drawPath(ear, FurColor)
+            drawPath(ear, OutlineColor, style = Stroke(width = line, join = StrokeJoin.Round))
+            val inner = Path().apply {
+                moveTo(42.8f * u, 21.5f * u); lineTo(42.6f * u, 11.5f * u); lineTo(36f * u, 16f * u); close()
+            }
+            drawPath(inner, PinkColor)
+        }
+
+        // ── سر ──
+        drawOval(FurColor, pt(13f, 13f), Size(34f * u, 30f * u))
+        drawOval(OutlineColor, pt(13f, 13f), Size(34f * u, 30f * u), style = Stroke(width = line))
+
+        // خط‌های پیشونی
+        val stripe = 1.6f * u
+        drawLine(FurDark, pt(30f, 14f), pt(30f, 18.5f), strokeWidth = stripe, cap = StrokeCap.Round)
+        drawLine(FurDark, pt(25.5f, 14.8f), pt(26.6f, 18.6f), strokeWidth = stripe, cap = StrokeCap.Round)
+        drawLine(FurDark, pt(34.5f, 14.8f), pt(33.4f, 18.6f), strokeWidth = stripe, cap = StrokeCap.Round)
+
+        // ── چشم‌های درشت و بامزه ──
+        val eyeR = 6.3f + p.scare * 0.8f
+        val open = (1f - p.blink).coerceAtLeast(0.08f)
+        val eyeAlpha = 1f - p.happy
+        listOf(22.3f, 37.7f).forEach { cx ->
+            val cy = 29.5f
+            if (eyeAlpha > 0.02f) {
+                drawOval(
+                    color = EyeColor.copy(alpha = eyeAlpha),
+                    topLeft = pt(cx - eyeR, cy - eyeR * open),
+                    size = Size(eyeR * 2f * u, eyeR * 2f * open * u)
+                )
+                if (open > 0.45f) {
+                    drawCircle(
+                        Color(0xFF6B4A3A).copy(alpha = 0.55f * eyeAlpha), 3.4f * u,
+                        pt(cx + p.lookX * 1.4f, cy + 1.6f + p.lookY * 1.4f)
+                    )
+                    drawCircle(
+                        Color.White.copy(alpha = eyeAlpha), 2.4f * u,
+                        pt(cx - 1.9f + p.lookX * 1.8f, cy - 2.3f + p.lookY * 1.8f)
+                    )
+                    drawCircle(
+                        Color.White.copy(alpha = 0.85f * eyeAlpha), 1.1f * u,
+                        pt(cx + 2.3f + p.lookX * 1.2f, cy + 2.4f + p.lookY * 1.2f)
+                    )
+                }
+            }
+            if (p.happy > 0.02f) {
+                val smile = Path().apply {
+                    moveTo((cx - 4.6f) * u, (cy + 1.6f) * u)
+                    quadraticBezierTo(cx * u, (cy - 4.6f) * u, (cx + 4.6f) * u, (cy + 1.6f) * u)
+                }
+                drawPath(
+                    smile, EyeColor.copy(alpha = p.happy),
+                    style = Stroke(width = 1.9f * u, cap = StrokeCap.Round)
+                )
+            }
+        }
+
+        // گونه‌ها
+        drawCircle(PinkColor.copy(alpha = 0.5f), 3.2f * u, pt(15.5f, 35.5f))
+        drawCircle(PinkColor.copy(alpha = 0.5f), 3.2f * u, pt(44.5f, 35.5f))
+
+        // دماغ
+        val nose = Path().apply {
+            moveTo(28.3f * u, 33.6f * u); lineTo(31.7f * u, 33.6f * u); lineTo(30f * u, 35.4f * u); close()
+        }
+        drawPath(nose, PinkColor)
+        drawPath(nose, OutlineColor, style = Stroke(width = 0.8f * u, join = StrokeJoin.Round))
+
+        // دهن: «ω» و موقع حرف زدن باز می‌شه
+        val mouth = Path().apply {
+            moveTo(30f * u, 35.4f * u); lineTo(30f * u, 36.8f * u)
+            moveTo(30f * u, 36.8f * u); quadraticBezierTo(28.6f * u, 38.6f * u, 26.8f * u, 37.4f * u)
+            moveTo(30f * u, 36.8f * u); quadraticBezierTo(31.4f * u, 38.6f * u, 33.2f * u, 37.4f * u)
+        }
+        drawPath(mouth, OutlineColor, style = Stroke(width = 1.1f * u, cap = StrokeCap.Round))
+        if (p.mouth > 0.05f) {
+            val ry = 0.8f + p.mouth * 2.6f
+            drawOval(Color(0xFF8B2E3C), pt(27.8f, 37.6f), Size(4.4f * u, ry * 2f * u))
+            drawCircle(PinkColor, 1.2f * p.mouth * u, pt(30f, 37.6f + ry * 1.6f))
+        }
+
+        // سبیل‌ها
+        val wh = CreamColor.copy(alpha = 0.9f)
+        val ws = 0.9f * u
+        drawLine(wh, pt(14f, 34f), pt(4f, 31.8f), strokeWidth = ws, cap = StrokeCap.Round)
+        drawLine(wh, pt(14f, 36.2f), pt(4f, 36.6f), strokeWidth = ws, cap = StrokeCap.Round)
+        drawLine(wh, pt(14.5f, 38.2f), pt(5.5f, 41f), strokeWidth = ws, cap = StrokeCap.Round)
+        drawLine(wh, pt(46f, 34f), pt(56f, 31.8f), strokeWidth = ws, cap = StrokeCap.Round)
+        drawLine(wh, pt(46f, 36.2f), pt(56f, 36.6f), strokeWidth = ws, cap = StrokeCap.Round)
+        drawLine(wh, pt(45.5f, 38.2f), pt(54.5f, 41f), strokeWidth = ws, cap = StrokeCap.Round)
     }
 }
 
@@ -209,10 +342,15 @@ private class AvatarMotion {
     val hideShift = Animatable(0f)
     val tilt = Animatable(0f)
 
-    // پیشرفت باز شدن بطری‌های منو
+    val blink = Animatable(0f)
+    val ear = Animatable(0f)
+    val pounce = Animatable(0f)
+    val land = Animatable(0f)
+
+    // پیشرفت بیرون اومدن کاموا‌های منو
     val menuProg = List(3) { Animatable(0f) }
 
-    // مسیر بطری‌ها موقع بررسی لینک: ۰ بالای صفحه، ۱ کشیده‌شده پایین، ۲ غلتیده سمت راست، ۳ برگشته تو منقار
+    // مسیر کاموا‌ها موقع بررسی لینک: ۰ بالای صفحه، ۱ آویزون و بازیگوش، ۲ قل‌خوران سمت راست، ۳ برگشته پیش گربه
     val dlPos = List(3) { Animatable(0f) }
     var dlJob: Job? = null
 
@@ -225,6 +363,27 @@ private class AvatarMotion {
     suspend fun relax() {
         tilt.animateTo(0f, spring(0.35f, Spring.StiffnessLow))
     }
+
+    suspend fun blinkOnce() {
+        blink.animateTo(1f, tween(80))
+        blink.animateTo(0f, tween(130))
+    }
+
+    suspend fun twitchEar() {
+        ear.animateTo(1f, tween(70))
+        ear.animateTo(-0.5f, tween(70))
+        ear.animateTo(0f, tween(140))
+    }
+
+    suspend fun hop(strength: Float = 1f) {
+        pounce.animateTo(strength, tween(130))
+        pounce.animateTo(0f, spring(0.35f, Spring.StiffnessMedium))
+    }
+
+    suspend fun landSquash() {
+        land.snapTo(1f)
+        land.animateTo(0f, spring(0.3f, Spring.StiffnessLow))
+    }
 }
 
 // ───────────────────────── جمله‌ها ─────────────────────────
@@ -234,9 +393,9 @@ private fun String.stripEmoji(): String =
 
 private object AssistantPhrases {
     private val general = listOf(
-        "سلام! اگه بازی خاصی تو ذهنته، از دکمه‌ی جستجو اسمش رو بزن 🔍",
+        "میو! اگه بازی خاصی تو ذهنته، از دکمه‌ی جستجو اسمش رو بزن 🔍",
         "خسته نشدی؟ یه نفس عمیق بکش، بعد برگرد سراغ دانلود 😄",
-        "هر وقت خواستی با من چت کن؛ نسخه‌ی بازی هم می‌پیچم!",
+        "هر وقت خواستی با من چت کن؛ بازی خوب هم پیدا می‌کنم!",
         "فضای گوشیت پره؟ قبل از نصب بازی‌های بزرگ یه نگاهی بهش بنداز.",
         "اگه نصب نشد، گزینه‌ی «نصب از منابع ناشناس» رو چک کن.",
         "منو بگیر و هر جا خواستی ببر؛ ناراحت نمی‌شم 😉",
@@ -256,8 +415,9 @@ private object AssistantPhrases {
         "بازی‌های سنگین رو با شارژ کافی نصب کن 🔋",
         "گاهی کش برنامه‌ها رو پاک کن، گوشی سبک‌تر می‌شه.",
         "اگه بازی باز نشد، یه بار گوشی رو ری‌استارت کن.",
-        "تنها نیستی؛ من همیشه همین گوشه منتظرم 🩺",
-        "حالت شب و روز رو هم می‌تونی از تنظیمات عوض کنی."
+        "تنها نیستی؛ من همیشه همین گوشه منتظرم 🐾",
+        "حالت شب و روز رو هم می‌تونی از تنظیمات عوض کنی.",
+        "کاموام رو دیدی؟ بدون اون خوابم نمی‌بره 🧶"
     ).map { AssistantSay(it.stripEmoji(), SayKind.TIP) }
 
     private val plus = listOf(
@@ -377,65 +537,22 @@ private fun kindColor(kind: SayKind, fallback: Color): Color = when (kind) {
     else -> fallback
 }
 
-// ───────────────────────── رسم بطری معجون ─────────────────────────
+// ───────────────────────── مسیر کاموا‌ها موقع بررسی لینک ─────────────────────────
 
-private fun mix(a: Offset, b: Offset, f: Float) = Offset(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f)
+/** قل خوردن: ۱ دور و نیم تا وسط مسیر و بقیه موقع برگشتن */
+private fun dlSpin(q: Float): Float = q * 540f
 
-private fun DrawScope.drawPotion(center: Offset, size: Float, color: Color, alpha: Float, wave: Float = 0f) {
-    if (alpha <= 0.01f) return
-    val strokeW = size * 0.07f
-    val bodyR = size * 0.34f
-    val bodyC = Offset(center.x, center.y + size * 0.14f)
-    val neckW = size * 0.24f
-    val neckTop = center.y - size * 0.34f
-    val neckBottom = bodyC.y - bodyR * 0.75f
+/** کاموا تا وقتی از بالا نیومده نامرئیه و آخر مسیر پیش گربه محو می‌شه */
+private fun dlAlpha(q: Float): Float = when {
+    q <= 0f -> 0f
+    q < 2.6f -> 1f
+    else -> ((3f - q) / 0.4f).coerceIn(0f, 1f)
+}
 
-    // مایع داخل بطری: سطحش موج می‌زنه و حباب داره
-    drawCircle(color.copy(alpha = 0.14f * alpha), bodyR, bodyC)
-    val circle = androidx.compose.ui.graphics.Path().apply { addOval(Rect(bodyC, bodyR)) }
-    clipPath(circle) {
-        val level = bodyC.y - bodyR * 0.45f
-        val amp = bodyR * 0.09f
-        val phase = (wave * 2f * Math.PI).toFloat()
-        val liquid = androidx.compose.ui.graphics.Path().apply {
-            val steps = 14
-            moveTo(bodyC.x - bodyR, level)
-            for (k in 0..steps) {
-                val x = bodyC.x - bodyR + 2f * bodyR * k / steps
-                lineTo(x, level + amp * sin(k * 0.9f + phase))
-            }
-            lineTo(bodyC.x + bodyR, bodyC.y + bodyR)
-            lineTo(bodyC.x - bodyR, bodyC.y + bodyR)
-            close()
-        }
-        drawPath(liquid, color.copy(alpha = 0.88f * alpha))
-        drawCircle(Color.White.copy(alpha = 0.45f * alpha), bodyR * 0.08f, Offset(bodyC.x - bodyR * 0.35f, level + bodyR * 0.55f))
-        drawCircle(Color.White.copy(alpha = 0.35f * alpha), bodyR * 0.06f, Offset(bodyC.x + bodyR * 0.30f, level + bodyR * 0.85f))
-    }
-    drawRoundRect(
-        color.copy(alpha = 0.30f * alpha),
-        topLeft = Offset(center.x - neckW / 2f, neckTop),
-        size = Size(neckW, neckBottom - neckTop),
-        cornerRadius = CornerRadius(neckW * 0.2f)
-    )
-    // بدنه و گردن
-    drawCircle(color.copy(alpha = alpha), bodyR, bodyC, style = Stroke(width = strokeW))
-    drawRoundRect(
-        color.copy(alpha = alpha),
-        topLeft = Offset(center.x - neckW / 2f, neckTop),
-        size = Size(neckW, neckBottom - neckTop),
-        cornerRadius = CornerRadius(neckW * 0.2f),
-        style = Stroke(width = strokeW)
-    )
-    // درپوش
-    drawRoundRect(
-        color.copy(alpha = alpha),
-        topLeft = Offset(center.x - neckW * 0.7f, neckTop - size * 0.09f),
-        size = Size(neckW * 1.4f, size * 0.1f),
-        cornerRadius = CornerRadius(size * 0.03f)
-    )
-    // برق شیشه
-    drawCircle(Color.White.copy(alpha = 0.55f * alpha), size * 0.045f, Offset(bodyC.x - bodyR * 0.45f, bodyC.y - bodyR * 0.35f))
+/** پرش‌های کوچیک موقع افتادن از بالا: هر بار پایین می‌رسه یه کم بالا می‌پره */
+private fun dlBounce(q: Float): Float {
+    if (q <= 0f || q >= 1f) return 0f
+    return abs(sin(q * Math.PI * 3.0)).toFloat() * (1f - q) * 0.9f
 }
 
 // ───────────────────────── کامپوننت اصلی ─────────────────────────
@@ -471,15 +588,17 @@ fun FloatingAssistant(
     var dlActive by remember { mutableStateOf(false) }
     var offerOnly by remember { mutableStateOf(false) }
 
-    // ترتیب: چت، راهنما، دانلودها، جستجو  ←  زاویه‌ی هر بطری نسبت به جهت «داخل صفحه»
+    // ترتیب: چت، دانلودها، جستجو
     val items = listOf(
-        Triple(Icons.Outlined.ChatBubbleOutline, "چت با دکتر", onChatClick),
+        Triple(Icons.Outlined.ChatBubbleOutline, "چت با من", onChatClick),
         Triple(Icons.Outlined.Download, "دانلودها", onDownloadsClick),
         Triple(Icons.Outlined.Search, "جستجو", onSearchClick)
     )
-    // رنگ مایع هر بطری (آیکن‌ها با رنگ متن می‌شینن و همیشه خوانان)
-    val potionColors = listOf(Color(0xFF2196F3), Color(0xFF2E9E5B), Color(0xFFE8890C))
     val angles = listOf(0f, 62f, -62f)
+
+    // نقطه‌ی شروع و پایان نخ هر گلوله؛ توی Layout پر می‌شه و Canvas نخ‌ها می‌خونه
+    // هر گلوله ۶ عدد: ballX, ballY, anchorX, anchorY, alpha, sag
+    val threadData = remember { FloatArray(18) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -488,7 +607,6 @@ fun FloatingAssistant(
             val sizePx = with(density) { AvatarSize.toPx() }
             val marginPx = with(density) { EdgeMargin.toPx() }
             val barPx = with(density) { bottomBarHeight.toPx() }
-            val barVisible = bottomBarHeight > 0.dp
             val topInset = WindowInsets.statusBars.getTop(density).toFloat()
             val bottomInset = WindowInsets.navigationBars.getBottom(density).toFloat()
 
@@ -538,7 +656,29 @@ fun FloatingAssistant(
                 }
             }
 
-            // بطری‌های منو: یکی‌یکی بیرون می‌پرن
+            // پلک زدن (گاهی دوبار پشت هم)
+            LaunchedEffect(ready) {
+                if (!ready) return@LaunchedEffect
+                while (true) {
+                    delay((2_200L..4_800L).random())
+                    motion.blinkOnce()
+                    if (Random.nextFloat() < 0.25f) {
+                        delay(160)
+                        motion.blinkOnce()
+                    }
+                }
+            }
+
+            // تکون خوردن گوش
+            LaunchedEffect(ready) {
+                if (!ready) return@LaunchedEffect
+                while (true) {
+                    delay((3_500L..8_000L).random())
+                    motion.twitchEar()
+                }
+            }
+
+            // کاموا‌های منو: یکی‌یکی از کنار گربه قل می‌خورن بیرون
             LaunchedEffect(expanded) {
                 if (expanded) { offerOnly = false; showMenu = true }
                 coroutineScope {
@@ -560,6 +700,17 @@ fun FloatingAssistant(
                 if (bubbleSay === say) bubbleSay = null
             }
 
+            // پرش‌های بازیگوشانه‌ی گربه تا وقتی لینک بررسی می‌شه
+            LaunchedEffect(dlActive) {
+                if (dlActive) {
+                    delay(400)
+                    while (true) {
+                        motion.hop(1f)
+                        delay((250L..600L).random())
+                    }
+                }
+            }
+
             // خبرهای فوری (مثلاً تموم شدن دانلود)
             LaunchedEffect(ready) {
                 if (!ready) return@LaunchedEffect
@@ -571,7 +722,8 @@ fun FloatingAssistant(
                 }
             }
 
-            // دکمه‌ی دانلود: بطری‌ها از بالا کشیده می‌شن، سمت راست می‌غلتن و آخرش فقط بطری دانلودها تعارف می‌شه
+            // دکمه‌ی دانلود: کاموا‌ها از بالا آویزون می‌شن و گربه باهاشون بازی می‌کنه،
+            // بعد قل می‌خورن سمت راست و آخرش فقط کاموای «دانلودها» تعارف می‌شه
             LaunchedEffect(ready) {
                 if (!ready) return@LaunchedEffect
                 var startMs = 0L
@@ -590,7 +742,7 @@ fun FloatingAssistant(
                             dlActive = true
                             startMs = System.currentTimeMillis()
                             scope.launch {
-                                val say = AssistantSay("صبر کن، دارم لینک رو بررسی می‌کنم…", SayKind.DOWNLOAD)
+                                val say = AssistantSay("تا لینک رو چک می‌کنم، بیا با کاموا بازی کنیم 🧶", SayKind.DOWNLOAD)
                                 AssistantBus.noteShown(say.text)
                                 speak(say, 6_000)
                             }
@@ -598,7 +750,7 @@ fun FloatingAssistant(
                                 motion.dlPos.forEachIndexed { i, a ->
                                     launch {
                                         delay(i * 260L)
-                                        a.animateTo(1f, spring(0.55f, Spring.StiffnessVeryLow))
+                                        a.animateTo(1f, tween(1300, easing = FastOutSlowInEasing))
                                         delay(350)
                                         a.animateTo(2f, tween(1100, easing = FastOutSlowInEasing))
                                     }
@@ -610,7 +762,7 @@ fun FloatingAssistant(
                             if (dlActive) {
                                 val wait = 3_500L - (System.currentTimeMillis() - startMs)
                                 if (wait > 0) delay(wait)
-                                // یکی‌یکی برمی‌گردن تو جیب
+                                // یکی‌یکی قل می‌خورن پیش گربه
                                 coroutineScope {
                                     motion.dlPos.forEachIndexed { i, a ->
                                         launch {
@@ -624,12 +776,12 @@ fun FloatingAssistant(
                             }
                             if (!visibleNow) return@collect
                             if (phase == DownloadPhase.READY) {
-                                // فقط بطری «دانلودها» تعارف می‌شه
+                                // فقط کاموای «دانلودها» تعارف می‌شه
                                 offerOnly = true
                                 showMenu = true
                                 motion.menuProg.forEach { it.snapTo(0f) }
                                 scope.launch {
-                                    val say = AssistantSay("این بشر رو بخور تا بری بخش دانلودها 🧪", SayKind.DOWNLOAD)
+                                    val say = AssistantSay("بیا، این کاموا تو رو می‌بره بخش دانلودها 🧶", SayKind.DOWNLOAD)
                                     AssistantBus.noteShown(say.text)
                                     speak(say, 9_000)
                                 }
@@ -685,15 +837,49 @@ fun FloatingAssistant(
                 animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse),
                 label = "talk"
             )
+            val tailSlow by infinite.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "tail_slow"
+            )
+            val tailFast by infinite.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(280, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "tail_fast"
+            )
+            val swat by infinite.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(330, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "swat"
+            )
             val speakAmt by animateFloatAsState(
                 targetValue = if (bubbleSay != null) 1f else 0f,
                 animationSpec = tween(300),
                 label = "speak"
             )
-            val upW by animateFloatAsState(
+            // بغل گرفته شدن (موقع کشیدن)
+            val scare by animateFloatAsState(
                 targetValue = if (dragging) 1f else 0f,
                 animationSpec = spring(0.6f, Spring.StiffnessLow),
-                label = "hands_up"
+                label = "scare"
+            )
+            val playAmt by animateFloatAsState(
+                targetValue = if (dlActive) 1f else 0f,
+                animationSpec = tween(350),
+                label = "play"
+            )
+            val offerAmt by animateFloatAsState(
+                targetValue = if (offerOnly) 1f else 0f,
+                animationSpec = tween(300),
+                label = "offer"
+            )
+            val happyAmt by animateFloatAsState(
+                targetValue = if (offerOnly || expanded) 1f else 0f,
+                animationSpec = tween(250),
+                label = "happy"
             )
             // جهت نگاه: همیشه به داخل صفحه؛ موقع عوض شدن طرف، نرم برمی‌گرده
             val face by animateFloatAsState(
@@ -701,11 +887,11 @@ fun FloatingAssistant(
                 animationSpec = spring(0.7f, Spring.StiffnessLow),
                 label = "face"
             )
-            val bobPx = with(density) { 4.dp.toPx() }
-            val talkPx = with(density) { 5.dp.toPx() }
-            val jellyPx = with(density) { 7.dp.toPx() }
+            val bobPx = with(density) { 3.dp.toPx() }
+            val jellyPx = with(density) { 6.dp.toPx() }
+            val hopPx = with(density) { 12.dp.toPx() }
 
-            // پرش نرم و ژله‌ای وقتی دکتر حرف می‌زنه
+            // پرش نرم و ژله‌ای وقتی گربه حرف می‌زنه
             val jelly = remember { Animatable(0f) }
             LaunchedEffect(bubbleSay != null) {
                 if (bubbleSay != null) {
@@ -722,6 +908,33 @@ fun FloatingAssistant(
                 Layout(
                     modifier = Modifier.fillMaxSize(),
                     content = {
+                        // ── نخ کاموا‌ها (پشت همه چیز) ──
+                        Canvas(modifier = Modifier.layoutId("threads").fillMaxSize()) {
+                            // این‌ها فقط برای اینه که با هر حرکت دوباره کشیده بشه
+                            motion.menuProg.forEach { it.value }
+                            motion.dlPos.forEach { it.value }
+                            motion.offX.value
+                            motion.offY.value
+                            val u = 1.dp.toPx()
+                            for (i in 0..2) {
+                                val a = threadData[i * 6 + 4]
+                                if (a <= 0.02f) continue
+                                val bx = threadData[i * 6]
+                                val by = threadData[i * 6 + 1]
+                                val ax = threadData[i * 6 + 2]
+                                val ay = threadData[i * 6 + 3]
+                                val sag = threadData[i * 6 + 5] * u
+                                val path = Path().apply {
+                                    moveTo(ax, ay)
+                                    quadraticBezierTo((ax + bx) / 2f, (ay + by) / 2f + sag, bx, by)
+                                }
+                                drawPath(
+                                    path, YarnColors[i].copy(alpha = a),
+                                    style = Stroke(width = 1.7f * u, cap = StrokeCap.Round)
+                                )
+                            }
+                        }
+
                         // ── بالن پیام ──
                         Box(modifier = Modifier.layoutId("extras")) {
                             AnimatedVisibility(
@@ -751,21 +964,22 @@ fun FloatingAssistant(
                             }
                         }
 
-                        // ── بطری‌های معجون (منو) ──
+                        // ── گلوله‌های کاموا (منو) ──
                         if (showMenu || dlActive) {
                             items.forEachIndexed { i, (icon, label, action) ->
                                 if (dlActive || !offerOnly || i == 1) {
                                     Box(modifier = Modifier.layoutId("item$i")) {
-                                        PotionButton(
+                                        YarnButton(
                                             icon = icon,
                                             label = label,
-                                            tint = potionColors[i],
+                                            tint = YarnColors[i],
                                             progress = {
                                                 if (dlActive) dlAlpha(motion.dlPos[i].value)
                                                 else motion.menuProg[i].value
                                             },
-                                            rotation = {
-                                                if (dlActive) dlRotation(motion.dlPos[i].value) else 0f
+                                            spin = {
+                                                if (dlActive) dlSpin(motion.dlPos[i].value)
+                                                else motion.menuProg[i].value * 600f
                                             },
                                             bob = { bob },
                                             flip = if (i % 2 == 0) 1f else -1f,
@@ -790,7 +1004,7 @@ fun FloatingAssistant(
                             }
                         }
 
-                        // ── خود دکتر طاعون ──
+                        // ── خود گربه ──
                         Box(
                             modifier = Modifier
                                 .layoutId("avatar")
@@ -799,6 +1013,7 @@ fun FloatingAssistant(
                                     detectTapGestures(
                                         onTap = {
                                             activity++
+                                            scope.launch { motion.hop(0.6f) }
                                             if (hidden) {
                                                 hidden = false
                                             } else {
@@ -846,6 +1061,8 @@ fun FloatingAssistant(
                                                 lowerHalf = ty + sizePx / 2f > hPx / 2f
                                                 launch { motion.offX.animateTo(tx, spring(0.65f, Spring.StiffnessLow)) }
                                                 launch { motion.offY.animateTo(ty, spring(0.75f, Spring.StiffnessMediumLow)) }
+                                                // مثل گربه‌ها روی چهار پا فرود میاد
+                                                launch { motion.landSquash() }
                                             }
                                         },
                                         onDragCancel = {
@@ -863,9 +1080,9 @@ fun FloatingAssistant(
                                         alpha = bodyAlpha
                                         transformOrigin = TransformOrigin(0.5f, 1f)
                                         rotationZ = motion.tilt.value
-                                        translationY = bob * bobPx - jelly.value * jellyPx
-                                        scaleY = 1f + 0.12f * jelly.value
-                                        scaleX = 1f - 0.08f * jelly.value
+                                        translationY = bob * bobPx - jelly.value * jellyPx - motion.pounce.value * hopPx
+                                        scaleY = 1f + 0.10f * jelly.value + 0.10f * scare - 0.14f * motion.land.value
+                                        scaleX = 1f - 0.06f * jelly.value - 0.05f * scare + 0.10f * motion.land.value
                                     }
                                     .semantics { contentDescription = "دستیار" },
                                 contentAlignment = Alignment.Center
@@ -879,30 +1096,38 @@ fun FloatingAssistant(
                                     content = {}
                                 )
 
-                                // دکتر طاعون؛ منقارش با حرف زدن و بیرون آوردن بطری‌ها باز و بسته می‌شه
                                 Canvas(modifier = Modifier.matchParentSize()) {
+                                    // وقتی کاموا از کنارش قل می‌خوره، پنجه‌اش بالا میاد
                                     var reach = 0f
-                                    motion.menuProg.forEach { p ->
-                                        val v = p.value
+                                    motion.menuProg.forEach { m ->
+                                        val v = m.value
                                         if (v > 0f && v < 0.45f) {
                                             val r = sin(Math.PI * v / 0.45).toFloat()
                                             if (r > reach) reach = r
                                         }
                                     }
-                                    val open = maxOf(talk * speakAmt * 16f, reach * 14f, upW * 10f)
-                                    drawDoctor(
+                                    val tail = ((tailSlow - 0.5f) * 2f) * (1f - playAmt) +
+                                        ((tailFast - 0.5f) * 2f) * playAmt
+                                    val pose = CatPose(
                                         face = face,
-                                        openDeg = open,
-                                        ink = primary,
-                                        fill = surfaceColor,
-                                        potionAlpha = speakAmt * (1f - upW),
-                                        wave = bob
+                                        blink = motion.blink.value,
+                                        ear = motion.ear.value,
+                                        tail = tail,
+                                        mouth = maxOf(talk * speakAmt, reach * 0.7f, scare * 0.45f),
+                                        paw = maxOf(reach, swat * playAmt, offerAmt * 0.75f),
+                                        lookX = (bob - 0.5f) * 0.8f * (1f - playAmt) + (swat - 0.5f) * 2f * playAmt,
+                                        lookY = -0.8f * playAmt + scare * 0.4f,
+                                        scare = scare,
+                                        happy = happyAmt,
+                                        wiggle = (bob - 0.5f) * 2f * (1f + playAmt)
                                     )
+                                    drawCat(pose)
                                 }
                             }
                         }
                     }
                 ) { measurables, constraints ->
+                    val threadsM = measurables.first { it.layoutId == "threads" }
                     val avatarM = measurables.first { it.layoutId == "avatar" }
                     val extrasM = measurables.first { it.layoutId == "extras" }
                     val avatarSizeInt = sizePx.roundToInt()
@@ -914,6 +1139,7 @@ fun FloatingAssistant(
                     ).coerceAtLeast(0)
                     val itemMaxW = with(density) { 130.dp.roundToPx() }
 
+                    val threadsP = threadsM.measure(Constraints.fixed(constraints.maxWidth, constraints.maxHeight))
                     val avatarP = avatarM.measure(Constraints.fixed(avatarSizeInt, avatarSizeInt))
                     val extrasP = extrasM.measure(Constraints(maxWidth = maxExtrasW))
                     val itemPs = List(3) { i ->
@@ -922,10 +1148,12 @@ fun FloatingAssistant(
                     }
 
                     layout(constraints.maxWidth, constraints.maxHeight) {
+                        threadsP.place(0, 0)
+
                         val baseX = motion.offX.value.roundToInt()
                         val ay = motion.offY.value.roundToInt()
 
-                        // بطری‌ها نسبت به جای «عادی» دکتر دور او پخش می‌شن
+                        // کاموا‌ها نسبت به جای «عادی» گربه دورش پخش می‌شن
                         val cx = baseX + avatarP.width / 2f
                         val cy = ay + avatarP.height / 2f
                         val dirIn = if (onRight) -1f else 1f
@@ -945,10 +1173,15 @@ fun FloatingAssistant(
 
                         avatarP.place(baseX + motion.hideShift.value.roundToInt(), ay)
 
-                        // بطری‌ها از سر منقار شروع می‌کنن، کمی بالا میان و بعد می‌رن سرجاشون
-                        val pocketX = baseX + with(density) { (30f + 25f * face).dp.toPx() }
-                        val pocketY = ay + with(density) { 42.dp.toPx() }
+                        // کاموا‌ها از کنار پنجه‌ی گربه شروع می‌کنن، کمی بالا میان و بعد می‌رن سرجاشون
+                        val pawX = baseX + with(density) { (30f + 7f * face).dp.toPx() }
+                        val pawY = ay + with(density) { 50.dp.toPx() }
                         val liftPx = with(density) { 24.dp.toPx() }
+                        val ballCenterFromTop = with(density) { 31.dp.toPx() }
+                        val sagMenu = 16f
+
+                        for (i in 0..2) threadData[i * 6 + 4] = 0f
+
                         itemPs.forEachIndexed { i, p ->
                             if (p != null) {
                                 val rad = Math.toRadians(angles[i].toDouble())
@@ -960,20 +1193,22 @@ fun FloatingAssistant(
                                 val hiY = (maxYf - p.height / 2f).coerceAtLeast(loY)
                                 val tx = tx0.coerceIn(loX, hiX)
                                 val ty = ty0.coerceIn(loY, hiY)
+                                var dx: Float
+                                var dy: Float
                                 if (dlActive) {
-                                    // ۰→۱ از بالای صفحه کشیده می‌شه پایین، ۱→۲ می‌غلته سمت راست، ۲→۳ برمی‌گرده تو جیب
+                                    // ۰→۱ از بالای صفحه آویزون می‌شه و بازیگوشانه می‌پره،
+                                    // ۱→۲ قل می‌خوره سمت راست، ۲→۳ برمی‌گرده پیش گربه
                                     val q = motion.dlPos[i].value
                                     val topX = constraints.maxWidth * (0.25f + 0.25f * i)
                                     val pullY = topInset + with(density) { 150.dp.toPx() }
                                     val startY = -p.height.toFloat()
                                     val rightX = constraints.maxWidth - marginInt - p.width / 2f
                                     val rightY = pullY + i * (p.height + with(density) { 6.dp.toPx() })
-                                    val dx: Float
-                                    val dy: Float
+                                    val bounceH = with(density) { 46.dp.toPx() }
                                     when {
                                         q <= 1f -> {
-                                            dx = topX
-                                            dy = startY + (pullY - startY) * q
+                                            dx = topX + sin(q * Math.PI * 4.0).toFloat() * with(density) { 10.dp.toPx() } * (1f - q)
+                                            dy = startY + (pullY - startY) * q - dlBounce(q) * bounceH
                                         }
                                         q <= 2f -> {
                                             val f = q - 1f
@@ -982,20 +1217,38 @@ fun FloatingAssistant(
                                         }
                                         else -> {
                                             val f = q - 2f
-                                            dx = rightX + (pocketX - rightX) * f
-                                            dy = rightY + (pocketY - rightY) * f
+                                            dx = rightX + (pawX - rightX) * f
+                                            dy = rightY + (pawY - rightY) * f
                                         }
                                     }
-                                    p.place((dx - p.width / 2f).roundToInt(), (dy - p.height / 2f).roundToInt())
+                                    // نخ: اول از بالای صفحه آویزونه، آخر مسیر به گربه وصله
+                                    val hangAlpha = if (q <= 0f) 0f else (1f - (q - 1f) * 2f).coerceIn(0f, 1f)
+                                    val returnAlpha = ((q - 2f)).coerceIn(0f, 1f) * dlAlpha(q)
+                                    if (hangAlpha > 0f) {
+                                        threadData[i * 6 + 2] = topX
+                                        threadData[i * 6 + 3] = -with(density) { 20.dp.toPx() }
+                                        threadData[i * 6 + 4] = hangAlpha
+                                        threadData[i * 6 + 5] = 0f
+                                    } else if (returnAlpha > 0f) {
+                                        threadData[i * 6 + 2] = pawX
+                                        threadData[i * 6 + 3] = pawY
+                                        threadData[i * 6 + 4] = returnAlpha
+                                        threadData[i * 6 + 5] = sagMenu
+                                    }
                                 } else {
                                     val prog = motion.menuProg[i].value
-                                    val px = pocketX + (tx - pocketX) * prog
-                                    val py = pocketY + (ty - pocketY) * prog - sin(Math.PI * prog.coerceIn(0f, 1f)).toFloat() * liftPx
-                                    p.place((px - p.width / 2f).roundToInt(), (py - p.height / 2f).roundToInt())
+                                    dx = pawX + (tx - pawX) * prog
+                                    dy = pawY + (ty - pawY) * prog - sin(Math.PI * prog.coerceIn(0f, 1f)).toFloat() * liftPx
+                                    threadData[i * 6 + 2] = pawX
+                                    threadData[i * 6 + 3] = pawY
+                                    threadData[i * 6 + 4] = (prog * 0.9f).coerceIn(0f, 0.9f)
+                                    threadData[i * 6 + 5] = sagMenu
                                 }
+                                threadData[i * 6] = dx
+                                threadData[i * 6 + 1] = dy - p.height / 2f + ballCenterFromTop
+                                p.place((dx - p.width / 2f).roundToInt(), (dy - p.height / 2f).roundToInt())
                             }
                         }
-
                     }
                 }
             }
@@ -1067,28 +1320,14 @@ private fun SpeechBubble(
     }
 }
 
-/** غلتیدن: یک دور کامل موقع رفتن به راست و یک دور برعکس موقع برگشتن */
-private fun dlRotation(q: Float): Float = when {
-    q <= 1f -> 0f
-    q <= 2f -> (q - 1f) * 360f
-    else -> 360f - (q - 2f) * 360f
-}
-
-/** بطری تا وقتی کشیده نشده نامرئیه و آخر مسیر تو جیب محو می‌شه */
-private fun dlAlpha(q: Float): Float = when {
-    q <= 0f -> 0f
-    q < 2.6f -> 1f
-    else -> ((3f - q) / 0.4f).coerceIn(0f, 1f)
-}
-
-/** یه بطری معجون که آیکن و اسم هر گزینه توشه؛ انگار جنس‌های دکتره */
+/** یه گلوله‌ی کاموا که آیکن و اسم هر گزینه روشه */
 @Composable
-private fun PotionButton(
+private fun YarnButton(
     icon: ImageVector,
     label: String,
     tint: Color,
     progress: () -> Float,
-    rotation: () -> Float = { 0f },
+    spin: () -> Float,
     bob: () -> Float,
     flip: Float,
     onClick: () -> Unit
@@ -1114,15 +1353,12 @@ private fun PotionButton(
         Box(
             modifier = Modifier
                 .size(58.dp)
-                .graphicsLayer { rotationZ = rotation() }
                 .drawBehind {
-                    drawPotion(
-                        center = Offset(size.width / 2f, size.height / 2f),
-                        size = size.minDimension,
-                        color = tint,
-                        alpha = 1f,
-                        wave = bob()
-                    )
+                    val r = size.minDimension / 2f - 2.dp.toPx()
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    drawYarnBall(c, r, tint, spin() + (bob() - 0.5f) * 24f)
+                    // سایه‌ی نرم پشت آیکن تا همیشه خوانا باشه
+                    drawCircle(Color.Black.copy(alpha = 0.28f), r * 0.46f, c)
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -1130,10 +1366,7 @@ private fun PotionButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = Color.White,
-                modifier = Modifier
-                    .size(20.dp)
-                    .padding(top = 0.dp)
-                    .graphicsLayer { translationY = 7.dp.toPx() }
+                modifier = Modifier.size(20.dp)
             )
         }
         Rtl {
