@@ -19,7 +19,7 @@ import javax.net.ssl.SSLException
 object AiApi {
 
     private const val TAG = "AiApi"
-    private const val BASE_URL = "https://api.llm7.io/v1"
+    private const val BASE_URL = "https://api.groq.com/openai/v1"
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 13; Appdony) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36"
 
@@ -28,10 +28,8 @@ object AiApi {
     var lastDebug: String = ""
         private set
 
-    // توکن از GitHub Secret با اسم AI_KEY می‌آد (داخل کد و ریپو نیست)
-    private val API_KEY: String = BuildConfig.AI_KEY
-
-    private val KEYS = listOf(API_KEY, "unused").filter { it.isNotBlank() }
+    // کلید Groq (شروع با gsk_) از GitHub Secret با اسم AI_KEY می‌آد (داخل کد و ریپو نیست)
+    private val API_KEY: String = BuildConfig.AI_KEY.trim()
 
     private val SYSTEM_PROMPT = """
         تو «دکتر طاعون» هستی، دستیار اپلیکیشن «اپدونی» (مرجع دانلود بازی و برنامه‌ی اندروید).
@@ -52,64 +50,17 @@ object AiApi {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private val PREFERRED = listOf(
-        "gpt-4.1", "gpt-4o", "gpt-oss-120b", "llama-3.3-70b", "llama-70b",
-        "qwen", "mistral-large", "gpt-oss-20b"
+    // مدل‌های Groq به ترتیب اولویت؛ اگه اولی جواب نداد، بعدی امتحان می‌شه
+    private val MODELS = listOf(
+        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
+        "llama-3.1-8b-instant"
     )
-    private val WEAK_MARKS = listOf("nano", "mini", "lite", "tiny", "small", "1b", "3b", "7b", "8b")
-
-    private val SAFE_MODELS = listOf("default", "fast", "pro")
 
     @Volatile
     private var cachedModel: String? = null
 
-    @Volatile
-    private var workingKey: String? = null
-
     private class ApiException(val code: Int, message: String) : Exception(message)
-
-    private fun parseModelIds(text: String): List<String> {
-        val array: JSONArray = if (text.trimStart().startsWith("[")) {
-            JSONArray(text)
-        } else {
-            JSONObject(text).optJSONArray("data") ?: JSONArray()
-        }
-        val ids = mutableListOf<String>()
-        for (i in 0 until array.length()) {
-            val item = array.opt(i)
-            if (item is JSONObject) {
-                val id = item.optString("id")
-                if (id.isNotBlank()) ids.add(id)
-            } else if (item is String && item.isNotBlank()) {
-                ids.add(item)
-            }
-        }
-        return ids
-    }
-
-    private fun discoverModel(key: String): String? {
-        cachedModel?.let { return it }
-        return try {
-            val request = Request.Builder()
-                .url("$BASE_URL/models")
-                .addHeader("Authorization", "Bearer $key")
-                .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", USER_AGENT)
-                .build()
-            val ids = client.newCall(request).execute().use { response ->
-                val text = response.body?.string().orEmpty()
-                if (response.isSuccessful && text.isNotBlank()) parseModelIds(text) else emptyList()
-            }
-            val strong = ids.filter { id -> WEAK_MARKS.none { id.contains(it, ignoreCase = true) } }
-            val picked = PREFERRED.firstNotNullOfOrNull { pref ->
-                strong.firstOrNull { it.contains(pref, ignoreCase = true) }
-            }
-            if (picked != null) cachedModel = picked
-            picked
-        } catch (e: Exception) {
-            null
-        }
-    }
 
     suspend fun sendMessage(
         userMessage: String,
@@ -143,28 +94,31 @@ object AiApi {
             }
             messages.put(JSONObject().put("role", "user").put("content", userMessage))
 
-            val keys = (listOfNotNull(workingKey) + KEYS).distinct()
-            var lastError: ApiException? = null
+            if (API_KEY.isBlank()) {
+                lastDebug = "AI_KEY خالیه"
+                return@withContext Result.failure(Exception("کلید هوش مصنوعی توی اپ تنظیم نشده."))
+            }
 
-            keyLoop@ for (key in keys) {
-                val models = (listOfNotNull(cachedModel, discoverModel(key)) + SAFE_MODELS).distinct()
-                for (model in models) {
-                    try {
-                        val reply = requestOnce(key, model, messages)
-                        workingKey = key
-                        cachedModel = if (model in SAFE_MODELS) cachedModel else model
-                        return@withContext Result.success(reply)
-                    } catch (e: ApiException) {
-                        lastError = e
-                        lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
-                        Log.w(TAG, "model=$model code=${e.code} msg=${e.message}")
-                        when (e.code) {
-                            401, 402, 403 -> continue@keyLoop
-                            429 -> break@keyLoop
-                            else -> {
-                                if (model == cachedModel) cachedModel = null
-                                continue
-                            }
+            var lastError: ApiException? = null
+            val models = (listOfNotNull(cachedModel) + MODELS).distinct()
+
+            for (model in models) {
+                try {
+                    val reply = requestOnce(API_KEY, model, messages)
+                    cachedModel = model
+                    return@withContext Result.success(reply)
+                } catch (e: ApiException) {
+                    lastError = e
+                    lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
+                    Log.w(TAG, "model=$model code=${e.code} msg=${e.message}")
+                    when (e.code) {
+                        // کلید اشتباه یا دسترسی نداره؛ مدل عوض کردن فایده نداره
+                        401, 403 -> break
+                        // محدودیت تعداد درخواست؛ صبر کنه
+                        429 -> break
+                        else -> {
+                            if (model == cachedModel) cachedModel = null
+                            continue
                         }
                     }
                 }
@@ -191,7 +145,7 @@ object AiApi {
     }
 
     private fun describe(e: ApiException?): String = when (e?.code) {
-        401, 403 -> "دکتر الان نمی‌تونه جواب هوشمند بده. چند دقیقه‌ی دیگه امتحان کن."
+        401, 403 -> "کلید هوش مصنوعی درست نیست یا دسترسی نداره."
         402 -> "سهمیه‌ی دکتر تموم شده. کمی بعد دوباره بپرس."
         429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
         null -> "مشکلی پیش اومد. دوباره امتحان کن."
