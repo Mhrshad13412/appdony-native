@@ -407,6 +407,12 @@ object DownloadEngine {
             )
             setLive(id, null)
             DownloadNotifications.result(ctx, id, rec.title, "دانلود کامل شد ✓")
+            AssistantBus.say(
+                AssistantSay(
+                    "دانلود «${rec.title.removePrefix("دانلود").trim().take(40)}» کامل شد. بزن تا بری سراغ نصبش.",
+                    SayKind.DONE
+                )
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Failure) {
@@ -433,7 +439,15 @@ object DownloadEngine {
             )
         }
         setLive(id, null)
-        if (cur != null) DownloadNotifications.result(ctx, id, rec.title, msg)
+        if (cur != null) {
+            DownloadNotifications.result(ctx, id, rec.title, msg)
+            AssistantBus.say(
+                AssistantSay(
+                    "دانلود «${rec.title.removePrefix("دانلود").trim().take(40)}» انجام نشد: $msg",
+                    SayKind.FAIL
+                )
+            )
+        }
     }
 
     private fun hasZipSignature(f: File): Boolean = try {
