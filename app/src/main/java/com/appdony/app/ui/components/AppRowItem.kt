@@ -33,7 +33,7 @@ import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, showRank: Boolean = true) {
-    Row(modifier = modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).appdonyCard().clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showRank) {
             Text(text = rank.toString(), color = AppdonyTextMuted, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
             Spacer(modifier = Modifier.width(8.dp))
