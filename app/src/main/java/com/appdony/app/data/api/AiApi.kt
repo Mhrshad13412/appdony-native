@@ -1,6 +1,7 @@
 package com.appdony.app.data.api
 
 import android.util.Log
+import com.appdony.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -27,8 +28,8 @@ object AiApi {
     var lastDebug: String = ""
         private set
 
-    // توکن رایگان رو از https://token.llm7.io بگیر و این‌جا بذار (کلید قبلی باطل شده)
-    private const val API_KEY = ""
+    // توکن از GitHub Secret با اسم AI_KEY می‌آد (داخل کد و ریپو نیست)
+    private val API_KEY: String = BuildConfig.AI_KEY
 
     private val KEYS = listOf(API_KEY, "unused").filter { it.isNotBlank() }
 
