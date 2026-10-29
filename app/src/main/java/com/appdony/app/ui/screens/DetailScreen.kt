@@ -153,7 +153,16 @@ private suspend fun startAppDownload(context: Context, link: DownloadLink, post:
             Toast.makeText(context, "دانلود شروع شد ✓ از بخش «دانلودها» دنبالش کن", Toast.LENGTH_LONG).show()
         }
         .onFailure {
-            Toast.makeText(context, it.message ?: "خطا در دریافت لینک", Toast.LENGTH_LONG).show()
+            // لینک مستقیم فایل پیدا نشد؛ صفحه‌ی دانلود خود سایت رو توی مرورگر باز می‌کنیم
+            try {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                Toast.makeText(context, "صفحه‌ی دانلود توی مرورگر باز شد", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, it.message ?: "خطا در دریافت لینک", Toast.LENGTH_LONG).show()
+            }
         }
 }
 
@@ -215,7 +224,17 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (info.downloadLinks.isEmpty()) {
+        if (info.downloadLinks.isEmpty() && !info.linksChecked) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("در حال بررسی لینک نصب...", color = AppdonyTextMuted, fontSize = 13.sp)
+            }
+        } else if (info.downloadLinks.isEmpty()) {
+            val failed = info.linkError != null
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -226,12 +245,21 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
-                    Text("خطا در دریافت لینک", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(
+                        if (failed) "خطا در اتصال" else "لینک نصب موجود نیست",
+                        color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, fontSize = 15.sp
+                    )
                 }
                 Spacer(Modifier.height(4.dp))
-                Text("لینک دانلودی برای این مورد پیدا نشد.", color = AppdonyTextMuted, fontSize = 13.sp)
+                Text(
+                    info.linkError ?: "سایت برای این مورد لینک نصب نذاشته.",
+                    color = AppdonyTextMuted, fontSize = 13.sp
+                )
                 TextButton(onClick = {
-                    clipboard.setText(AnnotatedString(info.allLinks.joinToString("\n").ifBlank { "هیچ لینکی در متن پست نبود" }))
+                    val tech = info.linkDebug.ifBlank {
+                        info.allLinks.joinToString("\n").ifBlank { "اطلاعاتی نبود" }
+                    }
+                    clipboard.setText(AnnotatedString(tech))
                     Toast.makeText(context, "کپی شد", Toast.LENGTH_SHORT).show()
                 }) { Text("کپی اطلاعات فنی", fontSize = 12.sp) }
             }
