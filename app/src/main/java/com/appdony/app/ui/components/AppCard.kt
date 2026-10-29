@@ -39,10 +39,10 @@ fun AppCard(title: String, imageUrl: String?, onClick: () -> Unit, modifier: Mod
     val imageRequest = ImageRequest.Builder(context).data(imageUrl).size(250).crossfade(true).build()
 
     Column(
-        modifier = modifier.width(100.dp).clip(RoundedCornerShape(16.dp)).clickable { onClick() }.padding(bottom = 4.dp),
+        modifier = modifier.width(100.dp).clip(RoundedCornerShape(22.dp)).clickable { onClick() }.padding(bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.size(100.dp).clip(RoundedCornerShape(16.dp)).background(AppdonyCardBg)) {
+        Box(modifier = Modifier.size(100.dp).appdonyCard(RoundedCornerShape(22.dp))) {
             SubcomposeAsyncImage(
                 model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
