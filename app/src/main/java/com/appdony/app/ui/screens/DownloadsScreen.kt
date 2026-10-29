@@ -7,11 +7,14 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.webkit.MimeTypeMap
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,20 +27,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -48,18 +54,24 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.appdony.app.ui.theme.AppdonyCardBg
+import com.appdony.app.ui.components.AppBanner
+import com.appdony.app.ui.components.BannerKind
+import com.appdony.app.ui.components.DownloadCardSkeleton
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.DownloadHelper
 import java.io.File
 import java.util.Locale
 
+private val StatusGreen = Color(0xFF34C77B)
+private val StatusYellow = Color(0xFFFFC53D)
+
 @Composable
 fun DownloadsScreen() {
     val context = LocalContext.current
     val vm: DownloadsViewModel = viewModel()
     val items by vm.items.collectAsStateWithLifecycle()
+    val loaded by vm.loaded.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
@@ -70,14 +82,16 @@ fun DownloadsScreen() {
             modifier = Modifier.padding(vertical = 12.dp)
         )
 
-        if (items.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when {
+            !loaded -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(3) { DownloadCardSkeleton() }
+            }
+            items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("هنوز چیزی دانلود نکردی.", color = AppdonyTextMuted)
             }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+            else -> LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(items, key = { it.id }) { item ->
                     DownloadCard(
@@ -85,17 +99,78 @@ fun DownloadsScreen() {
                         onOpen = { openDownload(context, item) },
                         onDelete = { vm.delete(item) },
                         onRetry = {
-                            Toast.makeText(context, "در حال آماده‌سازی لینک...", Toast.LENGTH_SHORT).show()
+                            AppBanner.show(BannerKind.CHECKING, "در حال آماده‌سازی دانلود...", 8000L)
                             vm.retry(item) { result ->
                                 result
-                                    .onSuccess { Toast.makeText(context, "دانلود دوباره شروع شد", Toast.LENGTH_SHORT).show() }
-                                    .onFailure {
-                                        Toast.makeText(context, it.message ?: "خطا در دریافت لینک", Toast.LENGTH_LONG).show()
-                                    }
+                                    .onSuccess { AppBanner.show(BannerKind.SUCCESS, "دانلود از همون‌جا که مونده بود ادامه پیدا کرد") }
+                                    .onFailure { AppBanner.show(BannerKind.ERROR, it.message ?: "این لینک کار نمی‌کنه", 4500L) }
                             }
                         }
                     )
                 }
+            }
+        }
+    }
+}
+
+// دکمه‌ی قرصی هم‌تم با اندیکاتور منوی پایین
+@Composable
+private fun PillButton(text: String, icon: ImageVector?, color: Color, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(color.copy(alpha = 0.14f))
+            .border(1.5.dp, color, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// آیکون برنامه با حلقه‌ی پیشرفت دورش (مثل گوگل‌پلی)
+@Composable
+private fun IconWithRing(item: DownloadItem, done: Boolean, failed: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(modifier = Modifier.size(66.dp), contentAlignment = Alignment.Center) {
+        when {
+            done -> CircularProgressIndicator(
+                progress = { 1f }, modifier = Modifier.fillMaxSize(),
+                color = StatusGreen, trackColor = StatusGreen.copy(alpha = 0.18f), strokeWidth = 3.dp
+            )
+            failed -> CircularProgressIndicator(
+                progress = { if (item.total > 0) item.progress / 100f else 0f },
+                modifier = Modifier.fillMaxSize(),
+                color = StatusYellow, trackColor = StatusYellow.copy(alpha = 0.22f), strokeWidth = 3.dp
+            )
+            item.total > 0 && item.status == DownloadManager.STATUS_RUNNING -> CircularProgressIndicator(
+                progress = { item.progress / 100f }, modifier = Modifier.fillMaxSize(),
+                color = primary, trackColor = primary.copy(alpha = 0.18f), strokeWidth = 3.dp
+            )
+            else -> CircularProgressIndicator(
+                modifier = Modifier.fillMaxSize(), color = primary,
+                trackColor = primary.copy(alpha = 0.18f), strokeWidth = 3.dp
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            if (!item.iconUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.iconUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -110,97 +185,86 @@ private fun DownloadCard(
 ) {
     val done = item.status == DownloadManager.STATUS_SUCCESSFUL
     val failed = item.status == DownloadManager.STATUS_FAILED
-    val running = !done && !failed
+    val primary = MaterialTheme.colorScheme.primary
+    val statusColor = when {
+        done -> StatusGreen
+        failed -> StatusYellow
+        else -> AppdonyTextMuted
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(AppdonyCardBg)
-            .padding(14.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        shadowElevation = 6.dp
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                if (!item.iconUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.iconUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconWithRing(item, done, failed)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        color = AppdonyTextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(Modifier.height(5.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (done || failed) {
+                            Icon(
+                                if (done) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null, tint = statusColor, modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                        }
+                        Text(
+                            text = statusText(item),
+                            color = statusColor,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.title,
-                    color = AppdonyTextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = statusText(item),
-                    color = if (failed) MaterialTheme.colorScheme.error else AppdonyTextMuted,
-                    fontSize = 12.sp
-                )
-            }
-        }
 
-        if (running) {
-            Spacer(Modifier.height(10.dp))
-            if (item.total > 0) {
-                LinearProgressIndicator(
-                    progress = { item.progress / 100f },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
-                )
-            } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (done) {
-                val isApk = item.fileName.lowercase().endsWith(".apk")
-                Button(onClick = onOpen, shape = RoundedCornerShape(12.dp)) {
-                    Text(if (isApk) "نصب" else "باز کردن")
+            Spacer(Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (done) {
+                    val isApk = item.fileName.lowercase().endsWith(".apk")
+                    PillButton(if (isApk) "نصب" else "باز کردن", null, primary, onOpen)
                 }
-            }
-            if (failed) {
-                OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("تلاش دوباره")
+                if (failed) {
+                    PillButton("تلاش دوباره", Icons.Default.Refresh, StatusYellow, onRetry)
                 }
-            }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
+                }
             }
         }
     }
 }
 
+// اعداد داخل ایزوله‌ی چپ‌به‌راست تا توی متن فارسی جابه‌جا نشن
+private fun ltr(s: String) = "\u2066$s\u2069"
+
 private fun statusText(item: DownloadItem): String = when (item.status) {
-    DownloadManager.STATUS_SUCCESSFUL -> "دانلود کامل شد • ${formatSize(item.total)}"
+    DownloadManager.STATUS_SUCCESSFUL -> "دانلود کامل شد • ${ltr(formatSize(item.total))}"
     DownloadManager.STATUS_FAILED -> item.message ?: "دانلود ناموفق بود"
     DownloadManager.STATUS_PENDING -> item.message ?: "در صف دانلود..."
     DownloadManager.STATUS_PAUSED -> item.message ?: "متوقف شد"
     else -> if (item.total > 0) {
-        "${item.progress}% • ${formatSize(item.bytes)} از ${formatSize(item.total)}"
+        "${ltr("${item.progress}%")} • ${ltr(formatSize(item.bytes))} از ${ltr(formatSize(item.total))}"
     } else {
-        "در حال دانلود..."
+        "در حال دانلود... ${ltr(formatSize(item.bytes))}"
     }
 }
 
@@ -225,7 +289,7 @@ private fun openDownload(context: Context, item: DownloadItem) {
         }
 
         if (uri == null) {
-            Toast.makeText(context, "فایل پیدا نشد. شاید حذف شده باشد.", Toast.LENGTH_LONG).show()
+            AppBanner.show(BannerKind.WARNING, "فایل پیدا نشد؛ شاید حذف شده باشه", 4000L)
             return
         }
 
@@ -236,7 +300,7 @@ private fun openDownload(context: Context, item: DownloadItem) {
         if (ext == "apk" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
-            Toast.makeText(context, "اجازه‌ی نصب برنامه را برای اپدونی فعال کن و دوباره بزن", Toast.LENGTH_LONG).show()
+            AppBanner.show(BannerKind.WARNING, "اجازه‌ی نصب برنامه رو برای اپدونی فعال کن و دوباره بزن", 4500L)
             context.startActivity(
                 Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -250,6 +314,6 @@ private fun openDownload(context: Context, item: DownloadItem) {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     } catch (e: Exception) {
-        Toast.makeText(context, "این فایل را با برنامه‌ی مدیریت فایل باز کن (پوشه‌ی Android/data/com.appdony.app/files/Download/Appdony)", Toast.LENGTH_LONG).show()
+        AppBanner.show(BannerKind.WARNING, "فایل رو با برنامه‌ی مدیریت فایل باز کن (Android/data/com.appdony.app/files/Download/Appdony)", 5000L)
     }
 }
