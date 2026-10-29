@@ -1,6 +1,8 @@
 package com.appdony.app.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -8,6 +10,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(22.dp),
+    extraLarge = RoundedCornerShape(28.dp)
+)
 
 @Composable
 fun AppdonyTheme(
@@ -17,33 +28,51 @@ fun AppdonyTheme(
 ) {
     val primary = Color(primaryColor)
 
-    val darkColors = darkColorScheme(
-        primary = primary,
-        onPrimary = Color.White,
-        background = Color(0xFF121517),
-        surface = Color(0xFF1E2225),
-        onBackground = Color(0xFFE6E1E5),
-        onSurface = Color(0xFFE6E1E5),
-        surfaceVariant = Color(0xFF23262A),
-        onSurfaceVariant = Color(0xFF939396)
-    )
+    if (AppdonyPalette.isDark != darkTheme) AppdonyPalette.isDark = darkTheme
+    if (AppdonyPalette.primary != primary) AppdonyPalette.primary = primary
 
-    val lightColors = lightColorScheme(
-        primary = primary,
-        onPrimary = Color.White,
-        background = Color(0xFFFAFAFA),
-        surface = Color(0xFFFFFFFF),
-        onBackground = Color(0xFF1A1A1A),
-        onSurface = Color(0xFF1A1A1A),
-        surfaceVariant = Color(0xFFEEEEEE),
-        onSurfaceVariant = Color(0xFF666666)
-    )
-
-    val colors = if (darkTheme) darkColors else lightColors
+    val colors = if (darkTheme) {
+        darkColorScheme(
+            primary = primary,
+            onPrimary = Color.White,
+            primaryContainer = primary.copy(alpha = 0.22f),
+            onPrimaryContainer = AppdonyTextPrimary,
+            secondary = primary,
+            onSecondary = Color.White,
+            background = AppdonyBg,
+            onBackground = AppdonyTextPrimary,
+            surface = AppdonySurface,
+            onSurface = AppdonyTextPrimary,
+            surfaceVariant = AppdonyCardBg,
+            onSurfaceVariant = AppdonyTextMuted,
+            outline = AppdonyOutline,
+            outlineVariant = AppdonyOutline,
+            error = Color(0xFFFF6B6B)
+        )
+    } else {
+        lightColorScheme(
+            primary = primary,
+            onPrimary = Color.White,
+            primaryContainer = primary.copy(alpha = 0.14f),
+            onPrimaryContainer = AppdonyTextPrimary,
+            secondary = primary,
+            onSecondary = Color.White,
+            background = AppdonyBg,
+            onBackground = AppdonyTextPrimary,
+            surface = AppdonySurface,
+            onSurface = AppdonyTextPrimary,
+            surfaceVariant = AppdonyCardBg,
+            onSurfaceVariant = AppdonyTextMuted,
+            outline = AppdonyOutline,
+            outlineVariant = AppdonyOutline,
+            error = Color(0xFFD93025)
+        )
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         MaterialTheme(
             colorScheme = colors,
+            shapes = AppShapes,
             content = content
         )
     }
