@@ -36,7 +36,7 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val history = ChatHistoryManager(app)
 
-    private val welcome = ChatMessage("سلام! من دکتر طاعونم 🩺 چطور می‌تونم کمکت کنم؟", false, excludeFromContext = true)
+    private val welcome = ChatMessage("سلام! من پاپیم 🐾 چطور می‌تونم کمکت کنم؟", false, excludeFromContext = true)
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages
@@ -199,13 +199,13 @@ private object LocalDoctor {
 
         return when {
             has(text, "سلام", "درود") || text == "hi" || text.startsWith("hello") ->
-                "سلام رفیق! 👋 من دکتر طاعونم. می‌تونم بازی پیشنهاد بدم یا مشکل نصب و دانلودت رو حل کنم."
+                "سلام رفیق! 👋 من پاپیم. می‌تونم بازی پیشنهاد بدم یا مشکل نصب و دانلودت رو حل کنم."
 
             has(text, "ممنون", "مرسی", "تشکر", "دمت گرم", "thanks") ->
                 "قابلی نداشت! هر وقت نسخه‌ای لازم داشتی من همین‌جام 😉"
 
             has(text, "کی هستی", "تو کی", "اسمت", "کیستی", "who are you") ->
-                "من دکتر طاعون، دستیار اپدونیم. نسخه‌ی بازی و برنامه می‌پیچم و مشکل نصب رو درمان می‌کنم 🩺"
+                "من پاپی، دستیار اپدونیم. بازی و برنامه پیدا می‌کنم و مشکل نصب رو حل می‌کنم 🐾"
 
             has(text, "نصب نمی", "نصب نم", "نصب نشد", "نصب نمیشه", "باز نمی", "اجرا نمی", "ارور", "خطا", "کرش", "پارس", "parse") ->
                 "برای مشکل نصب این‌ها رو چک کن:\n" +
