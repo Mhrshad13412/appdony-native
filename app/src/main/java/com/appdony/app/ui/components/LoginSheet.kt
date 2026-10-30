@@ -120,6 +120,11 @@ fun LoginSheet(
                             nonce = user.nonce
                         )
                         CredentialsManager(context).saveCredentials(typedUser, typedPass)
+                        // ثبت کاربر توی لیست پشتیبان (اگه نشد، ورود خراب نمی‌شه)
+                        com.appdony.app.data.api.SupportApi.registerUser(
+                            com.appdony.app.data.api.SupportApi.threadOf(user.id),
+                            user.displayName()
+                        )
                     }
                     onLoginSuccess(user)
                 }
