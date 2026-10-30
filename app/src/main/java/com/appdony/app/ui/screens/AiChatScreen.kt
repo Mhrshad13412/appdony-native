@@ -49,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,7 +66,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.appdony.app.ui.components.AiMessageContent
+import com.appdony.app.ui.components.AiModelSelector
+import com.appdony.app.ui.components.AiQuotaCard
+import com.appdony.app.ui.components.AiSuggestionBlock
 import com.appdony.app.ui.components.PlagueDoctorAvatar
+import com.appdony.app.ui.components.hasCodeBlock
 
 private val QuickReplies = listOf(
     "یه بازی پیشنهاد بده 🎮",
@@ -78,16 +84,37 @@ private val QuickReplies = listOf(
 fun AiChatScreen(
     onBack: () -> Unit,
     onSupportClick: (isAdmin: Boolean) -> Unit = {},
+    onPostClick: (Int) -> Unit = {},
     viewModel: AiChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isOffline by viewModel.isOffline.collectAsState()
     val pendingImage by viewModel.pendingImage.collectAsState()
+    val model by viewModel.model.collectAsState()
+    val quota by viewModel.quota.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     val primary = MaterialTheme.colorScheme.primary
+
+    // ساعت زنده برای شمارش معکوس بازه‌ی ۵ ساعته
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    // وقتی بازه تموم شد، سهم دوباره خونده می‌شه
+    LaunchedEffect(now) {
+        val reset = quota?.windowResetAt ?: 0L
+        if (reset in 1..now) viewModel.refreshQuota()
+    }
+
+    val blockReason = quota?.blockReason(now)
+    val blocked = blockReason != null
 
     // انتخاب عکس از گالری
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -116,7 +143,7 @@ fun AiChatScreen(
     }
 
     fun send(text: String) {
-        if ((text.isNotBlank() || pendingImage != null) && !isLoading) {
+        if ((text.isNotBlank() || pendingImage != null) && !isLoading && !blocked) {
             viewModel.sendMessage(text)
             inputText = ""
         }
@@ -193,6 +220,10 @@ fun AiChatScreen(
             }
         }
 
+        // انتخاب مدل + سهم مصرف
+        AiModelSelector(selected = model, enabled = !isLoading, onSelect = { viewModel.selectModel(it) })
+        AiQuotaCard(quota = quota, now = now)
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f),
@@ -219,6 +250,13 @@ fun AiChatScreen(
         }
 
         if (messages.size <= 2 && !isLoading) {
+            // بلاک پیشنهاد برنامه‌ها
+            AiSuggestionBlock(
+                posts = suggestions,
+                onPostClick = onPostClick,
+                onRefresh = { viewModel.loadSuggestions() }
+            )
+
             androidx.compose.foundation.lazy.LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -259,12 +297,20 @@ fun AiChatScreen(
                         .clip(RoundedCornerShape(10.dp))
                 )
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    "عکس آماده‌ی ارسال",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "عکس آماده‌ی ارسال",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 13.sp
+                    )
+                    if (!model.supportsImage) {
+                        Text(
+                            "برای عکس، از کلود هایکو استفاده می‌شه",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .size(34.dp)
@@ -298,7 +344,14 @@ fun AiChatScreen(
                 value = inputText,
                 onValueChange = { inputText = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("پیامت رو بنویس...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) },
+                enabled = !blocked,
+                placeholder = {
+                    Text(
+                        if (blocked) "سقف مصرف این مدل پر شده" else "پیامت رو بنویس...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                },
                 shape = RoundedCornerShape(26.dp),
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -308,13 +361,14 @@ fun AiChatScreen(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     cursorColor = primary
                 )
             )
             Spacer(Modifier.width(8.dp))
-            val canSend = (inputText.isNotBlank() || pendingImage != null) && !isLoading
+            val canSend = (inputText.isNotBlank() || pendingImage != null) && !isLoading && !blocked
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -337,6 +391,8 @@ fun AiChatScreen(
 @Composable
 private fun MessageRow(msg: ChatMessage) {
     val primary = MaterialTheme.colorScheme.primary
+    // پیام‌های دارای کد پهن‌تر نشون داده می‌شن
+    val maxBubble = if (hasCodeBlock(msg.text)) 330.dp else 290.dp
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start,
@@ -348,7 +404,7 @@ private fun MessageRow(msg: ChatMessage) {
         }
         Box(
             modifier = Modifier
-                .widthIn(max = 290.dp)
+                .widthIn(max = maxBubble)
                 .clip(
                     RoundedCornerShape(
                         topStart = 18.dp,
@@ -374,12 +430,7 @@ private fun MessageRow(msg: ChatMessage) {
                     if (msg.text.isNotBlank()) Spacer(Modifier.height(8.dp))
                 }
                 if (msg.text.isNotBlank()) {
-                    Text(
-                        text = msg.text,
-                        color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
-                        fontSize = 14.sp,
-                        lineHeight = 23.sp
-                    )
+                    AiMessageContent(text = msg.text, isUser = msg.isUser)
                 }
             }
         }
