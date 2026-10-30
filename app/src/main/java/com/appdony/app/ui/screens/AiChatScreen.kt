@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -67,6 +68,7 @@ private val QuickReplies = listOf(
 @Composable
 fun AiChatScreen(
     onBack: () -> Unit,
+    onSupportClick: (isAdmin: Boolean) -> Unit = {},
     viewModel: AiChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
@@ -76,6 +78,12 @@ fun AiChatScreen(
     val listState = rememberLazyListState()
 
     val primary = MaterialTheme.colorScheme.primary
+
+    // دکمه‌ی پشتیبانی: فقط برای کاربرهای واردشده؛ ادمین (با ایمیل) می‌ره لیست کاربرها
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val session = remember { com.appdony.app.data.session.SessionManager(context) }
+    val loggedIn by session.isLoggedIn.collectAsState(initial = false)
+    val email by session.userEmail.collectAsState(initial = "")
 
     // دکتر بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
     var speaking by remember { mutableStateOf(false) }
@@ -141,6 +149,23 @@ fun AiChatScreen(
                     )
                 }
             }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(21.dp))
+                    .background(primary.copy(alpha = 0.16f))
+                    .border(BorderStroke(1.dp, primary.copy(alpha = 0.7f)), RoundedCornerShape(21.dp))
+                    .clickable {
+                        if (loggedIn) onSupportClick(com.appdony.app.data.api.SupportApi.isAdmin(email))
+                        else android.widget.Toast.makeText(context, "برای پشتیبانی اول وارد حساب کاربریت شو", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.SupportAgent, null, tint = primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("پشتیبانی", color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .size(42.dp)
