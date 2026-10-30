@@ -13,7 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,7 +50,10 @@ fun FeaturedGameCard(
     screenshotUrl: String?,
     iconUrl: String?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isNew: Boolean = false,
+    androidReq: String? = null,
+    version: String? = null
 ) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
@@ -85,16 +95,16 @@ fun FeaturedGameCard(
 
         // دسته‌بندی، بالای کارت
         if (!category.isNullOrBlank()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(primary.copy(alpha = 0.88f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text(category, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+            NavChip(
+                text = category,
+                onImage = true,
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+            )
+        }
+
+        // «جدید» (تا ۴ روز بعد از انتشار یا ویرایش)
+        if (isNew) {
+            NewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
         }
 
         // پایین کارت: آیکن برنامه (سمت راست، چون اپ راست‌به‌چپه) + اسم بازی
@@ -122,16 +132,33 @@ fun FeaturedGameCard(
                 }
             }
             Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 20.sp
+                )
+                if (androidReq != null || version != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (androidReq != null) {
+                            Icon(Icons.Filled.Android, contentDescription = null, tint = primary, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(androidReq, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        if (version != null) {
+                            Icon(Icons.Filled.Bolt, contentDescription = null, tint = primary, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(version, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
+                        }
+                    }
+                }
+            }
         }
     }
 }
