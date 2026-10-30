@@ -27,6 +27,9 @@ class SessionManager(private val context: Context) {
     val isLoggedIn: Flow<Boolean> =
         context.sessionDataStore.data.map { it[KEY_LOGGED_IN] ?: false }
 
+    val userId: Flow<Int> =
+        context.sessionDataStore.data.map { it[KEY_USER_ID] ?: 0 }
+
     val username: Flow<String> =
         context.sessionDataStore.data.map { it[KEY_USERNAME] ?: "" }
 
