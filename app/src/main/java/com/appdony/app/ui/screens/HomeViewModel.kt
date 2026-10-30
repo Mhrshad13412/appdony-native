@@ -20,9 +20,7 @@ class HomeViewModel(
     private val repository: HomeRepository = HomeRepository()
 ) : ViewModel() {
 
-    private val _featured = MutableStateFlow<List<Post>?>(null)
-    val featured: StateFlow<List<Post>?> = _featured.asStateFlow()
-
+    // بلاک بالای صفحه: «اپدونی پلاس»
     private val _plus = MutableStateFlow<List<Post>?>(null)
     val plus: StateFlow<List<Post>?> = _plus.asStateFlow()
 
@@ -43,7 +41,6 @@ class HomeViewModel(
         if (!force && loadedTab == isGames) return
         loadedTab = isGames
         requested.clear()
-        _featured.value = null
         _plus.value = null
         _sections.value = emptyList()
         _isLoading.value = true
@@ -57,13 +54,6 @@ class HomeViewModel(
                 _sections.value = structure.sections.map { SectionState(it) }
                 _isLoading.value = false
 
-                launch {
-                    _featured.value = try {
-                        repository.loadFeatured(rootId)
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                }
                 launch {
                     _plus.value = try {
                         repository.loadPlus(isGames)
