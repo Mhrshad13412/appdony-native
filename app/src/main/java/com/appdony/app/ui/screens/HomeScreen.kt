@@ -71,6 +71,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val featured by viewModel.featured.collectAsStateWithLifecycle()
+    val plus by viewModel.plus.collectAsStateWithLifecycle()
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val hasError by viewModel.hasError.collectAsStateWithLifecycle()
@@ -95,7 +96,11 @@ fun HomeScreen(
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item(key = "featured") {
-            FeaturedBlock(posts = featured, onPostClick = onPostClick)
+            FeaturedBlock(title = "ویژه", keyPrefix = "featured", posts = featured, onPostClick = onPostClick)
+        }
+
+        item(key = "plus") {
+            FeaturedBlock(title = "اپدونی پلاس", keyPrefix = "plus", posts = plus, onPostClick = onPostClick)
         }
 
         if (isLoading) {
@@ -130,14 +135,14 @@ fun HomeScreen(
     }
 }
 
-// ───────────── بلوک «ویژه» ─────────────
+// ───────────── بلوک «ویژه» و «اپدونی پلاس» ─────────────
 
 @Composable
-private fun FeaturedBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
+private fun FeaturedBlock(title: String, keyPrefix: String, posts: List<Post>?, onPostClick: (Int) -> Unit) {
     if (posts != null && posts.isEmpty()) return
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        SectionHeader(title = "ویژه")
+        SectionHeader(title = title)
 
         if (posts == null) {
             LazyRow(
@@ -153,7 +158,7 @@ private fun FeaturedBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
-                    FadeIn(key = "featured-${post.id}", index = index) {
+                    FadeIn(key = "$keyPrefix-${post.id}", index = index) {
                         FeaturedCard(post = post, onClick = { onPostClick(post.id) })
                     }
                 }
