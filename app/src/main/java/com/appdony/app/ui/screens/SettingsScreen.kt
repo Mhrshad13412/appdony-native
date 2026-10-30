@@ -201,7 +201,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         item {
             SettingsGroup("دستیار هوش مصنوعی") {
-                SettingsSwitchRow("نمایش دکتر طاعون", Icons.Outlined.Visibility, showAiAssistant) {
+                SettingsSwitchRow("نمایش پاپی", Icons.Outlined.Visibility, showAiAssistant) {
                     scope.launch { settingsManager.setShowAiAssistant(it) }
                 }
             }
