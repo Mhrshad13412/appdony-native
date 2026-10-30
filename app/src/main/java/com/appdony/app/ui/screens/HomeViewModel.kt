@@ -23,6 +23,9 @@ class HomeViewModel(
     private val _featured = MutableStateFlow<List<Post>?>(null)
     val featured: StateFlow<List<Post>?> = _featured.asStateFlow()
 
+    private val _plus = MutableStateFlow<List<Post>?>(null)
+    val plus: StateFlow<List<Post>?> = _plus.asStateFlow()
+
     private val _sections = MutableStateFlow<List<SectionState>>(emptyList())
     val sections: StateFlow<List<SectionState>> = _sections.asStateFlow()
 
@@ -41,6 +44,7 @@ class HomeViewModel(
         loadedTab = isGames
         requested.clear()
         _featured.value = null
+        _plus.value = null
         _sections.value = emptyList()
         _isLoading.value = true
         _hasError.value = false
@@ -56,6 +60,13 @@ class HomeViewModel(
                 launch {
                     _featured.value = try {
                         repository.loadFeatured(rootId)
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                }
+                launch {
+                    _plus.value = try {
+                        repository.loadPlus(isGames)
                     } catch (e: Exception) {
                         emptyList()
                     }
