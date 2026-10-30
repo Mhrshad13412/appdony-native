@@ -28,13 +28,23 @@ internal class CatPose(
     val scare: Float,    // بغل گرفته شدن: چشم درشت‌تر و گوش خوابیده
     val happy: Float,    // چشم‌های خندون ^ ^
     val wiggle: Float,   // قل خوردن گلوله‌ی کاموای کنار پا
-    val yarn: Color = AppdonyGreen // رنگ کاموا؛ پیش‌فرض رنگ تم برنامه
+    val yarn: Color = AppdonyGreen, // رنگ کاموا؛ پیش‌فرض رنگ تم برنامه
+    val fur: Color = catFurOf(yarn) // رنگ خود گربه؛ از رنگ تم برنامه ساخته می‌شه
 )
+
+/** رنگ پوست گربه از روی رنگ تم برنامه: کمی روشن‌تر تا نرم و گربه‌ای بمونه */
+internal fun catFurOf(theme: Color): Color = lerp(theme, Color.White, 0.30f)
 
 internal fun DrawScope.drawCat(p: CatPose) {
     val u = 1.dp.toPx()
     fun pt(x: Float, y: Float) = Offset(x * u, y * u)
     val line = 1.5f * u
+
+    // رنگ‌های گربه همه از رنگ تم: پوست، راه‌راه، شکم/پنجه‌ها و خط دور
+    val FurColor = p.fur
+    val FurDark = lerp(p.fur, Color.Black, 0.22f)
+    val CreamColor = lerp(p.fur, Color.White, 0.80f)
+    val OutlineColor = lerp(p.fur, Color.Black, 0.62f)
 
     withTransform({ scale(p.face, 1f, pt(30f, 30f)) }) {
 
