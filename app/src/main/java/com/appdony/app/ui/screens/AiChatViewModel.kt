@@ -14,12 +14,17 @@ import com.appdony.app.data.api.AiApi
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
+import com.appdony.app.data.preferences.AiLimitManager
+import com.appdony.app.data.preferences.AiModel
+import com.appdony.app.data.preferences.AiQuota
 import com.appdony.app.data.preferences.ChatHistoryManager
 import com.appdony.app.data.preferences.StoredChatMessage
+import com.appdony.app.data.session.SessionManager
 import com.appdony.app.util.AssistantBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -35,6 +40,8 @@ data class ChatMessage(
 class AiChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val history = ChatHistoryManager(app)
+    private val limits = AiLimitManager(app)
+    private val session = SessionManager(app)
 
     private val welcome = ChatMessage("سلام! من پاپیم 🐾 چطور می‌تونم کمکت کنم؟", false, excludeFromContext = true)
 
@@ -46,6 +53,17 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline
+
+    // مدل انتخاب‌شده و سهم مصرف کاربر برای همون مدل
+    private val _model = MutableStateFlow(AiModel.DEEPSEEK)
+    val model: StateFlow<AiModel> = _model
+
+    private val _quota = MutableStateFlow<AiQuota?>(null)
+    val quota: StateFlow<AiQuota?> = _quota
+
+    // بلاک پیشنهاد برنامه‌ها
+    private val _suggestions = MutableStateFlow<List<Post>>(emptyList())
+    val suggestions: StateFlow<List<Post>> = _suggestions
 
     // عکس آماده‌ی ارسال (کوچیک‌شده) و نسخه‌ی base64 اون
     private val _pendingImage = MutableStateFlow<Bitmap?>(null)
@@ -59,6 +77,38 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
             val saved = try { history.load() } catch (e: Exception) { emptyList() }
             if (saved.isNotEmpty() && _messages.value.size <= 1) {
                 _messages.value = saved.map { ChatMessage(it.text, it.isUser, it.excludeFromContext) }
+            }
+        }
+        viewModelScope.launch {
+            _model.value = try { limits.selectedModel() } catch (e: Exception) { AiModel.DEEPSEEK }
+            refreshQuota()
+        }
+        loadSuggestions()
+    }
+
+    private suspend fun currentUid(): Int = try { session.userId.first() } catch (e: Exception) { 0 }
+
+    fun refreshQuota() {
+        viewModelScope.launch {
+            _quota.value = try { limits.quota(currentUid(), _model.value) } catch (e: Exception) { null }
+        }
+    }
+
+    fun selectModel(m: AiModel) {
+        if (_isLoading.value) return
+        _model.value = m
+        viewModelScope.launch {
+            try { limits.setSelectedModel(m) } catch (e: Exception) { }
+            _quota.value = try { limits.quota(currentUid(), m) } catch (e: Exception) { null }
+        }
+    }
+
+    fun loadSuggestions() {
+        viewModelScope.launch {
+            _suggestions.value = try {
+                ApiClient.api.getPosts(perPage = 20).shuffled().take(6)
+            } catch (e: Exception) {
+                emptyList()
             }
         }
     }
@@ -138,12 +188,30 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
         val b64 = pendingBase64
         if ((text.isBlank() && image == null) || _isLoading.value) return
 
-        val currentMessages = _messages.value + ChatMessage(text, true, image = image)
-        _messages.value = currentMessages
-        removePendingImage()
         _isLoading.value = true
 
         viewModelScope.launch {
+            val uid = currentUid()
+            // دیپ‌سیک عکس نمی‌بینه؛ برای عکس خودکار هایکو استفاده می‌شه و از سهم هایکو کم می‌شه
+            val useModel = if (b64 != null && !_model.value.supportsImage) AiModel.HAIKU else _model.value
+
+            // بررسی نهایی سهم قبل از ارسال
+            val block = try { limits.quota(uid, useModel).blockReason() } catch (e: Exception) { null }
+            if (block != null) {
+                _messages.value = _messages.value + ChatMessage("⏳ $block", false, excludeFromContext = true)
+                _quota.value = try { limits.quota(uid, _model.value) } catch (e: Exception) { null }
+                _isLoading.value = false
+                persist()
+                return@launch
+            }
+
+            val currentMessages = _messages.value + ChatMessage(text, true, image = image)
+            _messages.value = currentMessages
+            removePendingImage()
+
+            // ثبت پیام؛ اولین پیام بازه، شروع ۵ ساعت رو ثبت می‌کنه
+            try { limits.begin(uid, useModel) } catch (e: Exception) { }
+
             val ctxHistory = currentMessages
                 .dropLast(1)
                 .filter { !it.excludeFromContext && it.text.isNotBlank() }
@@ -153,17 +221,29 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
 
             val context = if (b64 != null) "" else loadSiteContext(text)
             val apiText = text.ifBlank { "این عکس رو ببین و کمکم کن." }
-            val result = AiApi.sendMessage(apiText, ctxHistory, context, AssistantBus.recentNotes(), b64)
+            val result = AiApi.sendMessage(
+                userMessage = apiText,
+                model = useModel.id,
+                history = ctxHistory,
+                siteContext = context,
+                assistantNotes = AssistantBus.recentNotes(),
+                imageBase64 = b64
+            )
 
-            result.onSuccess { response ->
+            result.onSuccess { reply ->
                 _isOffline.value = false
-                _messages.value = _messages.value + ChatMessage(response, false)
+                _messages.value = _messages.value + ChatMessage(reply.text, false)
+                try { limits.addTokens(uid, useModel, reply.totalTokens) } catch (e: Exception) { }
             }.onFailure { error ->
                 _isOffline.value = true
+                // درخواست ناموفق از سهم کاربر کم نمی‌شه
+                try { limits.refund(uid, useModel) } catch (e: Exception) { }
                 val reply = LocalDoctor.reply(text) +
                     "\n\n⚠️ ${error.message.orEmpty()}"
                 _messages.value = _messages.value + ChatMessage(reply, false, excludeFromContext = true)
             }
+
+            _quota.value = try { limits.quota(uid, _model.value) } catch (e: Exception) { null }
             _isLoading.value = false
             persist()
         }
@@ -182,6 +262,7 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
     fun clearChat() {
         _messages.value = listOf(welcome)
         removePendingImage()
+        loadSuggestions()
         viewModelScope.launch { try { history.clearHistory() } catch (e: Exception) { } }
     }
 }
