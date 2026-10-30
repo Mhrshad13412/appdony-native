@@ -100,7 +100,7 @@ fun AiChatScreen(
     val loggedIn by session.isLoggedIn.collectAsState(initial = false)
     val email by session.userEmail.collectAsState(initial = "")
 
-    // دکتر بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
+    // پاپی بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
     var speaking by remember { mutableStateOf(false) }
     LaunchedEffect(messages.size) {
         if (messages.size > 1 && !messages.last().isUser) {
@@ -148,7 +148,7 @@ fun AiChatScreen(
             PlagueDoctorAvatar(sizeDp = 42, hasShadow = false, talking = isLoading || speaking)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("دکتر طاعون", color = MaterialTheme.colorScheme.onBackground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("پاپی", color = MaterialTheme.colorScheme.onBackground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
