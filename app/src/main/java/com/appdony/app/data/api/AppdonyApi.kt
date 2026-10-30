@@ -20,7 +20,7 @@ data class CommentRequest(
     @SerializedName("author_name") val authorName: String? = null
 )
 
-private const val LIST_FIELDS = "id,title,excerpt,date,categories,featured_media,_links,_embedded"
+private const val LIST_FIELDS = "id,title,excerpt,date,modified,content,categories,featured_media,_links,_embedded"
 
 interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me?context=edit")
