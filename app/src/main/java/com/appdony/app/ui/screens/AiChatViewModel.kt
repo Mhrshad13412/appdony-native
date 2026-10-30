@@ -20,13 +20,18 @@ import com.appdony.app.data.preferences.AiQuota
 import com.appdony.app.data.preferences.ChatHistoryManager
 import com.appdony.app.data.preferences.StoredChatMessage
 import com.appdony.app.data.session.SessionManager
+import com.appdony.app.util.AppForeground
 import com.appdony.app.util.AssistantBus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 
 data class ChatMessage(
@@ -70,7 +75,15 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
     val pendingImage: StateFlow<Bitmap?> = _pendingImage
     private var pendingBase64: String? = null
 
+    // درخواست در حال انجام؛ برای رها کردنِ حالت «در حال ارسال» بعد از برگشت از بیرون اپ
+    private var sendJob: Job? = null
+    private var sendStartedAt = 0L
+
     init {
+        // وقتی کاربر از بیرون اپ برمی‌گرده، اگه درخواست گیر کرده بود آزاد می‌شه
+        viewModelScope.launch {
+            AppForeground.resumed.collect { backgroundMs -> onAppResumed(backgroundMs) }
+        }
         _messages.value = listOf(welcome)
         // چت‌های قبلی از حافظه‌ی گوشی برگردن
         viewModelScope.launch {
@@ -182,6 +195,18 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
         return bitmap to b64
     }
 
+    /** اگه اپ چند ثانیه بیرون بوده و هنوز منتظر جوابیم، اتصال احتمالاً مرده؛ رها و دوباره آماده می‌شیم */
+    private fun onAppResumed(backgroundMs: Long) {
+        val job = sendJob ?: return
+        if (!_isLoading.value || !job.isActive) return
+        AiApi.resetConnections()
+        if (backgroundMs < STUCK_BACKGROUND_MS) return
+        job.cancel()
+        _messages.value = _messages.value +
+            ChatMessage("⚠️ وقتی بیرون از برنامه بودی ارتباط قطع شد. پیامت رو دوباره بفرست.", false, excludeFromContext = true)
+        _isLoading.value = false
+    }
+
     fun sendMessage(userMessage: String) {
         val text = userMessage.trim()
         val image = _pendingImage.value
@@ -189,63 +214,82 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
         if ((text.isBlank() && image == null) || _isLoading.value) return
 
         _isLoading.value = true
+        sendStartedAt = System.currentTimeMillis()
 
-        viewModelScope.launch {
+        sendJob = viewModelScope.launch {
             val uid = currentUid()
             // دیپ‌سیک عکس نمی‌بینه؛ برای عکس خودکار هایکو استفاده می‌شه و از سهم هایکو کم می‌شه
             val useModel = if (b64 != null && !_model.value.supportsImage) AiModel.HAIKU else _model.value
+            var begun = false
+            var done = false
 
-            // بررسی نهایی سهم قبل از ارسال
-            val block = try { limits.quota(uid, useModel).blockReason() } catch (e: Exception) { null }
-            if (block != null) {
-                _messages.value = _messages.value + ChatMessage("⏳ $block", false, excludeFromContext = true)
-                _quota.value = try { limits.quota(uid, _model.value) } catch (e: Exception) { null }
-                _isLoading.value = false
-                persist()
-                return@launch
-            }
+            try {
+                // بررسی نهایی سهم قبل از ارسال
+                val block = try { limits.quota(uid, useModel).blockReason() } catch (e: Exception) { null }
+                if (block != null) {
+                    _messages.value = _messages.value + ChatMessage("⏳ $block", false, excludeFromContext = true)
+                    done = true
+                    return@launch
+                }
 
-            val currentMessages = _messages.value + ChatMessage(text, true, image = image)
-            _messages.value = currentMessages
-            removePendingImage()
+                val currentMessages = _messages.value + ChatMessage(text, true, image = image)
+                _messages.value = currentMessages
+                removePendingImage()
 
-            // ثبت پیام؛ اولین پیام بازه، شروع ۵ ساعت رو ثبت می‌کنه
-            try { limits.begin(uid, useModel) } catch (e: Exception) { }
+                // ثبت پیام؛ اولین پیام بازه، شروع ۵ ساعت رو ثبت می‌کنه
+                try { limits.begin(uid, useModel) } catch (e: Exception) { }
+                begun = true
 
-            val ctxHistory = currentMessages
-                .dropLast(1)
-                .filter { !it.excludeFromContext && it.text.isNotBlank() }
-                .takeLast(8)
-                .dropWhile { !it.isUser }
-                .map { (if (it.isUser) "user" else "assistant") to it.text }
+                val ctxHistory = currentMessages
+                    .dropLast(1)
+                    .filter { !it.excludeFromContext && it.text.isNotBlank() }
+                    .takeLast(8)
+                    .dropWhile { !it.isUser }
+                    .map { (if (it.isUser) "user" else "assistant") to it.text }
 
-            val context = if (b64 != null) "" else loadSiteContext(text)
-            val apiText = text.ifBlank { "این عکس رو ببین و کمکم کن." }
-            val result = AiApi.sendMessage(
-                userMessage = apiText,
-                model = useModel.id,
-                history = ctxHistory,
-                siteContext = context,
-                assistantNotes = AssistantBus.recentNotes(),
-                imageBase64 = b64
-            )
+                val context = if (b64 != null) "" else loadSiteContext(text)
+                val apiText = text.ifBlank { "این عکس رو ببین و کمکم کن." }
+                // سقف زمانی: هیچ‌وقت بی‌نهایت منتظر نمی‌مونیم
+                val result = withTimeoutOrNull(REQUEST_TIMEOUT_MS) {
+                    AiApi.sendMessage(
+                        userMessage = apiText,
+                        model = useModel.id,
+                        history = ctxHistory,
+                        siteContext = context,
+                        assistantNotes = AssistantBus.recentNotes(),
+                        imageBase64 = b64
+                    )
+                } ?: Result.failure(Exception("پاسخ دیر رسید. دوباره امتحان کن."))
 
-            result.onSuccess { reply ->
-                _isOffline.value = false
-                _messages.value = _messages.value + ChatMessage(reply.text, false)
-                try { limits.addTokens(uid, useModel, reply.totalTokens) } catch (e: Exception) { }
-            }.onFailure { error ->
+                result.onSuccess { reply ->
+                    _isOffline.value = false
+                    _messages.value = _messages.value + ChatMessage(reply.text, false)
+                    try { limits.addTokens(uid, useModel, reply.totalTokens) } catch (e: Exception) { }
+                    done = true
+                }.onFailure { error ->
+                    _isOffline.value = true
+                    val reply = LocalDoctor.reply(text) +
+                        "\n\n⚠️ ${error.message.orEmpty()}"
+                    _messages.value = _messages.value + ChatMessage(reply, false, excludeFromContext = true)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 _isOffline.value = true
-                // درخواست ناموفق از سهم کاربر کم نمی‌شه
-                try { limits.refund(uid, useModel) } catch (e: Exception) { }
-                val reply = LocalDoctor.reply(text) +
-                    "\n\n⚠️ ${error.message.orEmpty()}"
-                _messages.value = _messages.value + ChatMessage(reply, false, excludeFromContext = true)
+                _messages.value = _messages.value +
+                    ChatMessage("⚠️ مشکلی پیش اومد. دوباره امتحان کن.", false, excludeFromContext = true)
+            } finally {
+                // چه موفق، چه خطا، چه لغو؛ همیشه حالت «در حال ارسال» تموم می‌شه
+                withContext(NonCancellable) {
+                    // درخواست ناموفق از سهم کاربر کم نمی‌شه
+                    if (begun && !done) {
+                        try { limits.refund(uid, useModel) } catch (e: Exception) { }
+                    }
+                    _quota.value = try { limits.quota(uid, _model.value) } catch (e: Exception) { null }
+                    _isLoading.value = false
+                    persist()
+                }
             }
-
-            _quota.value = try { limits.quota(uid, _model.value) } catch (e: Exception) { null }
-            _isLoading.value = false
-            persist()
         }
     }
 
@@ -266,6 +310,9 @@ class AiChatViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { try { history.clearHistory() } catch (e: Exception) { } }
     }
 }
+
+private const val REQUEST_TIMEOUT_MS = 70_000L
+private const val STUCK_BACKGROUND_MS = 8_000L
 
 private object LocalDoctor {
 
