@@ -1,6 +1,9 @@
 package com.appdony.app.ui.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.appdony.app.data.preferences.ChatHistoryManager
+import com.appdony.app.data.preferences.StoredChatMessage
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.api.AiApi
 import com.appdony.app.data.api.ApiClient
@@ -17,7 +20,9 @@ data class ChatMessage(
     val excludeFromContext: Boolean = false
 )
 
-class AiChatViewModel : ViewModel() {
+class AiChatViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val history = ChatHistoryManager(app)
 
     private val welcome = ChatMessage("سلام! من دکتر طاعونم 🩺 چطور می‌تونم کمکت کنم؟", false, excludeFromContext = true)
 
@@ -32,6 +37,18 @@ class AiChatViewModel : ViewModel() {
 
     init {
         _messages.value = listOf(welcome)
+        // چت‌های قبلی از حافظه‌ی گوشی برگردن
+        viewModelScope.launch {
+            val saved = try { history.load() } catch (e: Exception) { emptyList() }
+            if (saved.isNotEmpty() && _messages.value.size <= 1) {
+                _messages.value = saved.map { ChatMessage(it.text, it.isUser, it.excludeFromContext) }
+            }
+        }
+    }
+
+    private fun persist() {
+        val snapshot = _messages.value.map { StoredChatMessage(it.text, it.isUser, it.excludeFromContext) }
+        viewModelScope.launch { try { history.saveChatHistory(snapshot) } catch (e: Exception) { } }
     }
 
     fun sendMessage(userMessage: String) {
@@ -43,7 +60,7 @@ class AiChatViewModel : ViewModel() {
         _isLoading.value = true
 
         viewModelScope.launch {
-            val history = currentMessages
+            val ctxHistory = currentMessages
                 .dropLast(1)
                 .filter { !it.excludeFromContext }
                 .takeLast(8)
@@ -51,7 +68,7 @@ class AiChatViewModel : ViewModel() {
                 .map { (if (it.isUser) "user" else "assistant") to it.text }
 
             val context = loadSiteContext(text)
-            val result = AiApi.sendMessage(text, history, context, AssistantBus.recentNotes())
+            val result = AiApi.sendMessage(text, ctxHistory, context, AssistantBus.recentNotes())
 
             result.onSuccess { response ->
                 _isOffline.value = false
@@ -63,6 +80,7 @@ class AiChatViewModel : ViewModel() {
                 _messages.value = _messages.value + ChatMessage(reply, false, excludeFromContext = true)
             }
             _isLoading.value = false
+            persist()
         }
     }
 
@@ -78,6 +96,7 @@ class AiChatViewModel : ViewModel() {
 
     fun clearChat() {
         _messages.value = listOf(welcome)
+        viewModelScope.launch { try { history.clearHistory() } catch (e: Exception) { } }
     }
 }
 
