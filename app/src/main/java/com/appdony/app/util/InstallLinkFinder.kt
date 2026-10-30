@@ -11,11 +11,8 @@ import org.jsoup.Jsoup
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/**
- * لینک «نصب کردن» رو از صفحه‌ی اصلی پست توی سایت پیدا می‌کنه.
- * - لینک واقعی: DownloadLink با url پر
- * - دکمه‌ی قفل: DownloadLink با url خالی (و عنوان LOCKED_TITLE)
- */
+// لینک «نصب کردن» رو از صفحه‌ی اصلی پست پیدا می‌کنه.
+// لینک واقعی: url پر | دکمه‌ی قفل: url خالی با عنوان LOCKED_TITLE
 object InstallLinkFinder {
 
     const val LOCKED_TITLE = "نصب کردن"
@@ -26,10 +23,9 @@ object InstallLinkFinder {
     )
 
     private const val SITE = "https://appdony.ir/"
-    private const val UA =
-        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
+    private const val UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
 
-    private val client by lazy {
+    private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
@@ -41,15 +37,14 @@ object InstallLinkFinder {
 
     private val FILE_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z", "obb")
     private val BLOCKED_DOMAINS = listOf(
-        "google.com", "doubleclick.net", "googlesyndication.com", "google-analytics.com", "facebook.com",
-        "t.me", "telegram.me", "telegram.org", "twitter.com", "x.com", "pinterest.com",
-        "youtube.com", "youtu.be", "aparat.com", "instagram.com", "whatsapp.com", "wa.me",
-        "linkedin.com", "tiktok.com", "apple.com", "cafebazaar.ir", "myket.ir",
-        "wikipedia.org", "reddit.com"
+        "google.com", "doubleclick.net", "facebook.com", "t.me", "telegram.me", "telegram.org",
+        "twitter.com", "x.com", "pinterest.com", "youtube.com", "youtu.be", "aparat.com",
+        "instagram.com", "whatsapp.com", "wa.me", "linkedin.com", "tiktok.com", "apple.com",
+        "cafebazaar.ir", "myket.ir", "wikipedia.org", "reddit.com"
     )
     private val ALLOWED_HOSTS = setOf("drive.google.com", "docs.google.com")
     private val INSTALL_TEXT = Regex("نصب|دانلود|download|دریافت", RegexOption.IGNORE_CASE)
-    private val DL_PATH = Regex("(^|/)(dl|download|downloads|getfile|file|files)(/|$)")
+    private val DL_PATH = Regex("/(dl|download|downloads|getfile|file|files)(/|\\z)")
     private val SIZE_REGEX = Regex(
         "([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
         RegexOption.IGNORE_CASE
@@ -58,19 +53,89 @@ object InstallLinkFinder {
 
     suspend fun find(postId: Int, postLink: String?): Result<FindResult> =
         withContext(Dispatchers.IO) {
-            try {
-                val pageUrl = postLink?.takeIf { it.toHttpUrlOrNull() != null } ?: "${SITE}?p=$postId"
-                val request = Request.Builder()
-                    .url(pageUrl)
-                    .header("User-Agent", UA)
-                    .header("Accept", "text/html,application/xhtml+xml")
-                    .header("Accept-Language", "fa,en;q=0.8")
-                    .build()
-                val html = client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) throw IOException("کد ${resp.code}")
-                    resp.body?.string().orEmpty()
+            runCatching {
+                val valid = postLink != null && postLink.toHttpUrlOrNull() != null
+                val pageUrl = if (valid) postLink!! else SITE + "?p=" + postId
+                parse(fetch(pageUrl), pageUrl)
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+            }
+        }
+
+    private fun fetch(url: String): String {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", UA)
+            .header("Accept", "text/html,application/xhtml+xml")
+            .header("Accept-Language", "fa,en;q=0.8")
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw IOException("کد " + resp.code)
+            return resp.body?.string() ?: ""
+        }
+    }
+
+    private fun parse(html: String, pageUrl: String): FindResult {
+        val doc = Jsoup.parse(html, pageUrl)
+        val scope = doc.selectFirst("article, .entry-content, .post-content, main") ?: doc.body()
+
+        val links = mutableListOf<DownloadLink>()
+        val seen = mutableSetOf<String>()
+        var lockedAdded = false
+        var checked = 0
+        val debug = StringBuilder()
+        debug.append("page: ").append(pageUrl).append('\n')
+
+        for (el in scope.select("a[href], button")) {
+            if (el.parents().any { it.tagName().lowercase() in SKIP_ANCESTORS }) continue
+            checked++
+
+            val text = el.text().replace("\u00A0", " ").trim()
+            val href = el.attr("href").trim()
+            val abs = if (href.isBlank()) "" else el.absUrl("href")
+            val looksInstall = INSTALL_TEXT.containsMatchIn(text)
+
+            val classes = el.className().lowercase()
+            val noHref = href.isBlank() || href == "#" || href.startsWith("javascript:")
+            val isLockedEl = looksInstall &&
+                (noHref || classes.contains("lock") || classes.contains("disabled") || el.hasAttr("disabled"))
+
+            if (isLockedEl) {
+                if (!lockedAdded) {
+                    links.add(DownloadLink(title = LOCKED_TITLE, url = ""))
+                    lockedAdded = true
+                    debug.append("locked: ").append(text.take(40)).append('\n')
                 }
-                Result.success(parse(html, pageUrl))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+                continue
+            }
+
+            if (abs.isBlank()) continue
+            val httpUrl = abs.toHttpUrlOrNull() ?: continue
+            if (isBlockedHost(httpUrl.host)) continue
+            if (abs.substringBefore('#') == pageUrl.substringBefore('#')) continue
+
+            val path = httpUrl.encodedPath
+            val ext = path.substringAfterLast('/', "").substringAfterLast('.', "").lowercase()
+            val isFile = ext in FILE_EXTS
+            val isDlPath = looksInstall && DL_PATH.containsMatchIn(path)
+            if (!isFile && !isDlPath) continue
+            if (!seen.add(abs)) continue
+
+            val m = SIZE_REGEX.find(text)
+            val size = if (m != null) m.groupValues[1] + " " + m.groupValues[2] else null
+            val title = if (text.isBlank()) LOCKED_TITLE else text.take(60)
+            links.add(DownloadLink(title = title, url = abs, size = size))
+            debug.append("link: ").append(abs).append('\n')
+            if (links.count { it.url.isNotBlank() } >= 6) break
+        }
+
+        debug.append("checked: ").append(checked).append(" | found: ").append(links.size)
+        return FindResult(links = links, debug = debug.toString())
+    }
+
+    private fun isBlockedHost(host: String): Boolean {
+        val h = host.lowercase()
+        if (h in ALLOWED_HOSTS) return false
+        return BLOCKED_DOMAINS.any { h == it || h.endsWith("." + it) }
+    }
+}
