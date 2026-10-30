@@ -61,6 +61,7 @@ import com.appdony.app.util.DownloadPhase
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.util.DownloadLink
+import com.appdony.app.util.TelegramLinks
 import kotlinx.coroutines.launch
 
 @Composable
@@ -153,6 +154,15 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
 private suspend fun startAppDownload(context: Context, link: DownloadLink, post: Post) {
     if (link.url.isBlank()) {
         AppBanner.show(BannerKind.WARNING, "این لینک فعلاً در دسترس نیست")
+        return
+    }
+    // لینک تلگرام: مستقیم با اپ تلگرام باز می‌شه، نه با وب و نه وارد صف دانلود
+    if (TelegramLinks.isTelegram(link.url)) {
+        if (TelegramLinks.open(context, link.url)) {
+            AppBanner.show(BannerKind.SUCCESS, "تلگرام باز شد؛ فایل رو از همون‌جا بگیر", 3500L)
+        } else {
+            AppBanner.show(BannerKind.WARNING, "نتونستم تلگرام رو باز کنم", 4000L)
+        }
         return
     }
     AppBanner.show(BannerKind.CHECKING, "در حال بررسی لینک...", 15000L)
