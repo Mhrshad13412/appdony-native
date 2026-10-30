@@ -119,8 +119,20 @@ fun AppNavGraph(
         composable("search") { SearchScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
         composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
         composable("favorites") { FavoritesScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
-        composable("chat") { AiChatScreen(onBack = { navController.popBackStack() }, onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") }) }
-        composable("ai_chat") { AiChatScreen(onBack = { navController.popBackStack() }, onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") }) }
+        composable("chat") {
+            AiChatScreen(
+                onBack = { navController.popBackStack() },
+                onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") },
+                onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }
+            )
+        }
+        composable("ai_chat") {
+            AiChatScreen(
+                onBack = { navController.popBackStack() },
+                onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") },
+                onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }
+            )
+        }
 
         // پشتیبانی: کاربر عادی مستقیم می‌ره چت، ادمین اول لیست کاربرها رو می‌بینه
         composable("support") {
