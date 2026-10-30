@@ -16,6 +16,11 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 
+/** جواب مدل + توکن مصرف‌شده (برای محاسبه‌ی سهم کاربر) */
+data class AiReply(val text: String, val promptTokens: Int, val completionTokens: Int) {
+    val totalTokens: Int get() = promptTokens + completionTokens
+}
+
 object AiApi {
 
     private const val TAG = "AiApi"
@@ -34,39 +39,28 @@ object AiApi {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val TEXT_MODELS = listOf("deepseek-v4-flash", "claude-haiku-5-5")
-    private val IMAGE_MODELS = listOf("claude-haiku-5-5")
-
     private class ApiException(val code: Int, message: String) : Exception(message)
 
+    /** مدل رو کاربر انتخاب می‌کنه؛ چون سهم هر مدل جداست، فالبک خودکار به مدل دیگه نداریم */
     suspend fun sendMessage(
         userMessage: String,
+        model: String,
         history: List<Pair<String, String>> = emptyList(),
         siteContext: String = "",
         assistantNotes: String = "",
         imageBase64: String? = null
-    ): Result<String> = withContext(Dispatchers.IO) {
+    ): Result<AiReply> = withContext(Dispatchers.IO) {
         if (API_KEY.isBlank()) {
             lastDebug = "AI_KEY خالیه"
             return@withContext Result.failure(Exception("کلید هوش مصنوعی توی اپ تنظیم نشده."))
         }
         try {
             val messages = buildMessages(userMessage, history, siteContext, assistantNotes, imageBase64)
-            val models = if (imageBase64.isNullOrBlank()) TEXT_MODELS else IMAGE_MODELS
-            var lastError: ApiException? = null
-
-            for (model in models) {
-                try {
-                    return@withContext Result.success(requestOnce(model, messages))
-                } catch (e: ApiException) {
-                    lastError = e
-                    lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
-                    Log.w(TAG, lastDebug)
-                    // کلید اشتباه، اعتبار تموم یا محدودیت؛ مدل عوض کردن فایده نداره
-                    if (e.code in listOf(401, 402, 403, 429)) break
-                }
-            }
-            Result.failure(Exception(describe(lastError)))
+            Result.success(requestOnce(model, messages))
+        } catch (e: ApiException) {
+            lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
+            Log.w(TAG, lastDebug)
+            Result.failure(Exception(describe(e)))
         } catch (e: Exception) {
             Log.w(TAG, "failed", e)
             networkFailure(e)
@@ -116,7 +110,7 @@ object AiApi {
         return messages
     }
 
-    private fun networkFailure(e: Exception): Result<String> {
+    private fun networkFailure(e: Exception): Result<AiReply> {
         lastDebug = "${e.javaClass.simpleName}: ${e.message.orEmpty().take(60)}"
         val msg = when (e) {
             is UnknownHostException -> "اتصال به اینترنت یا DNS مشکل داره."
@@ -136,12 +130,14 @@ object AiApi {
         else -> "سرویس هوش مصنوعی در دسترس نیست (کد ${e.code})."
     }
 
-    private fun requestOnce(model: String, messages: JSONArray): String {
+    private fun estimateTokens(s: String): Int = (s.length / 3).coerceAtLeast(1)
+
+    private fun requestOnce(model: String, messages: JSONArray): AiReply {
         // temperature عمداً نیست؛ max_tokens بالاست چون DeepSeek قبل از جواب «فکر» می‌کنه
         val json = JSONObject()
             .put("model", model)
             .put("messages", messages)
-            .put("max_tokens", 1500)
+            .put("max_tokens", 2000)
 
         val request = Request.Builder()
             .url("$BASE_URL/chat/completions")
@@ -156,13 +152,23 @@ object AiApi {
             if (!response.isSuccessful) throw ApiException(response.code, text.orEmpty().take(200))
             if (text.isNullOrBlank()) throw ApiException(204, "empty body")
 
-            val choices = JSONObject(text).optJSONArray("choices")
+            val root = JSONObject(text)
+            val choices = root.optJSONArray("choices")
             if (choices == null || choices.length() == 0) throw ApiException(204, "no choices")
 
             val reply = choices.getJSONObject(0)
                 .optJSONObject("message")?.optString("content", "")?.trim().orEmpty()
             if (reply.isBlank()) throw ApiException(204, "blank reply")
-            return reply
+
+            // توکن واقعی از سرور؛ اگه نفرستاد تخمین می‌زنیم
+            val usage = root.optJSONObject("usage")
+            var promptTokens = usage?.optInt("prompt_tokens", 0) ?: 0
+            var completionTokens = usage?.optInt("completion_tokens", 0) ?: 0
+            if (promptTokens + completionTokens == 0) {
+                promptTokens = estimateTokens(messages.toString().take(20000))
+                completionTokens = estimateTokens(reply)
+            }
+            return AiReply(reply, promptTokens, completionTokens)
         }
     }
 }
