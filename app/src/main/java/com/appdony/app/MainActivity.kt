@@ -65,6 +65,7 @@ import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
 import com.appdony.app.util.CrashReporter
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -107,6 +108,17 @@ fun AppRoot() {
     LaunchedEffect(Unit) {
         delay(1500)
         showSplash = false
+    }
+
+    // کاربرهایی که قبل از این آپدیت وارد شده بودن هم توی لیست پشتیبان ثبت بشن
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            val id = sessionManager.userId.first()
+            val name = sessionManager.displayName.first().ifBlank { sessionManager.username.first() }
+            if (id > 0) com.appdony.app.data.api.SupportApi.registerUser(
+                com.appdony.app.data.api.SupportApi.threadOf(id), name
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -263,7 +275,7 @@ fun MainContent(
         if (showAiAssistant) {
             FloatingAssistant(
                 currentRoute = currentRoute,
-                visible = currentRoute != "ai_chat" && currentRoute != "chat",
+                visible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support"),
                 bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
                 onSearchClick = { navController.navigate("search") { launchSingleTop = true } },
                 onDownloadsClick = { navController.navigateToTab("downloads") },
