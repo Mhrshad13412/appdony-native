@@ -70,7 +70,6 @@ fun HomeScreen(
     onCategoryClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
-    val featured by viewModel.featured.collectAsStateWithLifecycle()
     val plus by viewModel.plus.collectAsStateWithLifecycle()
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -95,12 +94,8 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        item(key = "featured") {
-            FeaturedBlock(title = "ویژه", keyPrefix = "featured", posts = featured, onPostClick = onPostClick)
-        }
-
         item(key = "plus") {
-            FeaturedBlock(title = "اپدونی پلاس", keyPrefix = "plus", posts = plus, onPostClick = onPostClick)
+            PlusBlock(posts = plus, onPostClick = onPostClick)
         }
 
         if (isLoading) {
@@ -135,14 +130,14 @@ fun HomeScreen(
     }
 }
 
-// ───────────── بلوک «ویژه» و «اپدونی پلاس» ─────────────
+// ───────────── بلوک «اپدونی پلاس» ─────────────
 
 @Composable
-private fun FeaturedBlock(title: String, keyPrefix: String, posts: List<Post>?, onPostClick: (Int) -> Unit) {
+private fun PlusBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
     if (posts != null && posts.isEmpty()) return
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        SectionHeader(title = title)
+        SectionHeader(title = "اپدونی پلاس")
 
         if (posts == null) {
             LazyRow(
@@ -158,8 +153,8 @@ private fun FeaturedBlock(title: String, keyPrefix: String, posts: List<Post>?, 
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
-                    FadeIn(key = "$keyPrefix-${post.id}", index = index) {
-                        FeaturedCard(post = post, onClick = { onPostClick(post.id) })
+                    FadeIn(key = "plus-${post.id}", index = index) {
+                        PlusCard(post = post, onClick = { onPostClick(post.id) })
                     }
                 }
             }
@@ -169,7 +164,7 @@ private fun FeaturedBlock(title: String, keyPrefix: String, posts: List<Post>?, 
 }
 
 @Composable
-private fun FeaturedCard(post: Post, onClick: () -> Unit) {
+private fun PlusCard(post: Post, onClick: () -> Unit) {
     val icon = post.safeImage()
     val category = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
     // اسکرین‌شات از توی متن پست پیدا می‌شه (پشت صحنه، تا اسکرول سنگین نشه)
