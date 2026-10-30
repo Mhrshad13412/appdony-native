@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 /**
  * گربه‌ی اپدونی؛ همون گربه‌ی شناور، برای جاهای ثابت اپ (چت، صفحه‌ی خالی، شروع و حساب کاربری).
  * پلک می‌زنه، گوشش تکون می‌خوره، دمش تاب می‌خوره و موقع حرف زدن [talking] دهنش باز و بسته می‌شه.
+ * رنگ گربه و کاموا از رنگ تم برنامه گرفته می‌شه.
  */
 @Composable
 fun CatAvatar(
@@ -45,6 +46,7 @@ fun CatAvatar(
     hasShadow: Boolean = true,
     talking: Boolean = false
 ) {
+    val themeColor = MaterialTheme.colorScheme.primary
     val infinite = rememberInfiniteTransition(label = "cat_avatar")
     val floatY by infinite.animateFloat(
         initialValue = 0f,
@@ -143,7 +145,8 @@ fun CatAvatar(
                         lookY = 0f,
                         scare = 0f,
                         happy = 0f,
-                        wiggle = (floatY / 6f - 0.5f) * 2f
+                        wiggle = (floatY / 6f - 0.5f) * 2f,
+                        yarn = themeColor
                     )
                 )
             }
