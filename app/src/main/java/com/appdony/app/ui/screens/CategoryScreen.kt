@@ -28,7 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.ui.components.AppCard
+import com.appdony.app.ui.components.PostCard
 import com.appdony.app.ui.components.CardSkeleton
 import com.appdony.app.ui.theme.AppdonyTextMuted
 
@@ -112,11 +112,11 @@ fun CategoryScreen(
         when (val s = state) {
             is CategoryUiState.Loading -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Fixed(2),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(12) {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CardSkeleton() }
@@ -131,16 +131,16 @@ fun CategoryScreen(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("محتوایی نیست", color = AppdonyTextMuted) }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2),
                         state = gridState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(s.posts, key = { it.id }) { post ->
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                AppCard(title = post.cleanTitle(), imageUrl = post.featuredImageUrl(), onClick = { onPostClick(post.id) })
+                                PostCard(post = post, onClick = { onPostClick(post.id) }, fillWidth = true)
                             }
                         }
 
