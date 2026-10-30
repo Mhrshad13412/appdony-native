@@ -46,7 +46,9 @@ import coil.request.ImageRequest
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.ui.components.AppCard
+import com.appdony.app.ui.components.PostCard
+import com.appdony.app.ui.components.rememberPostMeta
+import com.appdony.app.data.model.isNew
 import com.appdony.app.ui.components.BannerSkeleton
 import com.appdony.app.ui.components.CardSkeleton
 import com.appdony.app.ui.components.SectionHeader
@@ -171,12 +173,16 @@ private fun PlusCard(post: Post, onClick: () -> Unit) {
     val screenshot by produceState<String?>(initialValue = null, key1 = post.id) {
         value = withContext(Dispatchers.Default) { post.firstScreenshot(icon) }
     }
+    val meta = rememberPostMeta(post)
     FeaturedGameCard(
         title = post.cleanTitle(),
         category = category,
         screenshotUrl = screenshot,
         iconUrl = icon,
-        onClick = onClick
+        onClick = onClick,
+        isNew = post.isNew(),
+        androidReq = meta.androidReq,
+        version = meta.version
     )
 }
 
@@ -220,11 +226,7 @@ private fun CategorySection(
             ) {
                 itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
                     FadeIn(key = "${state.section.id}-${post.id}", index = index) {
-                        AppCard(
-                            title = post.cleanTitle(),
-                            imageUrl = post.safeImage(),
-                            onClick = { onPostClick(post.id) }
-                        )
+                        PostCard(post = post, onClick = { onPostClick(post.id) })
                     }
                 }
             }
