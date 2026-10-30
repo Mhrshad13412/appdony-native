@@ -44,7 +44,7 @@ import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.repository.AppRepository
-import com.appdony.app.ui.components.AppCard
+import com.appdony.app.ui.components.PostCard
 import com.appdony.app.ui.theme.AppdonyBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -142,22 +142,18 @@ fun FavoritesScreen(
             }
             else -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Fixed(2),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(posts, key = { it.id }) { post ->
                         Box(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            AppCard(
-                                title = post.cleanTitle(),
-                                imageUrl = post.featuredImageUrl(),
-                                onClick = { onPostClick(post.id) }
-                            )
+                            PostCard(post = post, onClick = { onPostClick(post.id) }, fillWidth = true)
                         }
                     }
                 }
