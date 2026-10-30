@@ -13,6 +13,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -21,6 +23,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.appdony.app.ui.screens.AiChatScreen
+import com.appdony.app.ui.screens.SupportAdminScreen
+import com.appdony.app.ui.screens.SupportChatScreen
 import com.appdony.app.ui.screens.AppsScreen
 import com.appdony.app.ui.screens.BlogScreen
 import com.appdony.app.ui.screens.CategoryScreen
@@ -115,8 +119,44 @@ fun AppNavGraph(
         composable("search") { SearchScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
         composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
         composable("favorites") { FavoritesScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
-        composable("chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
-        composable("ai_chat") { AiChatScreen(onBack = { navController.popBackStack() }) }
+        composable("chat") { AiChatScreen(onBack = { navController.popBackStack() }, onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") }) }
+        composable("ai_chat") { AiChatScreen(onBack = { navController.popBackStack() }, onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") }) }
+
+        // پشتیبانی: کاربر عادی مستقیم می‌ره چت، ادمین اول لیست کاربرها رو می‌بینه
+        composable("support") {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val session = androidx.compose.runtime.remember { com.appdony.app.data.session.SessionManager(ctx) }
+            val uid by session.userId.collectAsState(initial = 0)
+            val dn by session.displayName.collectAsState(initial = "")
+            val un by session.username.collectAsState(initial = "")
+            if (uid > 0) {
+                SupportChatScreen(
+                    thread = com.appdony.app.data.api.SupportApi.threadOf(uid),
+                    title = "پشتیبانی",
+                    myName = dn.ifBlank { un }.ifBlank { "کاربر" },
+                    asAdmin = false,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+        }
+        composable("support_admin") {
+            SupportAdminScreen(
+                onOpen = { t, n -> navController.navigate("support_chat/${Uri.encode(t)}/${Uri.encode(n)}") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "support_chat/{thread}/{name}",
+            arguments = listOf(navArgument("thread") { type = NavType.StringType }, navArgument("name") { type = NavType.StringType })
+        ) { backStack ->
+            SupportChatScreen(
+                thread = Uri.decode(backStack.arguments?.getString("thread").orEmpty()),
+                title = Uri.decode(backStack.arguments?.getString("name").orEmpty()),
+                myName = "پشتیبان",
+                asAdmin = true,
+                onBack = { navController.popBackStack() }
+            )
+        }
         tabComposable("downloads") { DownloadsScreen() }
 
         composable(
