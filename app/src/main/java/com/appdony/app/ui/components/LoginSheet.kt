@@ -3,6 +3,7 @@ package com.appdony.app.ui.components
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
@@ -65,6 +67,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.appdony.app.data.api.LoginException
 import com.appdony.app.data.api.WordPressLogin
+import com.appdony.app.data.api.WordPressRegister
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.session.CredentialsManager
 import com.appdony.app.data.session.SessionManager
@@ -89,6 +92,12 @@ fun LoginSheet(
     var errorText by remember { mutableStateOf<String?>(null) }
     var errorTrace by remember { mutableStateOf<String?>(null) }
     var traceCopied by remember { mutableStateOf(false) }
+
+    // حالت ثبت‌نام
+    var registerMode by remember { mutableStateOf(false) }
+    var regUser by remember { mutableStateOf("") }
+    var regEmail by remember { mutableStateOf("") }
+    var regDone by remember { mutableStateOf(false) }
 
     fun doLogin() {
         if (isLoading) return
@@ -136,6 +145,37 @@ fun LoginSheet(
         }
     }
 
+    fun doRegister() {
+        if (isLoading) return
+        val u = regUser.trim()
+        val e = regEmail.trim()
+        if (u.isBlank() || e.isBlank()) {
+            errorText = "نام کاربری و ایمیل را وارد کن."
+            errorTrace = null
+            return
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()) {
+            errorText = "ایمیل معتبر نیست."
+            errorTrace = null
+            return
+        }
+        focusManager.clearFocus()
+        isLoading = true
+        errorText = null
+        errorTrace = null
+        traceCopied = false
+
+        scope.launch {
+            WordPressRegister.register(u, e)
+                .onSuccess { regDone = true }
+                .onFailure { error ->
+                    errorText = error.message ?: "ثبت‌نام انجام نشد."
+                    errorTrace = (error as? LoginException)?.trace
+                }
+            isLoading = false
+        }
+    }
+
     FloatingDialog(onDismiss = onDismiss, dismissible = !isLoading) {
         val fieldColors = loginFieldColors()
         Row(
@@ -143,7 +183,7 @@ fun LoginSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "ورود به اپدونی",
+                text = if (registerMode) "ثبت‌نام در اپدونی" else "ورود به اپدونی",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -155,7 +195,7 @@ fun LoginSheet(
         }
 
         Text(
-            text = "با حساب سایت اپدونی وارد شو",
+            text = if (registerMode) "نام کاربری و ایمیلت را وارد کن" else "با حساب سایت اپدونی وارد شو",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth()
@@ -163,94 +203,257 @@ fun LoginSheet(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("نام کاربری یا ایمیل") },
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-            singleLine = true,
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = fieldColors,
-            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (registerMode) {
+            if (regDone) {
+                Text(
+                    text = "ثبت‌نام انجام شد ✅",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "ایمیلی برای ${regEmail.trim()} فرستاده شد. داخلش لینک (یا کد) تنظیم رمز عبور هست؛ رمزت رو بذار و بعد با همون نام کاربری وارد شو. اگه ایمیل نیومد، پوشه‌ی اسپم رو هم چک کن.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        username = regUser.trim()
+                        password = ""
+                        regDone = false
+                        registerMode = false
+                        errorText = null
+                        errorTrace = null
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Text("رفتن به ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                OutlinedTextField(
+                    value = regUser,
+                    onValueChange = { regUser = it },
+                    label = { Text("نام کاربری") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = fieldColors,
+                    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-        Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("رمز عبور") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (passwordVisible) "پنهان کردن رمز" else "نمایش رمز"
+                OutlinedTextField(
+                    value = regEmail,
+                    onValueChange = { regEmail = it },
+                    label = { Text("ایمیل") },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = fieldColors,
+                    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { doRegister() }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val error = errorText
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-            },
-            singleLine = true,
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = fieldColors,
-            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { doLogin() }),
-            modifier = Modifier.fillMaxWidth()
-        )
 
-        val error = errorText
-        if (error != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
+                val trace = errorTrace
+                if (trace != null) {
+                    TextButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(trace))
+                            traceCopied = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { doRegister() },
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                        disabledContentColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                    } else {
+                        Text("ثبت‌نام", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("قبلاً ثبت‌نام کرده‌ای؟", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    TextButton(
+                        onClick = {
+                            if (!isLoading) {
+                                registerMode = false
+                                errorText = null
+                                errorTrace = null
+                            }
+                        }
+                    ) {
+                        Text("ورود", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        } else {
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("نام کاربری یا ایمیل") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                singleLine = true,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(16.dp),
+                colors = fieldColors,
+                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth()
             )
-        }
 
-        val trace = errorTrace
-        if (trace != null) {
-            TextButton(
-                onClick = {
-                    clipboard.setText(AnnotatedString(trace))
-                    traceCopied = true
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("رمز عبور") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (passwordVisible) "پنهان کردن رمز" else "نمایش رمز"
+                        )
+                    }
                 },
+                singleLine = true,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(16.dp),
+                colors = fieldColors,
+                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { doLogin() }),
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
-            }
-        }
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { doLogin() },
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-                disabledContentColor = Color.White
-            ),
-            modifier = Modifier.fillMaxWidth().height(52.dp)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
+            val error = errorText
+            if (error != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            } else {
-                Text("ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+
+            val trace = errorTrace
+            if (trace != null) {
+                TextButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(trace))
+                        traceCopied = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (traceCopied) "کپی شد ✓" else "کپی گزارش فنی", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { doLogin() },
+                enabled = !isLoading,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                    disabledContentColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text("ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("حساب نداری؟", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                TextButton(
+                    onClick = {
+                        if (!isLoading) {
+                            registerMode = true
+                            errorText = null
+                            errorTrace = null
+                        }
+                    }
+                ) {
+                    Text("ثبت‌نام", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
