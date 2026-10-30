@@ -24,11 +24,21 @@ data class SupportMessage(
 /** یه گفتگو (برای لیست کاربران پشتیبان) */
 data class SupportThread(val thread: String, val userName: String, val lastBody: String, val lastId: Long)
 
+/** یه کاربر ثبت‌نام‌شده (برای لیست پشتیبان) */
+data class SupportUser(val thread: String, val userName: String)
+
 /**
  * ارتباط با Supabase از طریق REST (بدون کتابخونه‌ی اضافه).
  * thread = شناسه‌ی حساب وردپرسی کاربر، مثلاً "u12".
  */
 object SupportApi {
+
+    /** ایمیل پشتیبان. هر کی با این ایمیل وارد شه، پنل پشتیبانی رو می‌بینه */
+    const val ADMIN_EMAIL = "mhrshadshaary@gmail.com"
+
+    fun isAdmin(email: String): Boolean = email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
+
+    fun threadOf(userId: Int): String = "u$userId"
 
     val configured: Boolean get() = BuildConfig.SUPA_URL.isNotBlank() && BuildConfig.SUPA_KEY.isNotBlank()
 
@@ -102,6 +112,39 @@ object SupportApi {
                         val name = list.firstOrNull { it.sender == "user" && it.userName.isNotBlank() }?.userName ?: t
                         SupportThread(t, name, last.body, last.id)
                     }.sortedByDescending { it.lastId }
+                }
+            }
+        }
+
+    private fun usersBase() = BuildConfig.SUPA_URL.trim().trimEnd('/') + "/rest/v1/support_users"
+
+    /** ثبت (یا به‌روزرسانی) کاربر توی لیست پشتیبان. ایمیل ذخیره نمی‌شه، فقط اسم */
+    suspend fun registerUser(thread: String, userName: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (!configured) error("پشتیبانی هنوز تنظیم نشده.")
+                val payload = JSONObject().put("thread", thread).put("user_name", userName.take(80))
+                client.newCall(
+                    req(usersBase() + "?on_conflict=thread")
+                        .header("Prefer", "resolution=merge-duplicates,return=minimal")
+                        .post(payload.toString().toRequestBody(json)).build()
+                ).execute().use { if (!it.isSuccessful) error("ثبت نشد (${it.code})") }
+            }
+        }
+
+    /** برای پشتیبان: همه‌ی کاربرهای ثبت‌نام‌شده */
+    suspend fun users(): Result<List<SupportUser>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (!configured) error("پشتیبانی هنوز تنظیم نشده.")
+                val url = usersBase() + "?order=created_at.desc&limit=1000"
+                client.newCall(req(url).get().build()).execute().use { r ->
+                    if (!r.isSuccessful) error("دریافت نشد (${r.code})")
+                    val arr = JSONArray(r.body?.string().orEmpty())
+                    List(arr.length()) { i ->
+                        val o = arr.getJSONObject(i)
+                        SupportUser(o.getString("thread"), o.optString("user_name"))
+                    }
                 }
             }
         }
