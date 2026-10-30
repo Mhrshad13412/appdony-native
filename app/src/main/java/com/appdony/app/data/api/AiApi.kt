@@ -32,7 +32,7 @@ object AiApi {
     private val API_KEY: String = BuildConfig.AI_KEY.trim()
 
     private val SYSTEM_PROMPT = """
-        تو «دکتر طاعون» هستی، دستیار اپلیکیشن «اپدونی» (مرجع دانلود بازی و برنامه‌ی اندروید).
+        تو «پاپی» هستی، دستیار اپلیکیشن «اپدونی» (مرجع دانلود بازی و برنامه‌ی اندروید).
 
         قوانین:
         - فقط به فارسی ساده و روان جواب بده. کوتاه بنویس (حداکثر ۴ جمله).
@@ -80,7 +80,7 @@ object AiApi {
                     append(siteContext)
                 }
                 if (assistantNotes.isNotBlank()) {
-                    append("\n\nاین‌ها پیام‌هایی هستن که خودت (دکتر طاعون) به‌تازگی روی صفحه به کاربر نشون دادی. با همین‌ها هماهنگ جواب بده و خلافشون نگو:\n")
+                    append("\n\nاین‌ها پیام‌هایی هستن که خودت (پاپی) به‌تازگی روی صفحه به کاربر نشون دادی. با همین‌ها هماهنگ جواب بده و خلافشون نگو:\n")
                     append(assistantNotes)
                 }
             }
@@ -132,59 +132,3 @@ object AiApi {
             Result.failure(Exception("اتصال به اینترنت یا DNS مشکل داره."))
         } catch (e: SocketTimeoutException) {
             lastDebug = "Timeout"
-            Result.failure(Exception("پاسخ دیر رسید. دوباره امتحان کن."))
-        } catch (e: ConnectException) {
-            lastDebug = "Connect: ${e.message.orEmpty().take(60)}"
-            Result.failure(Exception("اتصال به سرویس هوش مصنوعی برقرار نشد. اینترنتت رو چک کن."))
-        } catch (e: SSLException) {
-            lastDebug = "SSL: ${e.message.orEmpty().take(60)}"
-            Result.failure(Exception("اتصال امن به سرویس هوش مصنوعی برقرار نشد. اینترنتت رو چک کن."))
-        } catch (e: Exception) {
-            Log.w(TAG, "unexpected", e)
-            lastDebug = "${e.javaClass.simpleName}: ${e.message.orEmpty().take(60)}"
-            Result.failure(Exception("مشکلی پیش اومد. دوباره امتحان کن."))
-        }
-    }
-
-    private fun describe(e: ApiException?): String = when (e?.code) {
-        400 -> "درخواست یا عکس پذیرفته نشد (کد ۴۰۰)."
-        401, 403 -> "کلید هوش مصنوعی درست نیست یا دسترسی نداره."
-        402 -> "اعتبار دکتر تموم شده. کمی بعد دوباره بپرس."
-        429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
-        null -> "مشکلی پیش اومد. دوباره امتحان کن."
-        else -> "سرویس هوش مصنوعی در دسترس نیست (کد ${e.code})."
-    }
-
-    private fun requestOnce(key: String, model: String, messages: JSONArray): String {
-        // temperature عمداً فرستاده نمی‌شه؛ max_tokens بالاست چون مدل‌های DeepSeek قبل از جواب «فکر» می‌کنن
-        val json = JSONObject()
-            .put("model", model)
-            .put("messages", messages)
-            .put("max_tokens", 1500)
-
-        val request = Request.Builder()
-            .url("$BASE_URL/chat/completions")
-            .addHeader("Authorization", "Bearer $key")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Accept", "application/json")
-            .addHeader("User-Agent", USER_AGENT)
-            .post(json.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            val text = response.body?.string()
-
-            if (!response.isSuccessful) {
-                throw ApiException(response.code, text.orEmpty().take(200))
-            }
-            if (text.isNullOrBlank()) throw ApiException(204, "empty body")
-
-            val choices = JSONObject(text).optJSONArray("choices")
-            if (choices == null || choices.length() == 0) throw ApiException(204, "no choices")
-
-            val reply = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim().orEmpty()
-            if (reply.isBlank()) throw ApiException(204, "blank reply")
-            return reply
-        }
-    }
-}
