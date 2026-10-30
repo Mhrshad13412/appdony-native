@@ -5,6 +5,7 @@ import com.google.gson.annotations.SerializedName
 data class Post(
     val id: Int,
     val date: String? = null,
+    val modified: String? = null, // آخرین ویرایش (برای نشان «جدید»)
     val title: RenderedText,
     val content: RenderedText,
     val excerpt: RenderedText? = null, // 👈 اینجا اختیاری شد
