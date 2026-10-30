@@ -1,11 +1,15 @@
 package com.appdony.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +37,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.Icon
@@ -51,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -74,10 +83,16 @@ fun AiChatScreen(
     val messages by viewModel.messages.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isOffline by viewModel.isOffline.collectAsState()
+    val pendingImage by viewModel.pendingImage.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     val primary = MaterialTheme.colorScheme.primary
+
+    // انتخاب عکس از گالری
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.attachImage(uri)
+    }
 
     // دکمه‌ی پشتیبانی: فقط برای کاربرهای واردشده؛ ادمین (با ایمیل) می‌ره لیست کاربرها
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -101,7 +116,7 @@ fun AiChatScreen(
     }
 
     fun send(text: String) {
-        if (text.isNotBlank() && !isLoading) {
+        if ((text.isNotBlank() || pendingImage != null) && !isLoading) {
             viewModel.sendMessage(text)
             inputText = ""
         }
@@ -224,10 +239,61 @@ fun AiChatScreen(
             }
         }
 
+        // نوار «عکس آماده‌ی ارسال»
+        pendingImage?.let { bmp ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "عکس آماده‌ی ارسال",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .clickable { viewModel.removePendingImage() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Close, "حذف عکس", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = !isLoading) {
+                        imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.AddPhotoAlternate, "ارسال عکس", tint = primary, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(8.dp))
             OutlinedTextField(
                 value = inputText,
                 onValueChange = { inputText = it },
@@ -248,7 +314,7 @@ fun AiChatScreen(
                 )
             )
             Spacer(Modifier.width(8.dp))
-            val canSend = inputText.isNotBlank() && !isLoading
+            val canSend = (inputText.isNotBlank() || pendingImage != null) && !isLoading
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -294,12 +360,28 @@ private fun MessageRow(msg: ChatMessage) {
                 .background(if (msg.isUser) primary else MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = msg.text,
-                color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                lineHeight = 23.sp
-            )
+            Column {
+                msg.image?.let { bmp ->
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = "عکس ارسالی",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .width(220.dp)
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                    if (msg.text.isNotBlank()) Spacer(Modifier.height(8.dp))
+                }
+                if (msg.text.isNotBlank()) {
+                    Text(
+                        text = msg.text,
+                        color = if (msg.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 14.sp,
+                        lineHeight = 23.sp
+                    )
+                }
+            }
         }
     }
 }
