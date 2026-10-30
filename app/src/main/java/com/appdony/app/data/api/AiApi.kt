@@ -2,19 +2,27 @@ package com.appdony.app.data.api
 
 import android.util.Log
 import com.appdony.app.BuildConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /** جواب مدل + توکن مصرف‌شده (برای محاسبه‌ی سهم کاربر) */
 data class AiReply(val text: String, val promptTokens: Int, val completionTokens: Int) {
@@ -35,9 +43,30 @@ object AiApi {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        // کل درخواست بیشتر از این طول نکشه؛ وقتی اپ بیرون بوده و سوکت مرده، گیر نمی‌کنه
+        .callTimeout(65, TimeUnit.SECONDS)
         .build()
+
+    /** بعد از برگشت از بیرون اپ، اتصال‌های مرده‌ی قبلی دور ریخته می‌شن */
+    fun resetConnections() {
+        try { client.connectionPool.evictAll() } catch (e: Exception) { }
+    }
+
+    /** نسخه‌ی قابل‌لغوِ execute(): با cancel شدن کوروتین، خودِ درخواست هم قطع می‌شه */
+    private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
+        cont.invokeOnCancellation { try { cancel() } catch (_: Throwable) { } }
+        enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (cont.isActive) cont.resume(response) else response.close()
+            }
+        })
+    }
 
     private class ApiException(val code: Int, message: String) : Exception(message)
 
@@ -57,6 +86,8 @@ object AiApi {
         try {
             val messages = buildMessages(userMessage, history, siteContext, assistantNotes, imageBase64)
             Result.success(requestOnce(model, messages))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: ApiException) {
             lastDebug = "model=$model code=${e.code} ${e.message.orEmpty().take(80)}"
             Log.w(TAG, lastDebug)
@@ -132,7 +163,7 @@ object AiApi {
 
     private fun estimateTokens(s: String): Int = (s.length / 3).coerceAtLeast(1)
 
-    private fun requestOnce(model: String, messages: JSONArray): AiReply {
+    private suspend fun requestOnce(model: String, messages: JSONArray): AiReply {
         // temperature عمداً نیست؛ max_tokens بالاست چون DeepSeek قبل از جواب «فکر» می‌کنه
         val json = JSONObject()
             .put("model", model)
@@ -147,7 +178,7 @@ object AiApi {
             .post(json.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val text = response.body?.string()
             if (!response.isSuccessful) throw ApiException(response.code, text.orEmpty().take(200))
             if (text.isNullOrBlank()) throw ApiException(204, "empty body")
