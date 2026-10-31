@@ -86,6 +86,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
 
     LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
@@ -256,12 +257,15 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        item {
-            SettingsGroup("حساب کاربری") {
-                SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.ExitToApp, color = MaterialTheme.colorScheme.error) {
-                    scope.launch {
-                        sessionManager.clearSession()
-                        Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
+        // «خروج از حساب» فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
+        if (isLoggedIn) {
+            item {
+                SettingsGroup("حساب کاربری") {
+                    SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.ExitToApp, color = MaterialTheme.colorScheme.error) {
+                        scope.launch {
+                            sessionManager.clearSession()
+                            Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
