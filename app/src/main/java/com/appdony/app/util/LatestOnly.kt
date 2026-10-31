@@ -2,19 +2,53 @@ package com.appdony.app.util
 
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
+import java.net.URLDecoder
 
-/** از هر اپ/بازی فقط جدیدترین پست رو نگه می‌داره و بقیه‌ی نسخه‌های قدیمی رو حذف می‌کنه */
+/**
+ * از هر اپ/بازی فقط جدیدترین پست (بر اساس تاریخ انتشار یا ویرایش) رو نگه می‌داره.
+ * هم‌اپ بودن از روی «اسکلت صامت» اسم تشخیص داده می‌شه، پس فارسی و انگلیسی یکی حساب می‌شن:
+ * ماینکرافت = Minecraft = MNKRFT
+ */
 object LatestOnly {
 
     private val stopWords = setOf(
-        "دانلود", "بازی", "برنامه", "اپلیکیشن", "نسخه", "ی", "نسخهی", "مود", "شده", "هک", "کرک",
-        "بدون", "تحریم", "برای", "اندروید", "ویندوز", "رایگان", "آخرین", "جدید", "آنلاین",
-        "mod", "apk", "premium", "unlocked", "hack", "hacked", "for", "android", "v"
+        "دانلود", "بازی", "برنامه", "اپلیکیشن", "ی", "مود", "شده", "هک", "کرک", "بدون", "تحریم",
+        "برای", "اندروید", "ویندوز", "رایگان", "آخرین", "جدید", "آنلاین", "آپدیت", "اصلی",
+        "نامحدود", "پولی", "نصب", "mod", "apk", "premium", "unlocked", "hack", "hacked", "for",
+        "android", "download", "free", "latest", "game", "games", "app", "apps", "application",
+        "new", "update", "full", "unlimited", "online", "and", "the", "of"
     )
 
-    private val parentheses = Regex("""\([^)]*\)|\[[^\]]*]|（[^）]*）""")
-    private val junkChars = Regex("""[^\p{L}\p{N}.]+""")
+    /** بعد از این کلمه‌ها شماره‌ی نسخه میاد و نباید جزو اسم حساب بشه */
+    private val markers = setOf("نسخه", "v", "version")
+
+    private val brackets = Regex("""\([^)]*\)|\[[^\]]*]""")
+    private val junk = Regex("""[^\p{L}\p{N}.]+""")
     private val versionToken = Regex("""^v?\d+([.\-]\d+)+$|^v\d+$|^(19|20)\d{2}$""")
+
+    private val digraphs = listOf(
+        "sh" to "ش", "ch" to "چ", "kh" to "k", "gh" to "k",
+        "ph" to "f", "th" to "t", "ck" to "k", "qu" to "k"
+    )
+
+    /** صامت‌های هم‌صدا یک حرف می‌شن؛ مصوت‌ها (a e i o u y w h و ا ی و ه ...) حذف می‌شن */
+    private val classes: Map<Char, Char> = HashMap<Char, Char>().also { m ->
+        fun put(chars: String, v: Char) {
+            for (c in chars) m[c] = v
+        }
+        put("bpبپ", 'B')
+        put("fف", 'F')
+        put("kcgqکگقغك", 'K')
+        put("szxثسصزذضظژ", 'S')
+        put("tdتدط", 'T')
+        put("jج", 'J')
+        put("lل", 'L')
+        put("mم", 'M')
+        put("nن", 'N')
+        put("rر", 'R')
+        put("ش", 'S')
+        put("چ", 'C')
+    }
 
     private fun normalizeDigits(s: String): String = buildString(s.length) {
         for (c in s) {
@@ -28,33 +62,102 @@ object LatestOnly {
         }
     }
 
-    /** اسم تمیز اپ بدون نسخه و کلمه‌های اضافه */
-    fun key(post: Post): String {
-        val title = normalizeDigits(post.cleanTitle().lowercase())
+    private fun skel(token: String): String {
+        var t = token
+        for ((a, b) in digraphs) t = t.replace(a, b)
+        val sb = StringBuilder()
+        for (c in t) {
+            val m = classes[c] ?: continue
+            if (sb.isEmpty() || sb.last() != m) sb.append(m)
+        }
+        return sb.toString()
+    }
+
+    private fun isMixedLatinDigit(x: String): Boolean =
+        x.any { it.isDigit() } && x.any { it in 'a'..'z' } && x.none { it in 'آ'..'ی' }
+
+    private fun key(text: String, dropNumbers: Boolean = false): String {
+        val t = normalizeDigits(text.lowercase())
             .replace('\u200c', ' ')
-            .replace(parentheses, " ")
-            .replace(junkChars, " ")
-        val tokens = title.split(' ')
-            .map { it.trim('.') }
-            .filter { it.isNotBlank() && it !in stopWords && !versionToken.matches(it) }
-        return if (tokens.isEmpty()) "id:${post.id}" else tokens.joinToString(" ")
+            .replace(brackets, " ")
+            .replace(junk, " ")
+        val sb = StringBuilder()
+        var skipNext = false
+        for (raw in t.split(' ')) {
+            val x = raw.trim('.')
+            if (x.isEmpty()) continue
+            if (x in markers) {
+                skipNext = true
+                continue
+            }
+            if (x in stopWords) continue
+            if (versionToken.matches(x)) {
+                skipNext = false
+                continue
+            }
+            if (x.all { it.isDigit() }) {
+                if (skipNext) {
+                    skipNext = false
+                    continue
+                }
+                // شماره‌ی بلند یعنی نسخه؛ عدد کوتاه (مثل 2 در Subway Surfers 2) جزو اسمه
+                if (dropNumbers || x.length > 2) continue
+                sb.append('#').append(x)
+                continue
+            }
+            skipNext = false
+            if (isMixedLatinDigit(x)) continue // مثل 3d و 4k
+            sb.append(skel(x))
+        }
+        return sb.toString()
+    }
+
+    private fun same(a: String, b: String): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        if (a == b) return true
+        val s = if (a.length <= b.length) a else b
+        val l = if (a.length <= b.length) b else a
+        // اسم کوتاه‌تر ابتدای اسم بلندتر باشه (مثل «توکا بوکا» با «توکا بوکا ورلد»)، ولی نه با شماره‌ی دنباله
+        return s.length >= 4 && l.startsWith(s) && !l.substring(s.length).startsWith("#")
+    }
+
+    private fun keysOf(p: Post): List<String> {
+        val out = ArrayList<String>(2)
+        val titleKey = key(p.cleanTitle())
+        if (titleKey.isNotEmpty()) out.add(titleKey)
+
+        // اسم داخل آدرس پست؛ بعضی پست‌های فارسی آدرس انگلیسی دارن (مثل /minecraft/)
+        val seg = p.link?.trimEnd('/')?.substringAfterLast('/').orEmpty()
+        if (seg.isNotEmpty()) {
+            val slug = try {
+                URLDecoder.decode(seg, "UTF-8")
+            } catch (e: Exception) {
+                seg
+            }.replace('-', ' ')
+            val slugKey = key(slug, dropNumbers = true)
+            if (slugKey.length >= 4 && slugKey !in out) out.add(slugKey)
+        }
+        if (out.isEmpty()) out.add("id:${p.id}")
+        return out
     }
 
     private fun stamp(p: Post): String = maxOf(p.date ?: "", p.modified ?: "")
 
+    private class Cluster(val keys: MutableList<String>, val members: MutableList<Post>)
+
     fun latestPerApp(posts: List<Post>): List<Post> {
-        val best = HashMap<String, Post>()
+        val clusters = ArrayList<Cluster>()
         for (p in posts) {
-            val k = key(p)
-            val cur = best[k]
-            if (cur == null || stamp(p) > stamp(cur)) best[k] = p
+            val ks = keysOf(p)
+            val hit = clusters.firstOrNull { c -> ks.any { a -> c.keys.any { b -> same(a, b) } } }
+            if (hit == null) {
+                clusters.add(Cluster(ks.toMutableList(), mutableListOf(p)))
+            } else {
+                hit.keys.addAll(ks)
+                hit.members.add(p)
+            }
         }
-        val seen = HashSet<String>()
-        val out = ArrayList<Post>()
-        for (p in posts) {
-            val k = key(p)
-            if (seen.add(k)) out.add(best.getValue(k))
-        }
-        return out
+        // از هر گروه جدیدترین پست؛ جای گروه توی لیست همون جای اولین نتیجه‌ی خودش می‌مونه
+        return clusters.map { c -> c.members.maxByOrNull { stamp(it) } ?: c.members.first() }
     }
 }
