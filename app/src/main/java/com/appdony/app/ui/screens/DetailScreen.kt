@@ -505,4 +505,56 @@ private fun DetailContent(
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                                loading = { ShimmerBox(modifier = Modifier.fillMaxWidth().height(180.dp), cornerRadius
+                                loading = { ShimmerBox(modifier = Modifier.fillMaxWidth().height(180.dp), cornerRadius = 16) },
+                                error = { Box(Modifier.fillMaxWidth().height(1.dp)) },
+                                success = { SubcomposeAsyncImageContent() }
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                    is ContentBlock.Quote -> {
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(8.dp)).background(primaryColor.copy(alpha = 0.1f))) {
+                                Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primaryColor))
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FormatQuote, null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(block.text, color = textColor, fontSize = 14.sp, fontStyle = FontStyle.Italic, lineHeight = 24.sp)
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                    is ContentBlock.ListBlock -> {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            block.items.forEachIndexed { i, item ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text(if (block.isOrdered) "${i + 1}." else "•", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(item, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 26.sp)
+                                }
+                                Spacer(Modifier.height(6.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!isBlog && similar.isNotEmpty()) {
+            item { SectionTitle("مشابه‌ها") }
+            item {
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(similar, key = { it.id }) { p ->
+                        AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl() ?: "", onClick = { onSimilarClick(p.id) })
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(24.dp))
+            CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
+        }
+    }
+}
