@@ -127,9 +127,11 @@ fun AppRoot() {
     var showAbout by remember { mutableStateOf(false) }
     var guideDismissed by remember { mutableStateOf(false) }
     val navController = rememberNavController()
-    // منبع بلور راهنما: کل رابط (نوار بالا، منوی پایین، پاپی و محتوا)
+    // منبع بلور راهنما: فقط وقتی راهنما در حال نمایشه فعاله (تا بلور منوی پایین رو خراب نکنه)
     val guideHaze = remember { HazeState() }
     var crashReport by remember { mutableStateOf(CrashReporter.read(context)) }
+
+    val guideActive = !showSplash && !hasSeenOnboarding && !guideDismissed
 
     LaunchedEffect(Unit) {
         delay(1500)
@@ -180,7 +182,11 @@ fun AppRoot() {
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
         AppdonyTheme(darkTheme = isDark, primaryColor = primaryColor) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                Box(modifier = Modifier.fillMaxSize().hazeSource(state = guideHaze)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (guideActive) Modifier.hazeSource(state = guideHaze) else Modifier)
+                ) {
                     if (showSplash) {
                         SplashScreen()
                     } else {
@@ -223,7 +229,7 @@ fun AppRoot() {
                 }
 
                 // راهنمای اولین ورود: فقط یک بار، بعدش دیگه هیچ‌وقت نشون داده نمی‌شه
-                if (!showSplash && !hasSeenOnboarding && !guideDismissed) {
+                if (guideActive) {
                     val startRoute = remember { navController.currentDestination?.route ?: "games" }
                     AppGuide(
                         hazeState = guideHaze,
