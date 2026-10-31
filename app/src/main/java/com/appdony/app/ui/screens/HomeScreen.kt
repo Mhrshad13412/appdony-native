@@ -51,6 +51,7 @@ import com.appdony.app.ui.components.rememberPostMeta
 import com.appdony.app.data.model.isNew
 import com.appdony.app.ui.components.BannerSkeleton
 import com.appdony.app.ui.components.CardSkeleton
+import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
 import com.appdony.app.ui.components.SectionTitleSkeleton
@@ -94,7 +95,8 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        // پایین لیست جا می‌ذاریم تا آخرین ردیف زیر منوی شیشه‌ای نمونه
+        contentPadding = PaddingValues(bottom = 24.dp + LocalBottomBarClearance.current)
     ) {
         item(key = "plus") {
             PlusBlock(posts = plus, onPostClick = onPostClick)
