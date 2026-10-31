@@ -50,6 +50,9 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
+/** لینک آخرش به تلگرام رسید؛ فایل نیست، باید با اپ تلگرام باز بشه */
+class TelegramRedirect(val url: String) : IOException("این لینک تلگرامه؛ با دکمه‌ی خودش از صفحه‌ی برنامه باز کن")
+
 object DownloadHelper {
 
     const val APK_MIME = "application/vnd.android.package-archive"
@@ -79,6 +82,7 @@ object DownloadHelper {
     /**
      * اول لینک رو واقعاً چک می‌کنه (به فایل می‌رسه یا نه). اگه لینک خراب/قفل بود
      * اصلاً وارد صف دانلود نمی‌شه و خطا برمی‌گرده. فقط لینک سالم میره توی صف.
+     * اگه لینک آخرش به تلگرام برسه، TelegramRedirect برمی‌گرده (نه دانلود).
      */
     suspend fun startDownload(
         context: Context,
@@ -98,6 +102,8 @@ object DownloadHelper {
             }
             val resolved = try {
                 resolve(url)
+            } catch (e: TelegramRedirect) {
+                return@withContext Result.failure(e)
             } catch (e: UnknownHostException) {
                 return@withContext Result.failure(Exception("اتصال به اینترنت برقرار نیست"))
             } catch (e: IOException) {
@@ -127,6 +133,7 @@ object DownloadHelper {
     }
 
     // لینک رو دنبال می‌کنه تا به فایل واقعی برسه (حداکثر ۴ مرحله)
+    // اگه وسط راه یا آخرش به تلگرام رسید، TelegramRedirect پرتاب می‌شه
     fun resolve(startUrl: String, depth: Int = 0): Resolved {
         if (depth > 3) throw IOException("لینک دانلود معتبر نیست (ریدایرکت زیاد)")
 
@@ -139,9 +146,19 @@ object DownloadHelper {
             .build()
 
         client.newCall(request).execute().use { resp ->
+            val finalUrl = resp.request.url.toString()
+
+            // بعد از ریدایرکت‌ها به تلگرام رسیدیم
+            if (TelegramLinks.isTelegram(finalUrl)) throw TelegramRedirect(finalUrl)
+
+            // ریدایرکتی که اوکی‌اچ‌تی‌تی‌پی دنبالش نمی‌ره (مثل tg://)
+            if (resp.code in 300..399) {
+                val loc = resp.header("Location").orEmpty().trim()
+                if (loc.isNotEmpty() && TelegramLinks.isTelegram(loc)) throw TelegramRedirect(loc)
+            }
+
             if (!resp.isSuccessful) throw IOException("سرور فایل را رد کرد (کد ${resp.code})")
 
-            val finalUrl = resp.request.url.toString()
             val type = resp.header("Content-Type").orEmpty().lowercase().substringBefore(';').trim()
             val size = resp.header("Content-Length")?.toLongOrNull() ?: -1L
             val fileName = fileNameFrom(resp.header("Content-Disposition"), finalUrl)
@@ -156,10 +173,11 @@ object DownloadHelper {
                 return Resolved(finalUrl, fileName, type, size)
             }
 
-            // صفحه‌ی وب: دنبال لینک فایل داخلش می‌گردیم
+            // صفحه‌ی وب: دنبال لینک فایل (یا تلگرام) داخلش می‌گردیم
             val html = resp.body?.string().orEmpty().take(500_000)
             val next = findFileLink(html, finalUrl)
                 ?: throw IOException("لینک مستقیم فایل پیدا نشد")
+            if (TelegramLinks.isTelegram(next)) throw TelegramRedirect(next)
             if (next == startUrl || next == finalUrl) throw IOException("لینک مستقیم فایل پیدا نشد")
             return resolve(next, depth + 1)
         }
@@ -175,6 +193,12 @@ object DownloadHelper {
         }
     }
 
+    // مثل absolute ولی لینک tg:// رو هم نگه می‌داره
+    private fun pick(base: String, raw: String): String? {
+        val u = raw.trim()
+        return if (u.startsWith("tg:", ignoreCase = true)) u else absolute(base, u)
+    }
+
     private fun findFileLink(html: String, baseUrl: String): String? {
         val doc = Jsoup.parse(html, baseUrl)
 
@@ -182,7 +206,7 @@ object DownloadHelper {
         val meta = doc.select("meta[http-equiv=refresh]").firstOrNull()?.attr("content")
         if (!meta.isNullOrBlank()) {
             val target = Regex("url\\s*=\\s*['\"]?([^'\";]+)", RegexOption.IGNORE_CASE).find(meta)?.groupValues?.get(1)
-            val abs = target?.let { absolute(baseUrl, it) }
+            val abs = target?.let { pick(baseUrl, it) }
             if (abs != null) return abs
         }
 
@@ -191,7 +215,7 @@ object DownloadHelper {
                 el.attr("href"), el.attr("data-href"), el.attr("data-url"),
                 el.attr("data-link"), el.attr("data-download")
             ).firstOrNull { it.isNotBlank() } ?: return@mapNotNull null
-            val abs = absolute(baseUrl, raw) ?: return@mapNotNull null
+            val abs = pick(baseUrl, raw) ?: return@mapNotNull null
             Pair(abs, el.text().trim())
         }
 
@@ -205,11 +229,14 @@ object DownloadHelper {
             u != baseUrl && DOWNLOAD_WORDS.any { text.contains(it, ignoreCase = true) }
         }?.let { return it.first }
 
+        // بعد: هر لینک تلگرام داخل صفحه
+        candidates.firstOrNull { (u, _) -> TelegramLinks.isTelegram(u) }?.let { return it.first }
+
         // آخر: ریدایرکت با جاوااسکریپت
         val js = Regex(
             "(?:location\\.href|window\\.location(?:\\.href)?|location\\.replace\\()\\s*=?\\s*\\(?[\"']([^\"']+)[\"']"
         ).find(html)?.groupValues?.get(1)
-        return js?.let { absolute(baseUrl, it) }
+        return js?.let { pick(baseUrl, it) }
     }
 
     private fun fileNameFrom(disposition: String?, url: String): String? {
@@ -398,7 +425,7 @@ object DownloadEngine {
             val size = file.length()
             val ext = file.name.substringAfterLast('.', "").lowercase()
 
-            // چک سالم بودن برای هر فایلی، فارق از پسوند
+            // چک سالم بودن برای هر فایلی، فارغ از پسوند
             if (size < DownloadHelper.MIN_VALID_BYTES) {
                 throw Failure("فایل خراب یا ناقص بود", deleteFile = true)
             }
