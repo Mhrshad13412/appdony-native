@@ -5,6 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -61,6 +68,7 @@ import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
 import com.appdony.app.ui.navigation.AppNavGraph
+import com.appdony.app.ui.screens.rememberSearchViewModel
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
 import com.appdony.app.util.CrashReporter
@@ -242,21 +250,41 @@ fun MainContent(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "games"
     val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
+    val isSearchRoute = currentRoute == "search"
+
+    // نوار بالا خودش فیلد جستجوئه؛ پس متن جستجو اینجا هم لازمه
+    val searchViewModel = rememberSearchViewModel()
+    val searchQuery by searchViewModel.query.collectAsStateWithLifecycle()
+    val openSearch: () -> Unit = {
+        if (currentRoute != "search") {
+            searchViewModel.onQueryChange("")
+            navController.navigate("search") { launchSingleTop = true }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                if (isMainRoute) {
+                if (isMainRoute || isSearchRoute) {
                     AppTopBar(
                         isLoggedIn = isLoggedIn,
                         userInitial = if (displayName.isNotBlank()) displayName else username,
-                        onSearchClick = { navController.navigate("search") },
-                        onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() }
+                        onSearchClick = openSearch,
+                        onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() },
+                        searchMode = isSearchRoute,
+                        query = searchQuery,
+                        onQueryChange = searchViewModel::onQueryChange,
+                        onSearchBack = { navController.popBackStack() }
                     )
                 }
             },
             bottomBar = {
-                if (isMainRoute) {
+                // منوی پایین موقع رفتن به جستجو آروم جمع می‌شه و موقع برگشتن آروم باز می‌شه
+                AnimatedVisibility(
+                    visible = isMainRoute,
+                    enter = expandVertically(tween(380, easing = FastOutSlowInEasing)) + fadeIn(tween(380)),
+                    exit = shrinkVertically(tween(380, easing = FastOutSlowInEasing)) + fadeOut(tween(200))
+                ) {
                     AppBottomNav(
                         currentRoute = currentRoute,
                         onTabSelected = { route -> navController.navigateToTab(route) }
@@ -277,7 +305,7 @@ fun MainContent(
                 currentRoute = currentRoute,
                 visible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support"),
                 bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
-                onSearchClick = { navController.navigate("search") { launchSingleTop = true } },
+                onSearchClick = openSearch,
                 onDownloadsClick = { navController.navigateToTab("downloads") },
                 onHelpClick = { navController.navigateToTab("blog") },
                 onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
