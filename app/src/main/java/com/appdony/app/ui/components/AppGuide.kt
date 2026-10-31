@@ -1,5 +1,6 @@
 package com.appdony.app.ui.components
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,35 +29,56 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -67,16 +89,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
 
-private enum class GuideTarget { POPPY, BOTTOM_NAV, TAB_GAMES, TAB_APPS, TAB_BLOG, TAB_DOWNLOADS, SEARCH, ACCOUNT }
+private enum class GuideTarget {
+    POPPY, BOTTOM_NAV, TAB_GAMES, TAB_APPS, TAB_BLOG, TAB_DOWNLOADS, SEARCH, ACCOUNT,
+    /** ناحیه‌ی محتوای صفحه؛ فقط وقتی کاربر روی تب می‌زنه و توضیح «داخلش» نشون داده می‌شه */
+    CONTENT
+}
 
 private class GuideStep(
     val title: String,
+    val icon: ImageVector,
     val text: String,
+    /** توضیح داخلی؛ وقتی کاربر روی بخش روشن بزنه نشون داده می‌شه */
+    val inner: String?,
+    /** اگه true باشه، موقع توضیح داخلی دایره می‌ره روی محتوای صفحه */
+    val innerContent: Boolean,
     val target: GuideTarget,
     val route: String? = null
 )
@@ -85,66 +113,74 @@ private fun buildSteps(showPoppy: Boolean): List<GuideStep> = buildList {
     if (showPoppy) {
         add(
             GuideStep(
-                "سلام، من پاپی‌ام",
-                "من دستیار اپدونی‌ام. روی من بزن تا چت کنیم، سراغ دانلودها بریم یا چیزی رو جستجو کنیم. می‌تونی منو بکشی و هر جای صفحه که خواستی بذاری.",
-                GuideTarget.POPPY
+                "من پاپی‌ام", Icons.Outlined.ChatBubbleOutline,
+                "سلام! من دستیار اپدونی‌ام. می‌تونی منو بکشی و هر جای صفحه که خواستی بذاری.",
+                "روی من که بزنی چند تا گزینه باز می‌شه؛ مثلاً چت با من، رفتن به دانلودها و جستجو. هر وقت لازم داشتی صدام کن.",
+                false, GuideTarget.POPPY
             )
         )
     }
     add(
         GuideStep(
-            "منوی پایین",
-            "از این منو بین بخش‌های اصلی اپ جابه‌جا می‌شی: بازی‌ها، برنامه‌ها، وبلاگ و دانلودها. بیا یکی‌یکی ببینیمشون.",
-            GuideTarget.BOTTOM_NAV
+            "منوی پایین", Icons.Outlined.Dashboard,
+            "با این منو بین چهار بخش اصلی جابه‌جا می‌شی: بازی‌ها، برنامه‌ها، وبلاگ و دانلودها.",
+            null, false, GuideTarget.BOTTOM_NAV
         )
     )
     add(
         GuideStep(
-            "بازی‌ها",
-            "اینجا جدیدترین و محبوب‌ترین بازی‌های اندروید رو پیدا می‌کنی، با لینک مستقیم و دانلود راحت.",
-            GuideTarget.TAB_GAMES, "games"
+            "بازی‌ها", Icons.Outlined.SportsEsports,
+            "اینجا جدیدترین بازی‌های اندروید رو پیدا می‌کنی، با لینک مستقیم.",
+            "بازی‌ها دسته‌بندی شدن و هر دسته یه ردیف داره. با «مشاهده همه» کل دسته رو می‌بینی و با زدن روی هر بازی، جزئیات و دکمه‌ی دانلودش باز می‌شه.",
+            true, GuideTarget.TAB_GAMES, "games"
         )
     )
     add(
         GuideStep(
-            "برنامه‌ها",
-            "برنامه‌های کاربردی اندروید اینجاست؛ از ابزارها تا سرگرمی، همه دسته‌بندی شده.",
-            GuideTarget.TAB_APPS, "apps"
+            "برنامه‌ها", Icons.Outlined.Apps,
+            "برنامه‌های کاربردی اندروید اینجاست.",
+            "مثل بازی‌ها دسته‌بندی شدن. روی هر برنامه بزنی، نسخه، حجم و لینک‌های دانلودش رو می‌بینی.",
+            true, GuideTarget.TAB_APPS, "apps"
         )
     )
     add(
         GuideStep(
-            "وبلاگ",
-            "مقاله‌ها، خبرها و معرفی‌های تازه‌ی اپدونی اینجان. اعلان وبلاگ رو هم می‌تونی از تنظیمات روشن یا خاموش کنی.",
-            GuideTarget.TAB_BLOG, "blog"
+            "وبلاگ", Icons.Outlined.Article,
+            "مقاله‌ها و خبرهای تازه‌ی اپدونی اینجان.",
+            "روی هر مطلب بزنی کامل باز می‌شه و فهرست مطالبش هم هست. اعلان وبلاگ رو هم از تنظیمات روشن یا خاموش می‌کنی.",
+            true, GuideTarget.TAB_BLOG, "blog"
         )
     )
     add(
         GuideStep(
-            "دانلودها",
-            "هر چی دانلود کنی اینجا جمع می‌شه؛ پیشرفت دانلود رو ببین و فایل‌هات رو مدیریت کن.",
-            GuideTarget.TAB_DOWNLOADS, "downloads"
+            "دانلودها", Icons.Outlined.Download,
+            "همه‌ی دانلودهات اینجا جمع می‌شن.",
+            "پیشرفت هر دانلود رو می‌بینی و فایل‌هات رو از همین‌جا مدیریت می‌کنی. اگه توی تنظیمات «فقط وای‌فای» رو بزنی، دانلود با اینترنت سیم‌کارت شروع نمی‌شه.",
+            true, GuideTarget.TAB_DOWNLOADS, "downloads"
         )
     )
     add(
         GuideStep(
-            "جستجو",
-            "اسم هر بازی یا برنامه‌ای رو توی این نوار بنویس تا سریع پیداش کنی.",
-            GuideTarget.SEARCH, "games"
+            "جستجو", Icons.Outlined.Search,
+            "اسم هر بازی یا برنامه‌ای رو اینجا بنویس تا سریع پیداش کنی.",
+            "نتیجه‌ها همین‌طور که می‌نویسی زیر نوار میان و جستجوهای قبلیت هم ذخیره می‌شه. از تنظیمات می‌تونی تاریخچه‌ش رو پاک کنی.",
+            false, GuideTarget.SEARCH, "games"
         )
     )
     add(
         GuideStep(
-            "منوی شما",
-            "این دکمه منوته: دانلودها، علاقه‌مندی‌ها، تنظیمات و درباره اپدونی. اگه حساب داری یا می‌خوای بسازی، ورود هم از همینجاست.",
-            GuideTarget.ACCOUNT
+            "منو", Icons.Outlined.Person,
+            "این دکمه منوته. هر وقت خواستی از اینجا حساب بسازی یا وارد شی.",
+            "توی منو: دانلودها، علاقه‌مندی‌ها، تنظیمات و درباره اپدونی هست. اگه حساب نداری، «ورود یا ثبت‌نام» هم بالای منوئه. کامنت گذاشتن و امتیاز دادن فقط با حساب فعاله.",
+            false, GuideTarget.ACCOUNT
         )
     )
     add(
         GuideStep(
-            "تنظیمات",
-            "از همین منو وارد تنظیمات شو تا تم، رنگ و اندازه‌ی فونت رو عوض کنی، پاپی رو روشن یا خاموش کنی، دانلود فقط با وای‌فای رو فعال کنی و اعلان‌ها رو مدیریت کنی. همه‌چیز آماده‌ست، خوش اومدی!",
-            GuideTarget.ACCOUNT
+            "تنظیمات", Icons.Outlined.Settings,
+            "تنظیمات رو هم از همین منو باز کن.",
+            "تم تاریک یا روشن، رنگ و اندازه‌ی فونت، روشن و خاموش کردن من، دانلود فقط با وای‌فای، اعلان‌ها و پاک کردن کش و تاریخچه‌ها همه اونجاست.",
+            false, GuideTarget.ACCOUNT
         )
     )
 }
@@ -164,12 +200,13 @@ private class HoleShape(private val hole: Rect, private val corner: Float) : Sha
 }
 
 /**
- * راهنمای اولین ورود: بیرونِ دایره بلور و مات، داخلش شفاف؛ پاپی توی بخش بلوری توضیح می‌ده.
- * hazeState باید منبعِ کل رابط (نوار بالا، منوی پایین، پاپی و محتوا) باشه.
+ * راهنمای اولین ورود: بیرونِ دایره بلور و مات، داخلش شفاف.
+ * پاپی با ابر پیام خودش (همون استایل حرف‌های همیشگی‌ش) سمت مخالفِ دایره توضیح می‌ده.
+ * sceneLayer باید کل رابط (نوار بالا، منوی پایین، پاپی و محتوا) رو ضبط کرده باشه.
  */
 @Composable
 fun AppGuide(
-    hazeState: HazeState,
+    sceneLayer: GraphicsLayer,
     showPoppyStep: Boolean,
     startRoute: String,
     onNavigate: (String) -> Unit,
@@ -182,8 +219,11 @@ fun AppGuide(
 
     val steps = remember(showPoppyStep) { buildSteps(showPoppyStep) }
     var step by remember { mutableIntStateOf(0) }
+    var innerShown by remember(step) { mutableStateOf(false) }
     val current = steps[step]
     val last = step == steps.lastIndex
+    val fullText = if (innerShown) (current.inner ?: current.text) else current.text
+    val canExplain = current.inner != null && !innerShown
 
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(450)) }
@@ -192,16 +232,16 @@ fun AppGuide(
     LaunchedEffect(step) { current.route?.let { onNavigate(it) } }
 
     // تایپ شدن متن پاپی
-    var shown by remember(step) { mutableIntStateOf(0) }
-    LaunchedEffect(step) {
+    var shown by remember(step, innerShown) { mutableIntStateOf(0) }
+    LaunchedEffect(step, innerShown) {
         shown = 0
-        delay(300)
-        while (shown < current.text.length) {
-            delay(24)
+        delay(if (innerShown) 120 else 300)
+        while (shown < fullText.length) {
+            delay(22)
             shown++
         }
     }
-    val typing = shown < current.text.length
+    val typing = shown < fullText.length
 
     // فقط دکمه‌ها می‌تونن راهنما رو ببندن
     BackHandler(enabled = true) { }
@@ -269,18 +309,28 @@ fun AppGuide(
                 val x = physX(w - px(56.dp), px(44.dp))
                 Rect(x, barTop, x + px(44.dp), barTop + barH)
             }
+            GuideTarget.CONTENT -> {
+                val top = barTop + barH + px(10.dp)
+                Rect(px(8.dp), top, w - px(8.dp), top + h * 0.30f)
+            }
         }
 
-        // هدف‌های تقریباً مربعی دایره می‌شن، هدف‌های پهن کپسول
-        val raw = rectFor(current.target)
+        // وقتی کاربر روی تب می‌زنه، دایره می‌ره روی محتوای همون بخش
+        val activeTarget = if (innerShown && current.innerContent) GuideTarget.CONTENT else current.target
+        val raw = rectFor(activeTarget)
         val padPx = px(8.dp)
         val targetHole: Rect
         val targetCorner: Float
-        if (raw.width / raw.height < 2.2f) {
+        if (activeTarget == GuideTarget.CONTENT) {
+            targetHole = raw
+            targetCorner = px(28.dp)
+        } else if (raw.width / raw.height < 2.2f) {
+            // هدف‌های تقریباً مربعی دایره می‌شن
             val r = maxOf(raw.width, raw.height) / 2f + padPx
             targetHole = Rect(raw.center, r)
             targetCorner = r
         } else {
+            // هدف‌های پهن (نوار جستجو، کل منوی پایین) کپسول می‌شن
             targetHole = raw.inflate(padPx)
             targetCorner = targetHole.height / 2f
         }
@@ -289,22 +339,33 @@ fun AppGuide(
         val corner by animateFloatAsState(targetCorner, tween(450, easing = FastOutSlowInEasing), label = "corner")
 
         val bg = scheme.background
+        val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val blurPx = px(22.dp)
 
-        // لایه‌ی بلور و مات: همه‌جا به‌جز داخل دایره
+        // ۱) کپی بلورشده‌ی کل صحنه، همه‌جا به‌جز داخل دایره
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(HoleShape(hole, corner))
-                .hazeEffect(state = hazeState) {
-                    blurRadius = 22.dp
-                    backgroundColor = bg
-                    tints = listOf(HazeTint(bg.copy(alpha = 0.6f)))
-                    // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط لایه‌ی مات میاد
-                    fallbackTint = HazeTint(bg.copy(alpha = 0.92f))
-                }
+                .then(
+                    if (canBlur) {
+                        Modifier.graphicsLayer {
+                            renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
+                        }
+                    } else Modifier
+                )
+                .drawBehind { drawLayer(sceneLayer) }
         )
 
-        // حلقه‌ی دور دایره
+        // ۲) لایه‌ی مات روی بلور (اندروید ۱۱ و پایین‌تر بلور نداره؛ مات‌تر می‌شه)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(HoleShape(hole, corner))
+                .background(bg.copy(alpha = if (canBlur) 0.55f else 0.92f))
+        )
+
+        // ۳) حلقه‌ی دور دایره
         Canvas(modifier = Modifier.fillMaxSize()) {
             val tl = hole.topLeft
             drawRoundRect(
@@ -323,14 +384,18 @@ fun AppGuide(
             )
         }
 
-        // جلوی لمس شدن اپ زیر راهنما رو می‌گیره (داخل دایره هم)
+        // ۴) جلوی لمس اپ زیر راهنما رو می‌گیره. زدن روی بخش روشن = توضیح داخلی
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) { detectTapGestures { } }
+                .pointerInput(targetHole, canExplain) {
+                    detectTapGestures { offset ->
+                        if (canExplain && targetHole.contains(offset)) innerShown = true
+                    }
+                }
         )
 
-        // پاپی و پیامش، سمت مخالفِ دایره
+        // ۵) پاپی و ابر پیامش، سمت مخالفِ دایره
         val holeInLowerHalf = hole.center.y > h / 2f
         val topPad = with(density) { statusTop.toDp() } + 20.dp
         val bottomPad = with(density) { navInset.toDp() } + 24.dp
@@ -338,89 +403,141 @@ fun AppGuide(
         Column(
             modifier = Modifier
                 .align(if (holeInLowerHalf) Alignment.TopCenter else Alignment.BottomCenter)
-                .padding(top = if (holeInLowerHalf) topPad else 0.dp, bottom = if (holeInLowerHalf) 0.dp else bottomPad)
-                .padding(horizontal = 20.dp)
-                .widthIn(max = 380.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(
+                    top = if (holeInLowerHalf) topPad else 0.dp,
+                    bottom = if (holeInLowerHalf) 0.dp else bottomPad
+                )
+                .padding(horizontal = 16.dp)
+                .widthIn(max = 340.dp)
+                .fillMaxWidth()
         ) {
-            CatAvatar(sizeDp = 72, hasShadow = false, talking = typing)
-            Spacer(Modifier.height(8.dp))
-            Surface(
-                shape = RoundedCornerShape(26.dp),
-                color = scheme.surface,
-                border = BorderStroke(1.dp, primary.copy(alpha = 0.5f)),
-                shadowElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                        steps.indices.forEach { i ->
-                            Box(
-                                modifier = Modifier
-                                    .height(6.dp)
-                                    .width(if (i == step) 18.dp else 6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (i == step) primary else scheme.outline.copy(alpha = 0.5f))
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = current.title,
-                        color = scheme.onSurface,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    // متن کامل نامرئی جا رو نگه می‌داره تا کارت موقع تایپ بالا و پایین نپره
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = current.text,
-                            color = Color.Transparent,
-                            fontSize = 14.sp,
-                            lineHeight = 24.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = current.text.take(shown),
-                            color = scheme.onSurfaceVariant,
-                            fontSize = 14.sp,
-                            lineHeight = 24.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        if (!last) {
-                            GuideButton(
-                                text = "رد کردن",
-                                container = scheme.error.copy(alpha = 0.14f),
-                                content = scheme.error,
-                                borderColor = scheme.error.copy(alpha = 0.6f),
-                                modifier = Modifier.weight(1f)
-                            ) { close() }
-                        }
-                        GuideButton(
-                            text = if (last) "شروع کنیم" else "بعدی",
-                            container = primary,
-                            content = Color.White,
-                            borderColor = null,
-                            modifier = Modifier.weight(if (last) 1f else 1.4f)
-                        ) {
-                            if (last) close() else step++
-                        }
-                    }
+            // پاپی سمت چپ، درست مثل جای همیشگی‌ش؛ ابر پیام زیرشه
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
+                    CatAvatar(sizeDp = 64, hasShadow = false, talking = typing)
                 }
+            }
+            Spacer(Modifier.height(6.dp))
+            GuideBubble(
+                step = current,
+                index = step,
+                total = steps.size,
+                fullText = fullText,
+                shownText = fullText.take(shown),
+                showHint = canExplain,
+                last = last,
+                onNext = { if (last) close() else step++ },
+                onSkip = { close() }
+            )
+        }
+    }
+}
+
+/** ابر پیام، هم‌استایل حرف‌های همیشگی پاپی (گوشه‌ی کوچک سمت پاپی) */
+@Composable
+private fun GuideBubble(
+    step: GuideStep,
+    index: Int,
+    total: Int,
+    fullText: String,
+    shownText: String,
+    showHint: Boolean,
+    last: Boolean,
+    onNext: () -> Unit,
+    onSkip: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val primary = scheme.primary
+    val big = 18.dp
+    val small = 6.dp
+    val shape = AbsoluteRoundedCornerShape(
+        topLeft = small, topRight = big, bottomRight = big, bottomLeft = big
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = scheme.surface,
+        shape = shape,
+        border = BorderStroke(1.dp, primary.copy(alpha = 0.65f)),
+        shadowElevation = 6.dp
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(primary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(step.icon, contentDescription = null, tint = primary, modifier = Modifier.size(17.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = step.title,
+                    color = scheme.onSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${index + 1} از $total",
+                    color = scheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            // متن کامل نامرئی جا رو نگه می‌داره تا ابر پیام موقع تایپ بالا و پایین نپره
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = fullText,
+                    color = Color.Transparent,
+                    fontSize = 13.sp,
+                    lineHeight = 21.sp,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = shownText,
+                    color = scheme.onSurface,
+                    fontSize = 13.sp,
+                    lineHeight = 21.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (showHint) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "برای جزئیات، روی بخش روشن بزن",
+                    color = primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (!last) {
+                    GuideButton(
+                        text = "رد کردن",
+                        container = scheme.error.copy(alpha = 0.14f),
+                        content = scheme.error,
+                        borderColor = scheme.error.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f),
+                        onClick = onSkip
+                    )
+                }
+                GuideButton(
+                    text = if (last) "شروع کنیم" else "بعدی",
+                    container = primary,
+                    content = Color.White,
+                    borderColor = null,
+                    modifier = Modifier.weight(if (last) 1f else 1.4f),
+                    onClick = onNext
+                )
             }
         }
     }
@@ -435,16 +552,16 @@ private fun GuideButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
     Box(
         modifier = modifier
-            .height(46.dp)
+            .height(40.dp)
             .clip(shape)
             .background(container)
             .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = content, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(text = text, color = content, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
