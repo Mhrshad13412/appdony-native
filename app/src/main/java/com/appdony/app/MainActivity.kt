@@ -1,5 +1,6 @@
 package com.appdony.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -85,6 +86,7 @@ import com.appdony.app.ui.screens.rememberSearchViewModel
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
 import com.appdony.app.util.CrashReporter
+import com.appdony.app.util.PendingRoute
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
@@ -103,7 +105,15 @@ class MainActivity : ComponentActivity() {
                 .launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
         enableEdgeToEdge()
+        // مقصدی که پنجره‌ی نصب سریع یا پاپیِ بیرونی خواسته
+        PendingRoute.set(intent?.getStringExtra("route"))
         setContent { AppRoot() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        PendingRoute.set(intent.getStringExtra("route"))
     }
 }
 
@@ -139,6 +149,19 @@ fun AppRoot() {
     LaunchedEffect(Unit) {
         delay(1500)
         showSplash = false
+    }
+
+    // رفتن به مقصدی که از پنجره‌ی نصب سریع یا پاپیِ بیرونی اومده
+    val pendingRoute by PendingRoute.route.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingRoute, showSplash) {
+        val r = pendingRoute ?: return@LaunchedEffect
+        if (showSplash) return@LaunchedEffect
+        delay(150)
+        runCatching {
+            if (r == "downloads") navController.navigateToTab(r)
+            else navController.navigate(r) { launchSingleTop = true }
+        }
+        PendingRoute.set(null)
     }
 
     // کاربرهایی که قبل از این آپدیت وارد شده بودن هم توی لیست پشتیبان ثبت بشن
