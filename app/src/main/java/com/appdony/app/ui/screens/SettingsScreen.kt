@@ -1,5 +1,6 @@
 package com.appdony.app.ui.screens
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -68,6 +69,7 @@ import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.util.CacheUtils
+import com.appdony.app.util.CatOverlayService
 import kotlinx.coroutines.launch
 
 @Composable
@@ -88,6 +90,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
+    var overlayOn by remember {
+        mutableStateOf(CatOverlayService.isEnabled(context) && CatOverlayService.canDraw(context))
+    }
 
     LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
 
@@ -204,6 +209,17 @@ fun SettingsScreen(onBack: () -> Unit) {
             SettingsGroup("دستیار هوش مصنوعی") {
                 SettingsSwitchRow("نمایش پاپی", Icons.Outlined.Visibility, showAiAssistant) {
                     scope.launch { settingsManager.setShowAiAssistant(it) }
+                }
+                RowDivider()
+                SettingsSwitchRow("پاپی بیرون از برنامه", Icons.Outlined.Visibility, overlayOn) { on ->
+                    overlayOn = on
+                    if (on && !CatOverlayService.canDraw(context)) {
+                        // اول اجازه‌ی «نمایش روی سایر برنامه‌ها»؛ بعد از برگشتن، سرویس خودش بالا میاد
+                        context.startActivity(
+                            CatOverlayService.permissionIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                    CatOverlayService.setEnabled(context, on)
                 }
             }
         }
