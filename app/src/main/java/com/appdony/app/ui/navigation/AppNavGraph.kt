@@ -11,7 +11,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -116,7 +118,22 @@ fun AppNavGraph(
             )
         }
         composable("updates") { UpdatesScreen() }
-        composable("search") { SearchScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
+        // جستجو: نوار بالا همزمان به نوار جستجو تبدیل می‌شه؛ نتیجه‌ها کمی دیرتر و آروم از پایین میان
+        composable(
+            route = "search",
+            enterTransition = {
+                fadeIn(tween(320, delayMillis = 140)) +
+                    slideInVertically(tween(380, delayMillis = 100, easing = FastOutSlowInEasing)) { it / 14 }
+            },
+            exitTransition = { fadeOut(tween(160)) },
+            popEnterTransition = { fadeIn(tween(240)) },
+            popExitTransition = {
+                fadeOut(tween(180)) +
+                    slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { it / 14 }
+            }
+        ) {
+            SearchScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") })
+        }
         composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
         composable("favorites") { FavoritesScreen(onBack = { navController.popBackStack() }, onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }) }
         composable("chat") {
