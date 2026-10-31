@@ -51,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
@@ -71,7 +72,10 @@ import com.appdony.app.ui.components.AiModelSelector
 import com.appdony.app.ui.components.AiQuotaCard
 import com.appdony.app.ui.components.AiSuggestionBlock
 import com.appdony.app.ui.components.PlagueDoctorAvatar
+import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.hasCodeBlock
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 private val QuickReplies = listOf(
     "یه بازی پیشنهاد بده 🎮",
@@ -121,11 +125,13 @@ fun AiChatScreen(
         if (uri != null) viewModel.attachImage(uri)
     }
 
-    // دکمه‌ی پشتیبانی: فقط برای کاربرهای واردشده؛ ادمین (با ایمیل) می‌ره لیست کاربرها
+    // دکمه‌ی پشتیبانی برای همه هست؛ مهمان اول وارد می‌شه یا حساب می‌سازه. ادمین (با ایمیل) می‌ره لیست کاربرها
     val context = androidx.compose.ui.platform.LocalContext.current
     val session = remember { com.appdony.app.data.session.SessionManager(context) }
     val loggedIn by session.isLoggedIn.collectAsState(initial = false)
     val email by session.userEmail.collectAsState(initial = "")
+    val scope = rememberCoroutineScope()
+    var showLogin by remember { mutableStateOf(false) }
 
     // پاپی بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
     var speaking by remember { mutableStateOf(false) }
@@ -198,7 +204,7 @@ fun AiChatScreen(
                     .border(BorderStroke(1.dp, primary.copy(alpha = 0.7f)), RoundedCornerShape(21.dp))
                     .clickable {
                         if (loggedIn) onSupportClick(com.appdony.app.data.api.SupportApi.isAdmin(email))
-                        else android.widget.Toast.makeText(context, "برای پشتیبانی اول وارد حساب کاربریت شو", android.widget.Toast.LENGTH_SHORT).show()
+                        else showLogin = true
                     }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -385,6 +391,20 @@ fun AiChatScreen(
                 )
             }
         }
+    }
+
+    // مهمان: بعد از ورود یا ساخت حساب، مستقیم می‌ره پشتیبانی (ادمین می‌ره لیست کاربرها)
+    if (showLogin) {
+        LoginSheet(
+            onDismiss = { showLogin = false },
+            onLoginSuccess = { user ->
+                showLogin = false
+                scope.launch {
+                    val mail = user.email.ifBlank { session.userEmail.first() }
+                    onSupportClick(com.appdony.app.data.api.SupportApi.isAdmin(mail))
+                }
+            }
+        )
     }
 }
 
