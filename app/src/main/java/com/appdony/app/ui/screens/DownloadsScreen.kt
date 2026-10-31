@@ -57,6 +57,7 @@ import coil.compose.AsyncImage
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.ui.components.DownloadCardSkeleton
+import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.DownloadHelper
@@ -72,6 +73,8 @@ fun DownloadsScreen() {
     val vm: DownloadsViewModel = viewModel()
     val items by vm.items.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
+    // پایین لیست جا می‌ذاریم تا آخرین کارت زیر منوی شیشه‌ای نمونه
+    val bottomClearance = LocalBottomBarClearance.current
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
@@ -91,7 +94,7 @@ fun DownloadsScreen() {
             }
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(bottom = 24.dp + bottomClearance)
             ) {
                 items(items, key = { it.id }) { item ->
                     DownloadCard(
