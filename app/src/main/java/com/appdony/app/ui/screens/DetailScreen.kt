@@ -62,6 +62,7 @@ import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.util.DownloadLink
 import com.appdony.app.util.TelegramLinks
+import com.appdony.app.util.TelegramRedirect
 import kotlinx.coroutines.launch
 
 @Composable
@@ -172,10 +173,20 @@ private suspend fun startAppDownload(context: Context, link: DownloadLink, post:
             AssistantBus.downloadPhase(DownloadPhase.READY)
             AppBanner.show(BannerKind.SUCCESS, "فایل پیدا شد و دانلود شروع شد؛ از بخش «دانلودها» دنبالش کن", 4000L)
         }
-        .onFailure {
-            AssistantBus.downloadPhase(DownloadPhase.FAILED)
-            // لینک خراب وارد صف دانلود نمی‌شه؛ فقط دلیلش رو نشون می‌دیم
-            AppBanner.show(BannerKind.ERROR, it.message ?: "این لینک کار نمی‌کنه", 4500L)
+        .onFailure { e ->
+            if (e is TelegramRedirect) {
+                // لینکی که اسمش «دانلود مستقیم» بود ولی آخرش به تلگرام می‌رسه
+                AssistantBus.downloadPhase(DownloadPhase.READY)
+                if (TelegramLinks.open(context, e.url)) {
+                    AppBanner.show(BannerKind.SUCCESS, "تلگرام باز شد؛ فایل رو از همون‌جا بگیر", 3500L)
+                } else {
+                    AppBanner.show(BannerKind.WARNING, "نتونستم تلگرام رو باز کنم", 4000L)
+                }
+            } else {
+                AssistantBus.downloadPhase(DownloadPhase.FAILED)
+                // لینک خراب وارد صف دانلود نمی‌شه؛ فقط دلیلش رو نشون می‌دیم
+                AppBanner.show(BannerKind.ERROR, e.message ?: "این لینک کار نمی‌کنه", 4500L)
+            }
         }
 }
 
