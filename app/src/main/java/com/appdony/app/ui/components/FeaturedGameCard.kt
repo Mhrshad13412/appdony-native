@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,6 +57,8 @@ import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
+import kotlin.math.PI
+import kotlin.math.sin
 
 // استایل اپدونی پلاس: فقط یه رنگ (طلایی)
 private val PlusGoldLight = Color(0xFFFFE082)
@@ -124,17 +127,23 @@ private fun Modifier.plusRing(corner: Dp): Modifier = composed {
     drawWithContent {
         drawContent()
 
-        // برق
+        // برق کج: یه نوار نورانی که اریب از رو کارت رد می‌شه
         val p = shine.value
         if (p < 0.6f) {
             val t = p / 0.6f
-            val band = size.width * 0.35f
+            val band = size.width * 0.40f
             val x = -band + t * (size.width + band * 2f)
             drawRect(
                 brush = Brush.linearGradient(
-                    colors = listOf(Color.Transparent, GoldColor.copy(alpha = 0.22f), Color.Transparent),
+                    colors = listOf(
+                        Color.Transparent,
+                        GoldColor.copy(alpha = 0.10f),
+                        PlusGoldLight.copy(alpha = 0.32f),
+                        GoldColor.copy(alpha = 0.10f),
+                        Color.Transparent
+                    ),
                     start = Offset(x, 0f),
-                    end = Offset(x + band, size.height * 0.4f)
+                    end = Offset(x + band, band * 0.6f)
                 ),
                 size = size
             )
@@ -168,10 +177,48 @@ private fun Modifier.plusRing(corner: Dp): Modifier = composed {
     }
 }
 
+// نقطه‌های طلایی که آروم پیدا و محو می‌شن (مثل چت جمنای)؛ بیشتر پایین کارت
+@Composable
+private fun PlusDots(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "plus_dots")
+    val t = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing)),
+        label = "plus_dots_t"
+    )
+    Canvas(modifier = modifier) {
+        val step = 11.dp.toPx()
+        val cols = (size.width / step).toInt() + 1
+        val rows = (size.height / step).toInt() + 1
+        val phase = t.value * 2f * PI.toFloat()
+        for (row in 0..rows) {
+            val y = row * step
+            val yn = (y / size.height).coerceIn(0f, 1f)
+            val vertical = yn * yn
+            if (vertical < 0.06f) continue
+            val rad = (0.6f + 1.1f * yn).dp.toPx()
+            val shift = if (row % 2 == 0) 0f else step / 2f
+            for (col in 0..cols) {
+                val x = col * step + shift
+                // موج مورب و نرم؛ هر نقطه کم‌کم روشن و خاموش می‌شه
+                val wave = 0.5f + 0.5f * sin(phase - (x + y) * 0.02f)
+                val a = vertical * wave * wave * 0.55f
+                if (a < 0.02f) continue
+                drawCircle(
+                    color = GoldColor.copy(alpha = a.coerceAtMost(1f)),
+                    radius = rad,
+                    center = Offset(x, y)
+                )
+            }
+        }
+    }
+}
+
 /**
  * کارت «ویژه» (اپدونی پلاس): اسکرین‌شات بازی بزرگ پشت کارته،
  * آیکن برنامه پایین سمت راست و اسم بازی کنار آیکن.
- * ظاهر طلاییِ تک‌رنگ: نور نرم زیر کارت، حلقه‌ی باریک با نور چرخان و برق ملایم.
+ * ظاهر طلاییِ تک‌رنگ: نور نرم زیر کارت، حلقه‌ی باریک با نور چرخان، برق کج و نقطه‌های متحرک.
  */
 @Composable
 fun FeaturedGameCard(
@@ -221,3 +268,81 @@ fun FeaturedGameCard(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
+                            startY = 120f
+                        )
+                    )
+            )
+
+            // نقطه‌های متحرک (زیر نوشته‌ها)
+            PlusDots(modifier = Modifier.fillMaxSize())
+
+            // دسته‌بندی، بالای کارت
+            if (!category.isNullOrBlank()) {
+                NavChip(
+                    text = category,
+                    onImage = true,
+                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                )
+            }
+
+            // «جدید» (تا ۴ روز بعد از انتشار یا ویرایش)
+            if (isNew) {
+                NewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
+            }
+
+            // پایین کارت: آیکن برنامه (سمت راست، چون اپ راست‌به‌چپه) + اسم بازی
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(scheme.surface)
+                        .border(1.5.dp, GoldColor, RoundedCornerShape(16.dp))
+                ) {
+                    if (!iconUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = iconUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 20.sp
+                    )
+                    if (androidReq != null || version != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (androidReq != null) {
+                                Icon(Icons.Filled.Android, contentDescription = null, tint = GoldColor, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(androidReq, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
+                                Spacer(modifier = Modifier.width(12.dp))
+                            }
+                            if (version != null) {
+                                Icon(Icons.Filled.Bolt, contentDescription = null, tint = GoldColor, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(version, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
