@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,9 +26,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -37,21 +36,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appdony.app.ui.navigation.BottomNavItem
 import com.appdony.app.ui.navigation.bottomNavItems
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 
 private val NavInnerPadding = 6.dp
 private val NavItemHeight = 56.dp
 
+/**
+ * فاصله‌ای که لیست‌های صفحه‌های اصلی باید پایین نگه دارن تا آخرِ لیست زیر منوی پایین نره.
+ * منوی پایین روی محتوا می‌شینه، پس جای خودش رو از صفحه رزرو نمی‌کنه.
+ */
+val LocalBottomBarClearance = compositionLocalOf<Dp> { 0.dp }
+
 @Composable
 fun AppBottomNav(
     currentRoute: String?,
+    hazeState: HazeState,
     onTabSelected: (String) -> Unit
 ) {
     val selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val primary = MaterialTheme.colorScheme.primary
+    val surface = MaterialTheme.colorScheme.surface
+    val background = MaterialTheme.colorScheme.background
+    val outline = MaterialTheme.colorScheme.outline
+    val barShape = RoundedCornerShape(32.dp)
 
     Box(
         modifier = Modifier
@@ -59,12 +73,19 @@ fun AppBottomNav(
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-            shadowElevation = 8.dp
+        // شیشه‌ی بلوری: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(barShape)
+                .hazeEffect(state = hazeState) {
+                    blurRadius = 24.dp
+                    backgroundColor = background
+                    tints = listOf(HazeTint(surface.copy(alpha = 0.55f)))
+                    // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
+                    fallbackTint = HazeTint(surface.copy(alpha = 0.92f))
+                }
+                .border(1.dp, outline.copy(alpha = 0.35f), barShape)
         ) {
             BoxWithConstraints(modifier = Modifier.padding(NavInnerPadding)) {
                 val itemWidth = maxWidth / bottomNavItems.size
