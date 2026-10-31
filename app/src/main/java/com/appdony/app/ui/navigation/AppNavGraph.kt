@@ -1,5 +1,6 @@
 package com.appdony.app.ui.navigation
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
@@ -15,8 +16,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -24,6 +28,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.appdony.app.data.api.SupportApi
+import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.screens.AiChatScreen
 import com.appdony.app.ui.screens.SupportAdminScreen
 import com.appdony.app.ui.screens.SupportChatScreen
@@ -37,6 +43,7 @@ import com.appdony.app.ui.screens.GamesScreen
 import com.appdony.app.ui.screens.SearchScreen
 import com.appdony.app.ui.screens.SettingsScreen
 import com.appdony.app.ui.screens.UpdatesScreen
+import kotlinx.coroutines.flow.first
 
 // ───── انیمیشن تب‌ها: صفحه مثل یک نوار افقی به چپ/راست «غُل می‌خورد» ─────
 // چیدمان RTL است: تب‌های با اندیس بیشتر سمت چپ‌اند؛ پس رفتن به آن‌ها یعنی ورود از چپ.
@@ -84,6 +91,34 @@ private fun NavGraphBuilder.tabComposable(route: String, content: @Composable (N
         popEnterTransition = { tabEnter() },
         popExitTransition = { tabExit() }
     ) { content(it) }
+}
+
+/** هویت کسی که با پشتیبانی چت می‌کنه: کاربر واردشده یا مهمان */
+private class SupportIdentity(val thread: String, val name: String)
+
+/** شناسه‌ی ثابت مهمان روی همین گوشی (برای اینکه گفتگوش بعداً هم پیدا بشه) */
+private fun guestThread(ctx: Context): String {
+    val prefs = ctx.getSharedPreferences("appdony_support", Context.MODE_PRIVATE)
+    val saved = prefs.getString("guest_id", null)
+    if (!saved.isNullOrBlank()) return saved
+    val fresh = "g" + java.util.UUID.randomUUID().toString().replace("-", "").take(10)
+    prefs.edit().putString("guest_id", fresh).apply()
+    return fresh
+}
+
+/** فقط حسابِ واردشده‌ای که ایمیلش ایمیل پشتیبانه اجازه‌ی دیدن محتوا رو داره */
+@Composable
+private fun AdminOnly(onDenied: () -> Unit, content: @Composable () -> Unit) {
+    val ctx = LocalContext.current
+    val allowed by produceState<Boolean?>(initialValue = null) {
+        val s = SessionManager(ctx)
+        value = s.isLoggedIn.first() && SupportApi.isAdmin(s.userEmail.first())
+    }
+    when (allowed) {
+        true -> content()
+        false -> LaunchedEffect(Unit) { onDenied() }
+        null -> Unit
+    }
 }
 
 @Composable
@@ -151,40 +186,53 @@ fun AppNavGraph(
             )
         }
 
-        // پشتیبانی: کاربر عادی مستقیم می‌ره چت، ادمین اول لیست کاربرها رو می‌بینه
+        // پشتیبانی: همه (حتی مهمان بدون حساب) مستقیم می‌رن چت؛ فقط پشتیبان اول لیست کاربرها رو می‌بینه
         composable("support") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            val session = androidx.compose.runtime.remember { com.appdony.app.data.session.SessionManager(ctx) }
-            val uid by session.userId.collectAsState(initial = 0)
-            val dn by session.displayName.collectAsState(initial = "")
-            val un by session.username.collectAsState(initial = "")
-            if (uid > 0) {
+            val ctx = LocalContext.current
+            val identity by produceState<SupportIdentity?>(initialValue = null) {
+                val session = SessionManager(ctx)
+                val loggedIn = session.isLoggedIn.first()
+                val uid = session.userId.first()
+                val dn = session.displayName.first()
+                val un = session.username.first()
+                value = if (loggedIn && uid > 0) {
+                    SupportIdentity(SupportApi.threadOf(uid), dn.ifBlank { un }.ifBlank { "کاربر" })
+                } else {
+                    val t = guestThread(ctx)
+                    SupportIdentity(t, "مهمان ${t.takeLast(4)}")
+                }
+            }
+            identity?.let { id ->
                 SupportChatScreen(
-                    thread = com.appdony.app.data.api.SupportApi.threadOf(uid),
+                    thread = id.thread,
                     title = "پشتیبانی",
-                    myName = dn.ifBlank { un }.ifBlank { "کاربر" },
+                    myName = id.name,
                     asAdmin = false,
                     onBack = { navController.popBackStack() }
                 )
             }
         }
         composable("support_admin") {
-            SupportAdminScreen(
-                onOpen = { t, n -> navController.navigate("support_chat/${Uri.encode(t)}/${Uri.encode(n)}") },
-                onBack = { navController.popBackStack() }
-            )
+            AdminOnly(onDenied = { navController.popBackStack() }) {
+                SupportAdminScreen(
+                    onOpen = { t, n -> navController.navigate("support_chat/${Uri.encode(t)}/${Uri.encode(n)}") },
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
         composable(
             route = "support_chat/{thread}/{name}",
             arguments = listOf(navArgument("thread") { type = NavType.StringType }, navArgument("name") { type = NavType.StringType })
         ) { backStack ->
-            SupportChatScreen(
-                thread = Uri.decode(backStack.arguments?.getString("thread").orEmpty()),
-                title = Uri.decode(backStack.arguments?.getString("name").orEmpty()),
-                myName = "پشتیبان",
-                asAdmin = true,
-                onBack = { navController.popBackStack() }
-            )
+            AdminOnly(onDenied = { navController.popBackStack() }) {
+                SupportChatScreen(
+                    thread = Uri.decode(backStack.arguments?.getString("thread").orEmpty()),
+                    title = Uri.decode(backStack.arguments?.getString("name").orEmpty()),
+                    myName = "پشتیبان",
+                    asAdmin = true,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
         tabComposable("downloads") { DownloadsScreen() }
 
