@@ -3,6 +3,7 @@ package com.appdony.app.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -19,9 +20,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -51,7 +55,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
@@ -62,20 +65,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.appdony.app.data.preferences.AiModel
+import com.appdony.app.data.preferences.AiQuota
+import com.appdony.app.data.preferences.formatRemaining
 import com.appdony.app.ui.components.AiMessageContent
-import com.appdony.app.ui.components.AiModelSelector
-import com.appdony.app.ui.components.AiQuotaCard
 import com.appdony.app.ui.components.AiSuggestionBlock
 import com.appdony.app.ui.components.PlagueDoctorAvatar
-import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.hasCodeBlock
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 private val QuickReplies = listOf(
     "یه بازی پیشنهاد بده 🎮",
@@ -103,6 +105,10 @@ fun AiChatScreen(
 
     val primary = MaterialTheme.colorScheme.primary
 
+    // وقتی کیبورد بازه، بخش‌های اضافه‌ی بالا مخفی می‌شن تا نوار پیام هیچ‌وقت زیر کیبورد نره
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+
     // ساعت زنده برای شمارش معکوس بازه‌ی ۵ ساعته
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -125,13 +131,11 @@ fun AiChatScreen(
         if (uri != null) viewModel.attachImage(uri)
     }
 
-    // دکمه‌ی پشتیبانی برای همه هست؛ مهمان اول وارد می‌شه یا حساب می‌سازه. ادمین (با ایمیل) می‌ره لیست کاربرها
+    // دکمه‌ی پشتیبانی: برای همه (مهمان هم). فقط حسابِ واردشده با ایمیل پشتیبان می‌ره لیست کاربرها
     val context = androidx.compose.ui.platform.LocalContext.current
     val session = remember { com.appdony.app.data.session.SessionManager(context) }
     val loggedIn by session.isLoggedIn.collectAsState(initial = false)
     val email by session.userEmail.collectAsState(initial = "")
-    val scope = rememberCoroutineScope()
-    var showLogin by remember { mutableStateOf(false) }
 
     // پاپی بعد از هر جواب چند ثانیه نرم بالا پایین می‌پره
     var speaking by remember { mutableStateOf(false) }
@@ -161,74 +165,79 @@ fun AiChatScreen(
             .background(MaterialTheme.colorScheme.background)
             .imePadding()
     ) {
+        // ── هدر فشرده
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(22.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(20.dp))
             }
-            Spacer(Modifier.width(12.dp))
-            PlagueDoctorAvatar(sizeDp = 42, hasShadow = false, talking = isLoading || speaking)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
+            PlagueDoctorAvatar(sizeDp = 36, hasShadow = false, talking = isLoading || speaking)
+            Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("پاپی", color = MaterialTheme.colorScheme.onBackground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("پاپی", color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
                             .background(if (isOffline) Color(0xFFF5A623) else Color(0xFF34C759))
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(5.dp))
                     Text(
-                        text = if (isOffline) "حالت آفلاین" else "آماده‌ی کمک",
+                        text = if (isOffline) "آفلاین" else "آماده‌ی کمک",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
+                        fontSize = 11.sp,
+                        maxLines = 1
                     )
                 }
             }
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(21.dp))
+                    .clip(RoundedCornerShape(18.dp))
                     .background(primary.copy(alpha = 0.16f))
-                    .border(BorderStroke(1.dp, primary.copy(alpha = 0.7f)), RoundedCornerShape(21.dp))
+                    .border(BorderStroke(1.dp, primary.copy(alpha = 0.7f)), RoundedCornerShape(18.dp))
                     .clickable {
-                        if (loggedIn) onSupportClick(com.appdony.app.data.api.SupportApi.isAdmin(email))
-                        else showLogin = true
+                        onSupportClick(loggedIn && com.appdony.app.data.api.SupportApi.isAdmin(email))
                     }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.SupportAgent, null, tint = primary, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("پشتیبانی", color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Outlined.SupportAgent, null, tint = primary, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("پشتیبانی", color = MaterialTheme.colorScheme.onBackground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { viewModel.clearChat() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.DeleteOutline, "پاک کردن", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                Icon(Icons.Outlined.DeleteOutline, "پاک کردن", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
             }
         }
 
-        // انتخاب مدل + سهم مصرف
-        AiModelSelector(selected = model, enabled = !isLoading, onSelect = { viewModel.selectModel(it) })
-        AiQuotaCard(quota = quota, now = now)
+        // انتخاب مدل + سهم مصرف (فشرده؛ موقع تایپ مخفی می‌شه)
+        AnimatedVisibility(visible = !imeVisible) {
+            Column {
+                CompactModelRow(selected = model, enabled = !isLoading, onSelect = { viewModel.selectModel(it) })
+                CompactQuota(quota = quota, now = now)
+            }
+        }
 
         LazyColumn(
             state = listState,
@@ -255,7 +264,7 @@ fun AiChatScreen(
             }
         }
 
-        if (messages.size <= 2 && !isLoading) {
+        if (messages.size <= 2 && !isLoading && !imeVisible) {
             // بلاک پیشنهاد برنامه‌ها
             AiSuggestionBlock(
                 posts = suggestions,
@@ -299,7 +308,7 @@ fun AiChatScreen(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(10.dp))
                 )
                 Spacer(Modifier.width(10.dp))
@@ -329,13 +338,14 @@ fun AiChatScreen(
             }
         }
 
+        // ── نوار پیام (همیشه پایین و بالای کیبورد)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(enabled = !isLoading) {
@@ -358,7 +368,7 @@ fun AiChatScreen(
                         fontSize = 13.sp
                     )
                 },
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(24.dp),
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send(inputText) }),
@@ -377,7 +387,7 @@ fun AiChatScreen(
             val canSend = (inputText.isNotBlank() || pendingImage != null) && !isLoading && !blocked
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(46.dp)
                     .clip(CircleShape)
                     .background(if (canSend) primary else MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(enabled = canSend) { send(inputText) },
@@ -392,18 +402,87 @@ fun AiChatScreen(
             }
         }
     }
+}
 
-    // مهمان: بعد از ورود یا ساخت حساب، مستقیم می‌ره پشتیبانی (ادمین می‌ره لیست کاربرها)
-    if (showLogin) {
-        LoginSheet(
-            onDismiss = { showLogin = false },
-            onLoginSuccess = { user ->
-                showLogin = false
-                scope.launch {
-                    val mail = user.email.ifBlank { session.userEmail.first() }
-                    onSupportClick(com.appdony.app.data.api.SupportApi.isAdmin(mail))
-                }
+/** انتخاب مدل: دو دکمه‌ی کوچک تک‌خطی */
+@Composable
+private fun CompactModelRow(selected: AiModel, enabled: Boolean, onSelect: (AiModel) -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        AiModel.values().forEach { m ->
+            val isSelected = m == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        BorderStroke(1.dp, if (isSelected) primary else Color.Transparent),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable(enabled = enabled && !isSelected) { onSelect(m) }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    m.label,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
+        }
+    }
+}
+
+/** سهم مصرف: یک خط متن + نوار باریک */
+@Composable
+private fun CompactQuota(quota: AiQuota?, now: Long) {
+    if (quota == null) return
+    val m = quota.model
+    val blocked = quota.blockReason(now) != null
+    val resetIn = quota.windowResetAt - now
+    val windowActive = resetIn > 0
+    val usedMsgs = if (windowActive) quota.usedMessages else 0
+    val color = if (blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "$usedMsgs از ${m.windowMessages} پیام • امروز ${quota.dailyUsed} از ${m.dailyMessages}",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 11.sp,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            if (windowActive) {
+                Text(
+                    "ریست: ${formatRemaining(resetIn)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { (usedMsgs.toFloat() / m.windowMessages).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color = color,
+            trackColor = color.copy(alpha = 0.18f)
         )
     }
 }
