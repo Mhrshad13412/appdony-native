@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.preferences.SearchHistoryManager
 import com.appdony.app.data.repository.AppRepository
+import com.appdony.app.util.LatestOnly
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +58,8 @@ class SearchViewModel(private val context: Context) : ViewModel() {
             historyManager.addQuery(newQuery.trim())
             
             repo.searchPosts(newQuery)
-                .onSuccess { _state.value = SearchUiState.Success(it) }
+                // از هر اپ/بازی فقط جدیدترین نسخه
+                .onSuccess { _state.value = SearchUiState.Success(LatestOnly.latestPerApp(it)) }
                 .onFailure {
                     _state.value = SearchUiState.Error(it.message ?: "خطا")
                 }
