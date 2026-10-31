@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
@@ -34,12 +35,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد. */
+/**
+ * منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد.
+ * مهمان‌ها (بدون حساب) هم همین منو را دارن؛ فقط کارت بالا «ورود» نشون می‌ده و «خروج از حساب» نیست.
+ */
 @Composable
 fun AccountSheet(
     displayName: String, username: String, onDismiss: () -> Unit,
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
-    onHelp: () -> Unit, onAbout: () -> Unit, onLogout: () -> Unit
+    onHelp: () -> Unit, onAbout: () -> Unit, onLogout: () -> Unit,
+    isLoggedIn: Boolean = true,
+    onLogin: () -> Unit = {}
 ) {
     FloatingDialog(onDismiss = onDismiss) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -64,6 +70,7 @@ fun AccountSheet(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(enabled = !isLoggedIn) { onDismiss(); onLogin() }
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -71,15 +78,23 @@ fun AccountSheet(
                 modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = displayName.firstOrNull()?.uppercase() ?: "U",
-                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
-                )
+                if (isLoggedIn) {
+                    Text(
+                        text = displayName.firstOrNull()?.uppercase() ?: "U",
+                        color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
             }
             Spacer(Modifier.width(14.dp))
-            Column {
-                Text(text = displayName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            if (isLoggedIn) {
+                Column {
+                    Text(text = displayName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+            } else {
+                Text(text = "ورود", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -89,10 +104,12 @@ fun AccountSheet(
         AccountRow(Icons.Outlined.Settings, "تنظیمات") { onDismiss(); onSettings() }
         AccountRow(Icons.Outlined.Info, "راهنما") { onDismiss(); onHelp() }
         AccountRow(Icons.Outlined.Info, "درباره اپدونی") { onDismiss(); onAbout() }
-        AccountRow(
-            Icons.AutoMirrored.Outlined.Logout, "خروج از حساب",
-            tint = MaterialTheme.colorScheme.error
-        ) { onDismiss(); onLogout() }
+        if (isLoggedIn) {
+            AccountRow(
+                Icons.AutoMirrored.Outlined.Logout, "خروج از حساب",
+                tint = MaterialTheme.colorScheme.error
+            ) { onDismiss(); onLogout() }
+        }
         Spacer(Modifier.height(4.dp))
     }
 }
