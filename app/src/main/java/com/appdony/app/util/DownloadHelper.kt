@@ -145,14 +145,14 @@ object DownloadHelper {
             val type = resp.header("Content-Type").orEmpty().lowercase().substringBefore(';').trim()
             val size = resp.header("Content-Length")?.toLongOrNull() ?: -1L
             val fileName = fileNameFrom(resp.header("Content-Disposition"), finalUrl)
-            val ext = (fileName ?: finalUrl.substringBefore('?')).substringAfterLast('.', "").lowercase()
 
             val isPage = type.startsWith("text/") || type.contains("html") ||
                 type.contains("json") || type.contains("xml")
 
             if (!isPage) {
-                // فایل واقعیه؛ فقط اگه خیلی کوچیک بود خرابه
-                if (ext in BINARY_EXTS && size in 0L until MIN_VALID_BYTES) throw IOException("فایل روی سرور خراب است")
+                // فایل واقعیه؛ ولی اگه حجمش معلومه و خیلی کوچیکه (صفحه‌ی خطا/توکن)، خرابه
+                // این چک برای هر پسوندی اعمال می‌شه، نه فقط apk و zip
+                if (size in 0L until MIN_VALID_BYTES) throw IOException("فایل روی سرور خراب است")
                 return Resolved(finalUrl, fileName, type, size)
             }
 
@@ -241,7 +241,12 @@ object DownloadHelper {
             .trim('.')
 
     fun buildFileName(title: String, resolved: Resolved): String {
-        val server = resolved.fileName?.let { sanitize(it) }?.takeIf { it.contains('.') && it.length > 3 }
+        // اسم سرور فقط وقتی قبوله که پسوندش واقعاً فایل نصبی/آرشیو باشه (نه get.php و index.html)
+        val server = resolved.fileName?.let { sanitize(it) }
+            ?.takeIf {
+                it.contains('.') && it.length > 3 &&
+                    it.substringAfterLast('.', "").lowercase() in FILE_EXTS
+            }
         if (server != null) return server
 
         val ext = resolved.url.substringBefore('?').substringAfterLast('.', "").lowercase()
@@ -392,8 +397,13 @@ object DownloadEngine {
 
             val size = file.length()
             val ext = file.name.substringAfterLast('.', "").lowercase()
-            if (DownloadHelper.isBinaryName(file.name) && size < DownloadHelper.MIN_VALID_BYTES) {
+
+            // چک سالم بودن برای هر فایلی، فارق از پسوند
+            if (size < DownloadHelper.MIN_VALID_BYTES) {
                 throw Failure("فایل خراب یا ناقص بود", deleteFile = true)
+            }
+            if (looksLikeText(file)) {
+                throw Failure("سرور به‌جای فایل یک صفحه‌ی وب فرستاد؛ این لینک خرابه", deleteFile = true)
             }
             if (ext in ZIP_FAMILY && !hasZipSignature(file)) {
                 throw Failure("فایل دریافتی سالم نیست (فایل نصبی نبود)", deleteFile = true)
@@ -456,6 +466,22 @@ object DownloadEngine {
         false
     }
 
+    // اگه اول فایل با < یا { یا [ شروع بشه یعنی HTML/JSON بوده، نه فایل نصبی
+    private fun looksLikeText(f: File): Boolean = try {
+        f.inputStream().use { input ->
+            val buf = ByteArray(512)
+            val n = input.read(buf)
+            var i = 0
+            if (n >= 3 && buf[0] == 0xEF.toByte() && buf[1] == 0xBB.toByte() && buf[2] == 0xBF.toByte()) i = 3
+            while (i < n && (buf[i] == ' '.code.toByte() || buf[i] == '\n'.code.toByte() ||
+                    buf[i] == '\r'.code.toByte() || buf[i] == '\t'.code.toByte())
+            ) i++
+            i < n && (buf[i] == '<'.code.toByte() || buf[i] == '{'.code.toByte() || buf[i] == '['.code.toByte())
+        }
+    } catch (e: Exception) {
+        false
+    }
+
     private suspend fun transfer(
         id: Long, title: String, url: String, file: File, knownTotal: Long,
         onProgress: (Long, Long) -> Unit
@@ -481,7 +507,9 @@ object DownloadEngine {
                 }
                 if (!resp.isSuccessful) throw Failure("سرور فایل را رد کرد (کد ${resp.code})")
                 val type = resp.header("Content-Type").orEmpty().lowercase()
-                if (type.startsWith("text/") || type.contains("html")) {
+                if (type.startsWith("text/") || type.contains("html") ||
+                    type.contains("json") || type.contains("xml")
+                ) {
                     throw Failure("سرور به‌جای فایل یک صفحه‌ی وب فرستاد؛ این لینک خرابه")
                 }
                 val body = resp.body ?: throw IOException("پاسخ خالی از سرور")
