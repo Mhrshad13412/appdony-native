@@ -24,7 +24,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +42,10 @@ import com.appdony.app.data.model.Comment
 import com.appdony.app.ui.screens.CommentsUiState
 import com.appdony.app.ui.screens.CommentsViewModel
 
+/**
+ * نظرات: همه می‌تونن بخونن، ولی فقط کاربرِ واردشده می‌تونه نظر بنویسه.
+ * برای مهمان دکمه‌ی «+» اصلاً نشون داده نمی‌شه.
+ */
 @Composable
 fun CommentsSection(
     postId: Int,
@@ -65,13 +68,6 @@ fun CommentsSection(
     var showComposer by remember { mutableStateOf(false) }
     var commentText by remember { mutableStateOf("") }
 
-    LaunchedEffect(showComposer) {
-        if (showComposer && !isLoggedIn) {
-            showComposer = false
-            onNeedLogin()
-        }
-    }
-
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -81,23 +77,25 @@ fun CommentsSection(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.weight(1f))
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable { showComposer = !showComposer },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "افزودن نظر",
-                    tint = Color.White
-                )
+            if (isLoggedIn) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { showComposer = !showComposer },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "افزودن نظر",
+                        tint = Color.White
+                    )
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
-        if (showComposer) {
+        if (isLoggedIn && showComposer) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -147,7 +145,7 @@ fun CommentsSection(
             is CommentsUiState.Success -> {
                 if (s.comments.isEmpty()) {
                     Text(
-                        "هنوز نظری ثبت نشده. اولین نفر باش!",
+                        if (isLoggedIn) "هنوز نظری ثبت نشده. اولین نفر باش!" else "هنوز نظری ثبت نشده.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 12.sp
                     )
