@@ -8,14 +8,18 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -65,6 +70,7 @@ import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
+import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
 import com.appdony.app.ui.navigation.AppNavGraph
@@ -72,6 +78,8 @@ import com.appdony.app.ui.screens.rememberSearchViewModel
 import com.appdony.app.ui.theme.AppdonyTheme
 import com.appdony.app.util.BlogUpdateWorker
 import com.appdony.app.util.CrashReporter
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -262,6 +270,13 @@ fun MainContent(
         }
     }
 
+    // منبع بلور: محتوای صفحه؛ منوی پایین از همین نمونه‌برداری می‌کنه و بلورش می‌کنه
+    val hazeState = remember { HazeState() }
+    val layoutDirection = LocalLayoutDirection.current
+    val systemNavInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // ارتفاع منو (۸۸ دپ) + نوار سیستم؛ لیست‌ها این‌قدر ته صفحه جا می‌ذارن
+    val bottomClearance = if (isMainRoute) 88.dp + systemNavInset else 0.dp
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -277,26 +292,42 @@ fun MainContent(
                         onSearchBack = { navController.popBackStack() }
                     )
                 }
-            },
-            bottomBar = {
-                // منوی پایین موقع رفتن به جستجو آروم جمع می‌شه و موقع برگشتن آروم باز می‌شه
-                AnimatedVisibility(
-                    visible = isMainRoute,
-                    enter = expandVertically(tween(380, easing = FastOutSlowInEasing)) + fadeIn(tween(380)),
-                    exit = shrinkVertically(tween(380, easing = FastOutSlowInEasing)) + fadeOut(tween(200))
-                ) {
-                    AppBottomNav(
-                        currentRoute = currentRoute,
-                        onTabSelected = { route -> navController.navigateToTab(route) }
-                    )
-                }
             }
         ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-                AppNavGraph(navController = navController)
+            // صفحه‌های اصلی: محتوا تا ته صفحه ادامه داره و از زیر منوی شیشه‌ای رد می‌شه
+            val contentPadding = if (isMainRoute) {
+                PaddingValues(
+                    start = padding.calculateStartPadding(layoutDirection),
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateEndPadding(layoutDirection),
+                    bottom = 0.dp
+                )
+            } else {
+                padding
+            }
+            Box(modifier = Modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(padding)) {
+                CompositionLocalProvider(LocalBottomBarClearance provides bottomClearance) {
+                    Box(modifier = Modifier.fillMaxSize().hazeSource(state = hazeState)) {
+                        AppNavGraph(navController = navController)
+                    }
+                }
 
                 com.appdony.app.ui.components.AppBannerHost(modifier = Modifier.align(Alignment.TopCenter))
             }
+        }
+
+        // منوی پایین: شناور روی محتوا، موقع رفتن به جستجو آروم می‌ره پایین و موقع برگشتن میاد بالا
+        AnimatedVisibility(
+            visible = isMainRoute,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(380)),
+            exit = slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+        ) {
+            AppBottomNav(
+                currentRoute = currentRoute,
+                hazeState = hazeState,
+                onTabSelected = { route -> navController.navigateToTab(route) }
+            )
         }
 
         // دکتر طاعون روی کل اپ (همه‌ی صفحه‌ها)، جز صفحه‌ی خود چت
