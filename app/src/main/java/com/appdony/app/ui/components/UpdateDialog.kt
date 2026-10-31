@@ -351,6 +351,9 @@ private fun CatThrowingYarn() {
         // فضای طراحی ۱۲۰ واحد عرض داره؛ گربه روی بوم ۶۰×۶۰ کشیده شده
         val k = size.width / 120.dp.toPx()
         val u = 1.dp.toPx()
+        // داخل withTransform نمی‌شه toPx صدا زد، پس مقدارها رو از همین‌جا حساب می‌کنیم
+        val shiftX = 6.dp.toPx()
+        val shiftY = 20.dp.toPx()
 
         // مرحله‌ی پرتاب: t بین ۰.۱۲ تا ۰.۸۸
         val q = ((t - 0.12f) / 0.76f).coerceIn(0f, 1f)
@@ -370,7 +373,7 @@ private fun CatThrowingYarn() {
 
         withTransform({
             scale(k, k, Offset.Zero)
-            translate(6.dp.toPx(), 20.dp.toPx())
+            translate(shiftX, shiftY)
         }) {
             drawCat(
                 CatPose(
