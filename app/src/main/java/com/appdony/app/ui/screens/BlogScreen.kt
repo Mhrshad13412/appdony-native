@@ -30,6 +30,7 @@ import com.appdony.app.data.model.cleanExcerpt
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.BlogCardSkeleton
+import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.appdonyCard
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
@@ -48,6 +49,8 @@ fun BlogScreen(
     val errorMsg by viewModel.errorMsg.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
+    // پایین لیست جا می‌ذاریم تا آخرین مطلب زیر منوی شیشه‌ای نمونه
+    val bottomClearance = LocalBottomBarClearance.current
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -71,7 +74,7 @@ fun BlogScreen(
         isLoading && posts.isEmpty() -> {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + bottomClearance)
             ) { 
                 items(4) { BlogCardSkeleton() } 
             }
@@ -87,7 +90,7 @@ fun BlogScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + bottomClearance)
             ) {
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
