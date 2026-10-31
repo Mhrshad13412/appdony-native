@@ -2,7 +2,10 @@ package com.appdony.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -105,6 +108,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -142,6 +146,8 @@ fun FloatingAssistant(
     var activity by remember { mutableIntStateOf(0) }
     var dlActive by remember { mutableStateOf(false) }
     var offerOnly by remember { mutableStateOf(false) }
+    var chasing by remember { mutableStateOf(false) }   // گربه داره دنبال کاموا می‌دوه
+    var joy by remember { mutableStateOf(false) }       // خوشحالی بعد از برداشتن کاموا
 
     // ترتیب: چت، دانلودها، جستجو
     val items = listOf(
@@ -204,8 +210,8 @@ fun FloatingAssistant(
             }
             val bodyAlpha by animateFloatAsState(if (hidden) 0.38f else 1f, tween(500), label = "assistant_alpha")
 
-            LaunchedEffect(activity, expanded, bubbleSay, dragging, hidden, ready, visible) {
-                if (ready && visible && !expanded && bubbleSay == null && !dragging && !hidden) {
+            LaunchedEffect(activity, expanded, bubbleSay, dragging, hidden, ready, visible, chasing) {
+                if (ready && visible && !expanded && bubbleSay == null && !dragging && !hidden && !chasing && !motion.ballLost) {
                     delay(12_000)
                     hidden = true
                 }
@@ -410,6 +416,13 @@ fun FloatingAssistant(
                 animationSpec = infiniteRepeatable(tween(330, easing = FastOutSlowInEasing), RepeatMode.Reverse),
                 label = "swat"
             )
+            // چرخش ستاره‌ها و مارپیچ چشم موقع گیجی (درجه)
+            val dizzyPhase by infinite.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Restart),
+                label = "dizzy_phase"
+            )
             val speakAmt by animateFloatAsState(
                 targetValue = if (bubbleSay != null) 1f else 0f,
                 animationSpec = tween(300),
@@ -426,13 +439,18 @@ fun FloatingAssistant(
                 animationSpec = tween(350),
                 label = "play"
             )
+            val chaseAmt by animateFloatAsState(
+                targetValue = if (chasing) 1f else 0f,
+                animationSpec = tween(250),
+                label = "chase"
+            )
             val offerAmt by animateFloatAsState(
                 targetValue = if (offerOnly) 1f else 0f,
                 animationSpec = tween(300),
                 label = "offer"
             )
             val happyAmt by animateFloatAsState(
-                targetValue = if (offerOnly || expanded) 1f else 0f,
+                targetValue = if (offerOnly || expanded || joy) 1f else 0f,
                 animationSpec = tween(250),
                 label = "happy"
             )
@@ -445,6 +463,10 @@ fun FloatingAssistant(
             val bobPx = with(density) { 3.dp.toPx() }
             val jellyPx = with(density) { 6.dp.toPx() }
             val hopPx = with(density) { 12.dp.toPx() }
+            val kickPx = with(density) { 7.dp.toPx() }
+            val staggerPx = with(density) { 2.5.dp.toPx() }
+            val bonkMinPx = with(density) { 5.dp.toPx() }    // حداقل سرعت برخورد برای «تق»
+            val shakeMinPx = with(density) { 3.dp.toPx() }   // حداقل سرعت برای حساب شدن تکون
 
             // پرش نرم و ژله‌ای وقتی گربه حرف می‌زنه
             val jelly = remember { Animatable(0f) }
@@ -456,6 +478,120 @@ fun FloatingAssistant(
                     }
                 } else {
                     jelly.animateTo(0f, spring(0.4f, Spring.StiffnessLow))
+                }
+            }
+
+            // ───────── چسبیدن به نزدیک‌ترین لبه‌ی صفحه ─────────
+            suspend fun dockCat() = coroutineScope {
+                val right = motion.offX.value + sizePx / 2f > wPx / 2f
+                onRight = right
+                val tx = if (right) wPx - sizePx - marginPx else marginPx
+                val ty = motion.offY.value.coerceIn(topLimit, bottomLimit)
+                lowerHalf = ty + sizePx / 2f > hPx / 2f
+                launch { motion.offX.animateTo(tx, spring(0.65f, Spring.StiffnessLow)) }
+                launch { motion.offY.animateTo(ty, spring(0.75f, Spring.StiffnessMediumLow)) }
+                // مثل گربه‌ها روی چهار پا فرود میاد
+                launch { motion.landSquash() }
+            }
+
+            // ───────── خوردن به دیوار: تق، پس‌زدن نرم و گیجی ─────────
+            fun hitWall(dirX: Float, dirY: Float, power: Float) {
+                motion.kickX = dirX
+                motion.kickY = dirY
+                scope.launch {
+                    motion.kick.snapTo(power)
+                    // فنر کم‌میرا: می‌خوره، عقب می‌پره و چند بار نرم می‌لرزه
+                    motion.kick.animateTo(0f, spring(0.28f, Spring.StiffnessLow))
+                }
+                motion.dizzyJob?.cancel()
+                motion.dizzyJob = scope.launch {
+                    motion.dizzy.animateTo(
+                        (motion.dizzy.value + 0.25f + power * 0.35f).coerceAtMost(1f),
+                        tween(220)
+                    )
+                    delay(1_600)
+                    motion.dizzy.animateTo(0f, tween(2_600, easing = LinearEasing))
+                }
+            }
+
+            // ───────── با تکون سریع، کاموا از پای گربه می‌پره و قل می‌خوره ─────────
+            fun dropBall() {
+                if (motion.ballLost || motion.ballJob?.isActive == true) return
+                val d = density.density
+                val faceT = if (onRight) -1f else 1f
+                val startX = motion.offX.value + (30f + 16f * faceT) * d
+                val startY = motion.offY.value + 55f * d
+                val dir = if (startX < wPx / 2f) 1f else -1f
+                val endX = (startX + dir * 78f * d).coerceIn(16f * d, wPx - 16f * d)
+                val groundY = startY + 4f * d
+                val spinDeg = (endX - startX) / d * 11f
+                motion.ballJob = scope.launch {
+                    motion.ballWX.snapTo(startX)
+                    motion.ballWY.snapTo(startY)
+                    motion.ballSpin.snapTo(0f)
+                    motion.ballLost = true
+                    // افقی: آروم‌آروم کند می‌شه و قل می‌خوره
+                    launch { motion.ballWX.animateTo(endX, tween(1_300, easing = LinearOutSlowInEasing)) }
+                    launch { motion.ballSpin.animateTo(spinDeg, tween(1_300, easing = LinearOutSlowInEasing)) }
+                    // عمودی: می‌پره بالا، می‌افته و چند بار کوچیک‌تر جهش می‌کنه
+                    motion.ballWY.animateTo(startY - 22f * d, tween(170, easing = LinearOutSlowInEasing))
+                    motion.ballWY.animateTo(groundY, tween(240, easing = FastOutLinearInEasing))
+                    motion.ballWY.animateTo(groundY - 10f * d, tween(130, easing = LinearOutSlowInEasing))
+                    motion.ballWY.animateTo(groundY, tween(130, easing = FastOutLinearInEasing))
+                    motion.ballWY.animateTo(groundY - 4f * d, tween(90, easing = LinearOutSlowInEasing))
+                    motion.ballWY.animateTo(groundY, tween(90, easing = FastOutLinearInEasing))
+                }
+            }
+
+            // ───────── گربه می‌دوه، کاموا رو برمی‌داره و برمی‌گرده ─────────
+            suspend fun chaseBall() {
+                if (!motion.ballLost) return
+                motion.ballJob?.join()
+                chasing = true
+                hidden = false
+                expanded = false
+                try {
+                    delay(500) // اول نگاهش می‌کنه
+                    val d = density.density
+                    // رو به کاموا می‌چرخه
+                    onRight = motion.ballWX.value < motion.offX.value + sizePx / 2f
+                    delay(280)
+                    val faceT = if (onRight) -1f else 1f
+                    val tx = (motion.ballWX.value - (30f + 16f * faceT) * d).coerceIn(0f, wPx - sizePx)
+                    val ty = (motion.ballWY.value - 55f * d).coerceIn(topLimit, bottomLimit)
+                    val sx = motion.offX.value
+                    val sy = motion.offY.value
+                    scope.launch { motion.lean(faceT * 7f) }
+                    // سه خیز کوچیک تا رسیدن به کاموا
+                    for (k in 1..3) {
+                        val f = k / 3f
+                        coroutineScope {
+                            launch { motion.hop(0.9f) }
+                            launch { motion.offX.animateTo(sx + (tx - sx) * f, tween(320, easing = FastOutSlowInEasing)) }
+                            launch { motion.offY.animateTo(sy + (ty - sy) * f, tween(320, easing = FastOutSlowInEasing)) }
+                        }
+                    }
+                    // برداشتن: پنجه میاد بالا و کاموا می‌پره سر جای اولش
+                    val rx = motion.offX.value + (30f + 16f * faceT) * d
+                    val ry = motion.offY.value + 55f * d
+                    coroutineScope {
+                        launch { motion.grab.animateTo(1f, tween(150)) }
+                        launch { motion.ballWX.animateTo(rx, tween(260, easing = FastOutSlowInEasing)) }
+                        launch {
+                            motion.ballWY.animateTo(ry - 14f * d, tween(130, easing = LinearOutSlowInEasing))
+                            motion.ballWY.animateTo(ry, tween(130, easing = FastOutLinearInEasing))
+                        }
+                    }
+                    motion.ballLost = false
+                    joy = true
+                    scope.launch { motion.grab.animateTo(0f, tween(320)) }
+                    scope.launch { motion.relax() }
+                    scope.launch { speak(AssistantSay("گرفتمت! 🧶"), 2_200) }
+                    delay(800)
+                    joy = false
+                } finally {
+                    chasing = false
+                    activity++
                 }
             }
 
@@ -567,13 +703,15 @@ fun FloatingAssistant(
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onTap = {
-                                            activity++
-                                            scope.launch { motion.hop(0.6f) }
-                                            if (hidden) {
-                                                hidden = false
-                                            } else {
-                                                bubbleSay = null
-                                                expanded = !expanded
+                                            if (!chasing) {
+                                                activity++
+                                                scope.launch { motion.hop(0.6f) }
+                                                if (hidden) {
+                                                    hidden = false
+                                                } else {
+                                                    bubbleSay = null
+                                                    expanded = !expanded
+                                                }
                                             }
                                         }
                                     )
@@ -581,6 +719,14 @@ fun FloatingAssistant(
                                 .pointerInput(wPx, hPx, topLimit, bottomLimit) {
                                     detectDragGestures(
                                         onDragStart = {
+                                            // اگه داشت دنبال کاموا می‌دوید، بغل گرفته می‌شه و دویدن لغو می‌شه
+                                            motion.dockJob?.cancel()
+                                            if (chasing) {
+                                                chasing = false
+                                                scope.launch { motion.grab.animateTo(0f, tween(150)) }
+                                                scope.launch { motion.pounce.animateTo(0f, tween(150)) }
+                                            }
+                                            motion.resetShake()
                                             dragging = true
                                             expanded = false
                                             bubbleSay = null
@@ -589,6 +735,26 @@ fun FloatingAssistant(
                                         },
                                         onDrag = { change, drag ->
                                             change.consume()
+                                            val now = change.uptimeMillis
+
+                                            // خوردن به دیوار: اگه سریع بخوره، تق می‌خوره و گیج می‌شه
+                                            val maxX = wPx - sizePx
+                                            val rawX = motion.offX.value + drag.x
+                                            val rawY = motion.offY.value + drag.y
+                                            val ox = if (rawX < 0f) rawX else if (rawX > maxX) rawX - maxX else 0f
+                                            val oy = if (rawY < topLimit) rawY - topLimit
+                                            else if (rawY > bottomLimit) rawY - bottomLimit else 0f
+                                            val over = maxOf(abs(ox), abs(oy))
+                                            if (over > bonkMinPx && now - motion.lastBonk > 450L) {
+                                                motion.lastBonk = now
+                                                hitWall(sign(ox), sign(oy), (over / (bonkMinPx * 3f)).coerceIn(0.5f, 1f))
+                                            }
+
+                                            // تکون سریع: کاموا از پاش می‌افته
+                                            if (motion.feedShake(drag.x, drag.y, now, shakeMinPx)) {
+                                                dropBall()
+                                            }
+
                                             scope.launch {
                                                 motion.offX.snapTo(
                                                     (motion.offX.value + drag.x).coerceIn(0f, wPx - sizePx)
@@ -608,17 +774,18 @@ fun FloatingAssistant(
                                             dragging = false
                                             activity++
                                             motion.lastLean = 0f
-                                            scope.launch {
+                                            motion.dockJob = scope.launch {
                                                 launch { motion.relax() }
-                                                val right = motion.offX.value + sizePx / 2f > wPx / 2f
-                                                onRight = right
-                                                val tx = if (right) wPx - sizePx - marginPx else marginPx
-                                                val ty = motion.offY.value.coerceIn(topLimit, bottomLimit)
-                                                lowerHalf = ty + sizePx / 2f > hPx / 2f
-                                                launch { motion.offX.animateTo(tx, spring(0.65f, Spring.StiffnessLow)) }
-                                                launch { motion.offY.animateTo(ty, spring(0.75f, Spring.StiffnessMediumLow)) }
-                                                // مثل گربه‌ها روی چهار پا فرود میاد
-                                                launch { motion.landSquash() }
+                                                dockCat()
+                                                if (motion.dizzy.value > 0.6f) {
+                                                    scope.launch { speak(AssistantSay("آخ... سرم گیج رفت 😵‍💫"), 3_500) }
+                                                }
+                                                // اگه کاموا افتاده، گربه می‌دوه برش می‌داره و برمی‌گرده سر جاش
+                                                if (motion.ballLost) {
+                                                    chaseBall()
+                                                    delay(200)
+                                                    dockCat()
+                                                }
                                             }
                                         },
                                         onDragCancel = {
@@ -633,12 +800,22 @@ fun FloatingAssistant(
                                 modifier = Modifier
                                     .matchParentSize()
                                     .graphicsLayer {
+                                        val dz = motion.dizzy.value
+                                        val ph = Math.toRadians(dizzyPhase.toDouble()).toFloat()
+                                        val kick = motion.kick.value
+                                        val squash = kick.coerceAtLeast(0f)
                                         alpha = bodyAlpha
                                         transformOrigin = TransformOrigin(0.5f, 1f)
-                                        rotationZ = motion.tilt.value
-                                        translationY = bob * bobPx - jelly.value * jellyPx - motion.pounce.value * hopPx
-                                        scaleY = 1f + 0.10f * jelly.value + 0.10f * scare - 0.14f * motion.land.value
-                                        scaleX = 1f - 0.06f * jelly.value - 0.05f * scare + 0.10f * motion.land.value
+                                        // گیجی: تلو‌تلو خوردن و کج‌وکوله شدن نرم
+                                        rotationZ = motion.tilt.value + sin(ph) * 9f * dz
+                                        // برخورد: به‌سمت مخالف دیوار پس‌زده می‌شه و نرم می‌لرزه
+                                        translationX = -motion.kickX * kick * kickPx + cos(ph) * staggerPx * dz
+                                        translationY = bob * bobPx - jelly.value * jellyPx -
+                                            motion.pounce.value * hopPx - motion.kickY * kick * kickPx
+                                        scaleY = 1f + 0.10f * jelly.value + 0.10f * scare - 0.14f * motion.land.value -
+                                            0.12f * abs(motion.kickY) * squash
+                                        scaleX = 1f - 0.06f * jelly.value - 0.05f * scare + 0.10f * motion.land.value -
+                                            0.12f * abs(motion.kickX) * squash
                                     }
                                     .semantics { contentDescription = "دستیار" },
                                 contentAlignment = Alignment.Center
@@ -653,6 +830,7 @@ fun FloatingAssistant(
                                 )
 
                                 Canvas(modifier = Modifier.matchParentSize()) {
+                                    val u1 = 1.dp.toPx()
                                     // وقتی کاموا از کنارش قل می‌خوره، پنجه‌اش بالا میاد
                                     var reach = 0f
                                     motion.menuProg.forEach { m ->
@@ -662,21 +840,30 @@ fun FloatingAssistant(
                                             if (r > reach) reach = r
                                         }
                                     }
-                                    val tail = ((tailSlow - 0.5f) * 2f) * (1f - playAmt) +
-                                        ((tailFast - 0.5f) * 2f) * playAmt
+                                    val busy = maxOf(playAmt, chaseAmt)
+                                    val tail = ((tailSlow - 0.5f) * 2f) * (1f - busy) +
+                                        ((tailFast - 0.5f) * 2f) * busy
+                                    val dz = motion.dizzy.value
                                     val pose = CatPose(
                                         face = face,
                                         blink = motion.blink.value,
                                         ear = motion.ear.value,
                                         tail = tail,
-                                        mouth = maxOf(talk * speakAmt, reach * 0.7f, scare * 0.45f),
-                                        paw = maxOf(reach, swat * playAmt, offerAmt * 0.75f),
-                                        lookX = (bob - 0.5f) * 0.8f * (1f - playAmt) + (swat - 0.5f) * 2f * playAmt,
-                                        lookY = -0.8f * playAmt + scare * 0.4f,
+                                        mouth = maxOf(talk * speakAmt, reach * 0.7f, scare * 0.45f, dz * 0.35f),
+                                        paw = maxOf(reach, swat * playAmt, offerAmt * 0.75f, motion.grab.value),
+                                        lookX = ((bob - 0.5f) * 0.8f * (1f - playAmt) + (swat - 0.5f) * 2f * playAmt) *
+                                            (1f - chaseAmt) + chaseAmt,
+                                        lookY = -0.8f * playAmt + scare * 0.4f + chaseAmt * 0.7f,
                                         scare = scare,
                                         happy = happyAmt,
-                                        wiggle = (bob - 0.5f) * 2f * (1f + playAmt),
-                                        yarn = primary
+                                        wiggle = (bob - 0.5f) * 2f * (1f + busy),
+                                        yarn = primary,
+                                        dizzy = dz,
+                                        spin = dizzyPhase,
+                                        ballOff = if (motion.ballLost) 1f else 0f,
+                                        ballX = (motion.ballWX.value - motion.offX.value) / u1,
+                                        ballY = (motion.ballWY.value - motion.offY.value) / u1,
+                                        ballSpin = motion.ballSpin.value
                                     )
                                     drawCat(pose)
                                 }
