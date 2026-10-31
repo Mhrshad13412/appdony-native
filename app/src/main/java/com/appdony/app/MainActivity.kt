@@ -200,7 +200,9 @@ fun AppRoot() {
                         onFavorites = { navController.navigate("favorites") { launchSingleTop = true } },
                         onHelp = { navController.navigateToTab("blog") },
                         onAbout = { showAbout = true },
-                        onLogout = { scope.launch { sessionManager.clearSession() } }
+                        onLogout = { scope.launch { sessionManager.clearSession() } },
+                        isLoggedIn = isLoggedIn,
+                        onLogin = { showLoginSheet = true }
                     )
                 }
 
@@ -287,7 +289,7 @@ fun MainContent(
                         isLoggedIn = isLoggedIn,
                         userInitial = if (displayName.isNotBlank()) displayName else username,
                         onSearchClick = openSearch,
-                        onLoginClick = { if (isLoggedIn) onAccountClick() else onLoginClick() },
+                        onLoginClick = { onAccountClick() }, // مهمان‌ها هم منوی حساب رو می‌بینن؛ ورود از داخل همون منوئه
                         searchMode = isSearchRoute,
                         query = searchQuery,
                         onQueryChange = searchViewModel::onQueryChange,
