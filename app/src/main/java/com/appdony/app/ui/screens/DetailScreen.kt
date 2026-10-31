@@ -344,10 +344,165 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
         }
     }
 }
-
 @Composable
 private fun DetailContent(
     post: Post, info: AppInfo, similar: List<Post>, contentBlocks: List<ContentBlock>,
     isLoggedIn: Boolean, nonce: String, isBlog: Boolean, userRating: Int,
     onRatingChanged: (Int) -> Unit, onSimilarClick: (Int) -> Unit,
-    on
+    onDownload: (DownloadLink) -> Unit, onNeedLogin: () -> Unit
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val textColor = AppdonyTextPrimary
+    val tocItems = contentBlocks.filterIsInstance<ContentBlock.Header>().filter { it.level == 2 }
+    val featured = post.featuredImageUrl()
+
+    // برای بازی/برنامه عکس‌ها توی گالری نشون داده می‌شن نه توی متن
+    val description = if (isBlog) contentBlocks else contentBlocks.filter { it !is ContentBlock.Image }
+    val shots = remember(info, featured) {
+        val featuredName = featured?.let { baseName(it) }
+        info.screenshots.filter { baseName(it) != featuredName }
+    }
+    val tableRows = remember(info, post) {
+        buildList {
+            info.version?.let { add("نسخه" to it) }
+            info.size?.let { add("حجم" to it) }
+            info.androidReq?.let { add("اندروید مورد نیاز" to it) }
+            info.developer?.let { add("سازنده" to it) }
+            add("دسته‌بندی" to post.primaryCategoryName())
+            post.date?.let { add("تاریخ انتشار" to it.substringBefore('T')) }
+        }
+    }
+
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+            ) {
+                AsyncImage(model = featured, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))
+                    )
+                )
+            }
+        }
+
+        item {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+                if (isBlog) {
+                    Text(post.primaryCategoryName(), color = primaryColor, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                    Spacer(Modifier.height(8.dp))
+                    Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
+                    Spacer(Modifier.height(16.dp))
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = featured, contentDescription = null,
+                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.height(4.dp))
+                                Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                            Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
+                            Spacer(Modifier.width(8.dp))
+                            RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isBlog && tocItems.isNotEmpty()) {
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(16.dp)).border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .background(AppdonyCardBg).padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.List, null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("فهرست مطالب", color = primaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    tocItems.forEach { header ->
+                        Text(
+                            "• ${header.text}", color = textColor, fontSize = 14.sp,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { scope.launch { listState.animateScrollToItem(contentBlocks.indexOf(header) + 3) } }
+                                .padding(vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!isBlog) {
+            // جدول مشخصات
+            item { SectionTitle("مشخصات") }
+            item { InfoTable(tableRows) }
+
+            // دانلود
+            item { SectionTitle("دانلود") }
+            item { DownloadSection(info = info, onDownload = onDownload) }
+
+            // تصاویر
+            if (shots.isNotEmpty()) {
+                item { SectionTitle("تصاویر") }
+                item {
+                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(shots, key = { it }) { url ->
+                            SubcomposeAsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(width = 260.dp, height = 180.dp).clip(RoundedCornerShape(14.dp)).background(AppdonyCardBg),
+                                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
+                                error = { Box(Modifier.fillMaxSize().background(AppdonyCardBg)) },
+                                success = { SubcomposeAsyncImageContent() }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (description.isNotEmpty()) item { SectionTitle("توضیحات") }
+        }
+
+        itemsIndexed(description) { _, block ->
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                when (block) {
+                    is ContentBlock.Header -> {
+                        Column {
+                            Spacer(Modifier.height(16.dp))
+                            Text(block.text, color = textColor, fontSize = if (block.level == 2) 20.sp else 18.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                    is ContentBlock.Paragraph -> {
+                        Column {
+                            Text(block.text, color = AppdonyTextMuted, fontSize = 15.sp, lineHeight = 28.sp)
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                    is ContentBlock.Image -> {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            SubcomposeAsyncImage(
+                                model = block.url,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
+                                loading = { ShimmerBox(modifier = Modifier.fillMaxWidth().height(180.dp), cornerRadius
