@@ -340,7 +340,7 @@ fun MainContent(
                 bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
                 onSearchClick = openSearch,
                 onDownloadsClick = { navController.navigateToTab("downloads") },
-                onHelpClick = { navController.navigate("blog") { launchSingleTop = true } },
+                onHelpClick = { navController.navigateToTab("blog") },
                 onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
             )
         }
