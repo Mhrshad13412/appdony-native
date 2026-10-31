@@ -13,8 +13,9 @@ android {
         applicationId = "com.appdony.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2935
-        versionName = "2.9.35"
+        // نسخه: زیربنا.قابلیت‌ها.دیباگ‌ها (فقط همین خط رو عوض کن؛ کد نسخه خودش از روی اون ساخته می‌شه)
+        versionName = "2.10.0"
+        versionCode = versionName!!.split(".").let { (a, b, c) -> a.toInt() * 1_000_000 + b.toInt() * 1_000 + c.toInt() }
 
         // توکن هوش مصنوعی از متغیر محیطی AI_KEY (GitHub Secret) یا از local.properties می‌آد؛ توی ریپو نمی‌مونه
         val aiKey = System.getenv("AI_KEY")
