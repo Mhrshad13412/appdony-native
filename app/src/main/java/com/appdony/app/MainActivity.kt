@@ -62,6 +62,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.preferences.FontSize
+import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
@@ -70,6 +71,7 @@ import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AboutDialog
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AppBottomNav
+import com.appdony.app.ui.components.AppGuide
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.LocalBottomBarClearance
@@ -108,6 +110,7 @@ fun AppRoot() {
     val themeManager = remember { ThemeManager(context) }
     val settingsManager = remember { SettingsManager(context) }
     val sessionManager = remember { SessionManager(context) }
+    val onboardingManager = remember { OnboardingManager(context) }
     val scope = rememberCoroutineScope()
 
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
@@ -115,12 +118,17 @@ fun AppRoot() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    // مقدار اولیه true: تا وقتی دیتاستور نخونده شده، راهنما چشمک نزنه
+    val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = true)
 
     var showSplash by remember { mutableStateOf(true) }
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var guideDismissed by remember { mutableStateOf(false) }
     val navController = rememberNavController()
+    // منبع بلور راهنما: کل رابط (نوار بالا، منوی پایین، پاپی و محتوا)
+    val guideHaze = remember { HazeState() }
     var crashReport by remember { mutableStateOf(CrashReporter.read(context)) }
 
     LaunchedEffect(Unit) {
@@ -172,18 +180,20 @@ fun AppRoot() {
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
         AppdonyTheme(darkTheme = isDark, primaryColor = primaryColor) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                if (showSplash) {
-                    SplashScreen()
-                } else {
-                    MainContent(
-                        navController = navController,
-                        isLoggedIn = isLoggedIn,
-                        username = username,
-                        displayName = displayName,
-                        showAiAssistant = showAiAssistant,
-                        onLoginClick = { showLoginSheet = true },
-                        onAccountClick = { showAccountSheet = true }
-                    )
+                Box(modifier = Modifier.fillMaxSize().hazeSource(state = guideHaze)) {
+                    if (showSplash) {
+                        SplashScreen()
+                    } else {
+                        MainContent(
+                            navController = navController,
+                            isLoggedIn = isLoggedIn,
+                            username = username,
+                            displayName = displayName,
+                            showAiAssistant = showAiAssistant,
+                            onLoginClick = { showLoginSheet = true },
+                            onAccountClick = { showAccountSheet = true }
+                        )
+                    }
                 }
 
                 if (showLoginSheet) {
@@ -192,17 +202,16 @@ fun AppRoot() {
 
                 if (showAccountSheet) {
                     AccountSheet(
+                        isLoggedIn = isLoggedIn,
                         displayName = if (displayName.isNotBlank()) displayName else username,
                         username = username,
                         onDismiss = { showAccountSheet = false },
                         onDownloads = { navController.navigateToTab("downloads") },
                         onSettings = { navController.navigate("settings") { launchSingleTop = true } },
                         onFavorites = { navController.navigate("favorites") { launchSingleTop = true } },
-                        onHelp = { navController.navigateToTab("blog") },
                         onAbout = { showAbout = true },
-                        onLogout = { scope.launch { sessionManager.clearSession() } },
-                        isLoggedIn = isLoggedIn,
-                        onLogin = { showLoginSheet = true }
+                        onLogin = { showLoginSheet = true },
+                        onLogout = { scope.launch { sessionManager.clearSession() } }
                     )
                 }
 
@@ -211,6 +220,21 @@ fun AppRoot() {
                         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
                     }
                     AboutDialog(versionName = versionName, onDismiss = { showAbout = false })
+                }
+
+                // راهنمای اولین ورود: فقط یک بار، بعدش دیگه هیچ‌وقت نشون داده نمی‌شه
+                if (!showSplash && !hasSeenOnboarding && !guideDismissed) {
+                    val startRoute = remember { navController.currentDestination?.route ?: "games" }
+                    AppGuide(
+                        hazeState = guideHaze,
+                        showPoppyStep = showAiAssistant,
+                        startRoute = startRoute,
+                        onNavigate = { navController.navigateToTab(it) },
+                        onFinish = {
+                            guideDismissed = true
+                            scope.launch { onboardingManager.setSeen() }
+                        }
+                    )
                 }
 
                 val report = crashReport
@@ -289,7 +313,8 @@ fun MainContent(
                         isLoggedIn = isLoggedIn,
                         userInitial = if (displayName.isNotBlank()) displayName else username,
                         onSearchClick = openSearch,
-                        onLoginClick = { onAccountClick() }, // مهمان‌ها هم منوی حساب رو می‌بینن؛ ورود از داخل همون منوئه
+                        // مهمان هم منو رو می‌بینه (ورود از داخل منوئه)
+                        onLoginClick = { onAccountClick() },
                         searchMode = isSearchRoute,
                         query = searchQuery,
                         onQueryChange = searchViewModel::onQueryChange,
