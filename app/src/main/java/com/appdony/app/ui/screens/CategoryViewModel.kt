@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.repository.AppRepository
+import com.appdony.app.util.LatestOnly
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,7 +72,8 @@ class CategoryViewModel(
                 orderBy = sort.apiValue,
                 order = sort.order
             ).onSuccess { posts ->
-                _state.value = CategoryUiState.Success(posts)
+                // از هر اپ/بازی فقط جدیدترین نسخه
+                _state.value = CategoryUiState.Success(LatestOnly.latestPerApp(posts))
                 if (posts.size < 24) isEndReached = true
             }.onFailure {
                 _state.value = CategoryUiState.Error(it.message ?: "خطا")
@@ -101,7 +103,10 @@ class CategoryViewModel(
                 } else {
                     val current = _state.value
                     if (current is CategoryUiState.Success) {
-                        _state.value = CategoryUiState.Success(current.posts + newPosts)
+                        // صفحه‌های بعدی هم با قبلی‌ها یکی می‌شن تا نسخه‌ی قدیمی دوباره نیاد
+                        _state.value = CategoryUiState.Success(
+                            LatestOnly.latestPerApp(current.posts + newPosts)
+                        )
                     }
                     if (newPosts.size < 24) isEndReached = true
                 }
