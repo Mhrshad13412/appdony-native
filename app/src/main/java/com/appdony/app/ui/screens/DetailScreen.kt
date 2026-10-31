@@ -411,13 +411,16 @@ private fun DetailContent(
                                 Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
                             }
                         }
-                        Spacer(Modifier.height(16.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
-                            Spacer(Modifier.width(8.dp))
-                            RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
+                        // امتیاز دادن فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
+                        if (isLoggedIn) {
+                            Spacer(Modifier.height(16.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            Spacer(Modifier.height(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
+                                Spacer(Modifier.width(8.dp))
+                                RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
+                            }
                         }
                     }
                 }
