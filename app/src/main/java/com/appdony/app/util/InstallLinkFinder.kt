@@ -51,6 +51,11 @@ object InstallLinkFinder {
     )
     private val SKIP_ANCESTORS = setOf("header", "footer", "nav", "aside")
 
+    // لینک پیام تلگرام (t.me/کانال/شماره) لینک دانلوده؛ لینک خالی کانال یا share نه
+    private val TG_HOSTS = setOf("t.me", "telegram.me", "telegram.dog")
+    private val TG_MESSAGE = Regex("^/(c/[0-9]+|[A-Za-z0-9_]{3,})/[0-9]+")
+    private val TG_RAW = Regex("https?://(?:t|telegram)\\.me/(?:c/[0-9]+|[A-Za-z0-9_]{3,})/[0-9]+")
+
     suspend fun find(postId: Int, postLink: String?): Result<FindResult> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -111,14 +116,21 @@ object InstallLinkFinder {
 
             if (abs.isBlank()) continue
             val httpUrl = abs.toHttpUrlOrNull() ?: continue
-            if (isBlockedHost(httpUrl.host)) continue
+            val host = httpUrl.host.lowercase()
+            val path = httpUrl.encodedPath
+            val isTg = host in TG_HOSTS
+            if (isTg) {
+                if (!TG_MESSAGE.containsMatchIn(path)) continue
+            } else if (isBlockedHost(host)) {
+                continue
+            }
             if (abs.substringBefore('#') == pageUrl.substringBefore('#')) continue
 
-            val path = httpUrl.encodedPath
             val ext = path.substringAfterLast('/', "").substringAfterLast('.', "").lowercase()
             val isFile = ext in FILE_EXTS
             val isDlPath = looksInstall && DL_PATH.containsMatchIn(path)
-            if (!isFile && !isDlPath) continue
+            val external = !host.endsWith("appdony.ir")
+            if (!isTg && !isFile && !isDlPath && !(looksInstall && external)) continue
             if (!seen.add(abs)) continue
 
             val m = SIZE_REGEX.find(text)
@@ -127,6 +139,18 @@ object InstallLinkFinder {
             links.add(DownloadLink(title = title, url = abs, size = size))
             debug.append("link: ").append(abs).append('\n')
             if (links.count { it.url.isNotBlank() } >= 6) break
+        }
+
+        // اگه با تگ a پیدا نشد (مثلاً لینک تو دکمه/اسکریپت بود) خود HTML رو دنبال لینک تلگرام می‌گردیم
+        if (links.none { it.url.isNotBlank() }) {
+            var raws = TG_RAW.findAll(scope.outerHtml().replace("\\/", "/")).map { it.value }.distinct().toList()
+            if (raws.isEmpty()) {
+                raws = TG_RAW.findAll(html.replace("\\/", "/")).map { it.value }.distinct().toList()
+            }
+            for (u in raws.take(3)) {
+                links.add(DownloadLink(title = "دانلود از تلگرام", url = u))
+                debug.append("raw: ").append(u).append('\n')
+            }
         }
 
         debug.append("checked: ").append(checked).append(" | found: ").append(links.size)
