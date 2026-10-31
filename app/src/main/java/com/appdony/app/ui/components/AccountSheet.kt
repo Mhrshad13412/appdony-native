@@ -16,10 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
@@ -37,20 +37,19 @@ import androidx.compose.ui.unit.sp
 
 /**
  * منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد.
- * مهمان‌ها (بدون حساب) هم همین منو را دارن؛ فقط کارت بالا «ورود» نشون می‌ده و «خروج از حساب» نیست.
+ * برای مهمان (بدون حساب): کارت کاربر و «خروج از حساب» مخفی‌اند و به‌جاشون «ورود یا ثبت‌نام» میاد.
  */
 @Composable
 fun AccountSheet(
+    isLoggedIn: Boolean,
     displayName: String, username: String, onDismiss: () -> Unit,
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
-    onHelp: () -> Unit, onAbout: () -> Unit, onLogout: () -> Unit,
-    isLoggedIn: Boolean = true,
-    onLogin: () -> Unit = {}
+    onAbout: () -> Unit, onLogin: () -> Unit, onLogout: () -> Unit
 ) {
     FloatingDialog(onDismiss = onDismiss) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "حساب کاربری",
+                text = if (isLoggedIn) "حساب کاربری" else "منو",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
@@ -65,44 +64,41 @@ fun AccountSheet(
         }
         Spacer(Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(enabled = !isLoggedIn) { onDismiss(); onLogin() }
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
+        if (isLoggedIn) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isLoggedIn) {
+                Box(
+                    modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = displayName.firstOrNull()?.uppercase() ?: "U",
                         color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
                     )
-                } else {
-                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-            }
-            Spacer(Modifier.width(14.dp))
-            if (isLoggedIn) {
+                Spacer(Modifier.width(14.dp))
                 Column {
                     Text(text = displayName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
-            } else {
-                Text(text = "ورود", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
+            Spacer(Modifier.height(10.dp))
+        } else {
+            AccountRow(
+                Icons.Outlined.Person, "ورود یا ثبت‌نام",
+                tint = MaterialTheme.colorScheme.primary
+            ) { onDismiss(); onLogin() }
         }
 
-        Spacer(Modifier.height(10.dp))
         AccountRow(Icons.Outlined.Download, "دانلودها") { onDismiss(); onDownloads() }
         AccountRow(Icons.Outlined.StarBorder, "علاقه‌مندی‌ها") { onDismiss(); onFavorites() }
         AccountRow(Icons.Outlined.Settings, "تنظیمات") { onDismiss(); onSettings() }
-        AccountRow(Icons.Outlined.Info, "راهنما") { onDismiss(); onHelp() }
         AccountRow(Icons.Outlined.Info, "درباره اپدونی") { onDismiss(); onAbout() }
         if (isLoggedIn) {
             AccountRow(
