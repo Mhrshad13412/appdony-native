@@ -162,6 +162,8 @@ private val BannerRed = Color(0xFFFF5C5C)
 
 @Composable
 fun AppBannerHost(modifier: Modifier = Modifier) {
+    UpdateHost() // چک آپدیت خودکار از گیت‌هاب
+
     val current by AppBanner.msg.collectAsState()
     var last by remember { mutableStateOf<BannerMsg?>(null) }
     SideEffect { if (current != null) last = current }
