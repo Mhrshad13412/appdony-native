@@ -41,6 +41,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -127,8 +130,8 @@ fun AppRoot() {
     var showAbout by remember { mutableStateOf(false) }
     var guideDismissed by remember { mutableStateOf(false) }
     val navController = rememberNavController()
-    // منبع بلور راهنما: فقط وقتی راهنما در حال نمایشه فعاله (تا بلور منوی پایین رو خراب نکنه)
-    val guideHaze = remember { HazeState() }
+    // ضبط صحنه برای بلورِ راهنما؛ فقط وقتی راهنما بازه استفاده می‌شه و به هیز ربطی نداره
+    val sceneLayer = rememberGraphicsLayer()
     var crashReport by remember { mutableStateOf(CrashReporter.read(context)) }
 
     val guideActive = !showSplash && !hasSeenOnboarding && !guideDismissed
@@ -185,7 +188,15 @@ fun AppRoot() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (guideActive) Modifier.hazeSource(state = guideHaze) else Modifier)
+                        .then(
+                            // فقط وقتی راهنما بازه: صحنه ضبط می‌شه تا بیرون دایره بلور بشه
+                            if (guideActive) {
+                                Modifier.drawWithContent {
+                                    sceneLayer.record { this@drawWithContent.drawContent() }
+                                    drawLayer(sceneLayer)
+                                }
+                            } else Modifier
+                        )
                 ) {
                     if (showSplash) {
                         SplashScreen()
@@ -232,7 +243,7 @@ fun AppRoot() {
                 if (guideActive) {
                     val startRoute = remember { navController.currentDestination?.route ?: "games" }
                     AppGuide(
-                        hazeState = guideHaze,
+                        sceneLayer = sceneLayer,
                         showPoppyStep = showAiAssistant,
                         startRoute = startRoute,
                         onNavigate = { navController.navigateToTab(it) },
