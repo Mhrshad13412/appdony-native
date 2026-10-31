@@ -88,4 +88,37 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implemen
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    
+    // این کتابخانه رو نگه می‌داریم، ولی چون Minify روشنه، فقط آیکون‌هایی که استفاده کردیم توی اپ می‌مونن
+    implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.github.franmontiel:PersistentCookieJar:v1.0.1")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Room (کش پست‌ها)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    // WorkManager (آپدیت خودکار وبلاگ)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // ذخیره‌ی رمزنگاری‌شده‌ی اطلاعات ورود
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Jsoup (پارس HTML و پیدا کردن لینک نصب)
+    implementation("org.jsoup:jsoup:1.18.1")
+}
