@@ -20,7 +20,9 @@ data class CommentRequest(
     @SerializedName("author_name") val authorName: String? = null
 )
 
-private const val LIST_FIELDS = "id,title,excerpt,date,modified,content,categories,featured_media,_links,_embedded"
+const val LIST_FIELDS = "id,title,excerpt,date,modified,content,categories,featured_media,_links,_embedded"
+// فقط تصویر شاخص و دسته؛ نویسنده/پاسخ‌ها و ... دیگه دانلود نمی‌شن
+const val EMBED_LIGHT = "wp:featuredmedia,wp:term"
 
 interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me?context=edit")
@@ -33,27 +35,27 @@ interface AppdonyApi {
     suspend fun getCustomBlogPosts(
         @Query("per_page") perPage: Int = 10,
         @Query("page") page: Int = 1,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: String = EMBED_LIGHT
     ): List<Post>
 
     @GET("wp-json/wp/v2/blog/{id}")
     suspend fun getBlogPost(
         @Path("id") id: Int,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: String = EMBED_LIGHT
     ): Post
 
     @GET("wp-json/wp/v2/posts")
     suspend fun getPosts(
         @Query("per_page") perPage: Int = 10,
         @Query("page") page: Int = 1,
-        @Query("_embed") embed: Int = 1,
+        @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
     @GET("wp-json/wp/v2/posts/{id}")
     suspend fun getPost(
         @Path("id") id: Int,
-        @Query("_embed") embed: Int = 1
+        @Query("_embed") embed: String = EMBED_LIGHT
     ): Post
 
     @GET("wp-json/wp/v2/posts")
@@ -63,7 +65,7 @@ interface AppdonyApi {
         @Query("page") page: Int = 1,
         @Query("orderby") orderBy: String = "date",
         @Query("order") order: String = "desc",
-        @Query("_embed") embed: Int = 1,
+        @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
@@ -71,7 +73,7 @@ interface AppdonyApi {
     suspend fun getPostsByMultipleCategories(
         @Query("categories") categories: String,
         @Query("per_page") perPage: Int = 6,
-        @Query("_embed") embed: Int = 1,
+        @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
@@ -79,7 +81,7 @@ interface AppdonyApi {
     suspend fun getPostsByIds(
         @Query("include") ids: String,
         @Query("per_page") perPage: Int = 50,
-        @Query("_embed") embed: Int = 1,
+        @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
@@ -87,7 +89,7 @@ interface AppdonyApi {
     suspend fun searchPosts(
         @Query("search") query: String,
         @Query("per_page") perPage: Int = 20,
-        @Query("_embed") embed: Int = 1,
+        @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
 
