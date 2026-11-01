@@ -3,29 +3,20 @@ package com.appdony.app.ui.components
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -49,11 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -65,16 +53,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.appdony.app.util.UpdateHelper
+import java.io.File
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.io.File
-import kotlin.math.PI
-import kotlin.math.roundToInt
-import kotlin.math.sin
+
 
 /**
  * چک آپدیت خودکار: موقع باز شدن برنامه آخرین ریلیز گیت‌هاب رو می‌گیره
- * و اگه جدیدتر بود دیالوگ گربه و کاموا رو نشون می‌ده.
+ * و اگه جدیدتر بود کارت شناور آپدیت (پشتیبان پشت کامپیوتر) رو نشون می‌ده.
  */
 @Composable
 fun UpdateHost() {
@@ -115,9 +102,11 @@ fun UpdateHost() {
                     if (f == null) {
                         failed = true
                         progress = -1f
+                        show = true // اگه کارت کوچیک شده بود، برای تلاش دوباره برمی‌گرده
                     } else {
                         file = f
                         progress = 1f
+                        show = true // «بفرما» رو ببینه، حتی اگه کارت کوچیک شده بود
                         UpdateHelper.install(context, f)
                     }
                 }
@@ -126,7 +115,9 @@ fun UpdateHost() {
         onLater = {
             job?.cancel()
             show = false
-        }
+        },
+        // علامت «–»: کارت می‌ره کنار ولی دانلود ادامه داره و خودش نصب رو شروع می‌کنه
+        onMinimize = { show = false }
     )
 }
 
@@ -136,15 +127,22 @@ private fun UpdateDialog(
     progress: Float,
     failed: Boolean,
     onPrimary: () -> Unit,
-    onLater: () -> Unit
+    onLater: () -> Unit,
+    onMinimize: () -> Unit
 ) {
     val downloading = progress in 0f..0.9999f
     val finished = progress >= 1f
+    // مرحله‌ی انیمیشن: کد زدن ← (نصب رو زد) بلند می‌شه و 👌 می‌ده ← (دانلود تموم شد) «بفرما»
+    val stage = when {
+        finished -> UpdateStage.Ready
+        downloading -> UpdateStage.Confirm
+        else -> UpdateStage.Coding
+    }
 
     Dialog(
-        onDismissRequest = { if (!downloading) onLater() },
+        onDismissRequest = { if (downloading) onMinimize() else onLater() },
         properties = DialogProperties(
-            dismissOnBackPress = !downloading,
+            dismissOnBackPress = true,
             dismissOnClickOutside = !downloading,
             usePlatformDefaultWidth = false
         )
@@ -182,17 +180,29 @@ private fun UpdateDialog(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     shadowElevation = 8.dp
                 ) {
+                  Box {
                     Column(
                         modifier = Modifier
                             .verticalScroll(rememberScrollState())
                             .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CatThrowingYarn()
+                        UpdateDevScene(
+                            stage = stage,
+                            progress = progress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(200f / 135f)
+                                .clip(RoundedCornerShape(22.dp))
+                        )
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(10.dp))
                         Text(
-                            text = "نسخه جدید اومده!",
+                            text = when (stage) {
+                                UpdateStage.Coding -> "نسخه جدید اومده!"
+                                UpdateStage.Confirm -> "عالیه، دارم می‌گیرمش…"
+                                UpdateStage.Ready -> "بفرما، آماده‌ست!"
+                            },
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -241,9 +251,36 @@ private fun UpdateDialog(
                             )
                         }
                     }
+                    MinimizeButton(
+                        onClick = if (downloading) onMinimize else onLater,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(26.dp)
+                    )
+                  }
                 }
             }
         }
+    }
+}
+
+/** علامت «–» گوشه‌ی کارت: کارت رو کنار می‌ذاره (دانلود ادامه پیدا می‌کنه) */
+@Composable
+private fun MinimizeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.40f))
+            .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(12.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(Color.White.copy(alpha = 0.9f))
+        )
     }
 }
 
@@ -315,100 +352,5 @@ private fun ProgressPill(progress: Float) {
             fontWeight = FontWeight.SemiBold,
             color = primary
         )
-    }
-}
-
-/** گربه‌ای که گلوله‌ی کاموا رو پرت می‌کنه؛ نخ کاموا پشت سرش کشیده می‌شه */
-@Composable
-private fun CatThrowingYarn() {
-    val primary = MaterialTheme.colorScheme.primary
-    val inf = rememberInfiniteTransition(label = "cat_yarn")
-    val t by inf.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
-        label = "throw"
-    )
-    val tailT by inf.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "tail"
-    )
-    val blinkT by inf.animateFloat(
-        initialValue = 0f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            keyframes {
-                durationMillis = 3200
-                0f at 0
-                0f at 2800
-                1f at 2950
-                0f at 3100
-            }
-        ),
-        label = "blink"
-    )
-
-    Canvas(modifier = Modifier.size(width = 200.dp, height = 134.dp)) {
-        // فضای طراحی ۱۲۰ واحد عرض داره؛ گربه روی بوم ۶۰×۶۰ کشیده شده
-        val k = size.width / 120.dp.toPx()
-        val u = 1.dp.toPx()
-        // داخل withTransform نمی‌شه toPx صدا زد، پس مقدارها رو از همین‌جا حساب می‌کنیم
-        val shiftX = 6.dp.toPx()
-        val shiftY = 20.dp.toPx()
-
-        // مرحله‌ی پرتاب: t بین ۰.۱۲ تا ۰.۸۸
-        val q = ((t - 0.12f) / 0.76f).coerceIn(0f, 1f)
-        val flying = t in 0.12f..0.88f
-        val pawX = 36f
-        val pawY = 52f
-        val bx = 40f + 58f * q
-        val by = 52f - 250f * q * (1f - q)
-        val alpha = when {
-            !flying -> 0f
-            q < 0.08f -> q / 0.08f
-            q > 0.85f -> (1f - q) / 0.15f
-            else -> 1f
-        }
-        val paw = if (t < 0.2f) sin(PI * (t / 0.2f)).toFloat() else 0f
-        val talk = (0.5f + 0.5f * sin(t * PI.toFloat() * 10f)) * 0.55f
-
-        withTransform({
-            scale(k, k, Offset.Zero)
-            translate(shiftX, shiftY)
-        }) {
-            drawCat(
-                CatPose(
-                    face = 1f,
-                    blink = blinkT,
-                    ear = if (flying) 0.6f else 0f,
-                    tail = (tailT - 0.5f) * 2f,
-                    mouth = talk,
-                    paw = paw,
-                    lookX = if (flying) 0.3f + 0.6f * q else 0f,
-                    lookY = if (flying) -0.8f * sin(PI * q).toFloat() else 0f,
-                    scare = 0f,
-                    happy = 0f,
-                    wiggle = (tailT - 0.5f) * 2f,
-                    yarn = primary
-                )
-            )
-
-            if (alpha > 0f) {
-                // نخ از پنجه‌ی گربه تا گلوله
-                val thread = Path().apply {
-                    moveTo(pawX * u, pawY * u)
-                    quadraticBezierTo(
-                        (pawX + bx) / 2f * u,
-                        (maxOf(pawY, by) + 14f * (1f - q * 0.5f)) * u,
-                        bx * u, by * u
-                    )
-                }
-                drawPath(
-                    thread,
-                    primary.copy(alpha = 0.75f * alpha),
-                    style = Stroke(width = 1.2f * u, cap = StrokeCap.Round)
-                )
-                drawYarnBall(Offset(bx * u, by * u), 5.2f * u, primary.copy(alpha = alpha), q * 720f)
-            }
-        }
     }
 }
