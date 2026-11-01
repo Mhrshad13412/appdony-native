@@ -105,7 +105,7 @@ fun AppCard(
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
-    val imageRequest = remember(imageUrl) { ImageRequest.Builder(context).data(imageUrl).size(400).crossfade(true).build() }
+    val imageRequest = remember(imageUrl) { ImageRequest.Builder(context).data(imageUrl).size(320).crossfade(150).build() }
     val sizing = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(CardWidth)
 
     Column(
