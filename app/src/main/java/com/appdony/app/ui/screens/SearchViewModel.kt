@@ -41,6 +41,10 @@ class SearchViewModel(private val context: Context) : ViewModel() {
     )
 
     private var searchJob: Job? = null
+    // نتیجه‌ی جستجوهای قبلی توی حافظه؛ تکراری‌ها فوری نشون داده می‌شن
+    private val memo = object : LinkedHashMap<String, List<Post>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Post>>?) = size > 30
+    }
 
     fun onQueryChange(newQuery: String) {
         _query.value = newQuery
@@ -51,15 +55,26 @@ class SearchViewModel(private val context: Context) : ViewModel() {
             return
         }
         
+        val q = newQuery.trim()
+        memo[q]?.let { // نتیجه‌ی کش‌شده: بدون تأخیر
+            _state.value = SearchUiState.Success(it)
+            searchJob = viewModelScope.launch { historyManager.addQuery(q) }
+            return
+        }
+
         searchJob = viewModelScope.launch {
-            delay(400)
+            delay(250)
             _state.value = SearchUiState.Loading
-            
-            historyManager.addQuery(newQuery.trim())
-            
-            repo.searchPosts(newQuery)
+
+            launch { historyManager.addQuery(q) }
+
+            repo.searchPosts(q)
                 // از هر اپ/بازی فقط جدیدترین نسخه
-                .onSuccess { _state.value = SearchUiState.Success(LatestOnly.latestPerApp(it)) }
+                .onSuccess {
+                    val list = LatestOnly.latestPerApp(it)
+                    memo[q] = list
+                    _state.value = SearchUiState.Success(list)
+                }
                 .onFailure {
                     _state.value = SearchUiState.Error(it.message ?: "خطا")
                 }
