@@ -132,7 +132,7 @@ class CatOverlayService : Service() {
         const val ACTION_STOP = "com.appdony.app.CAT_STOP"
 
         fun isEnabled(c: Context): Boolean =
-            c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON, false)
+            c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON, true)
 
         fun canDraw(c: Context): Boolean =
             Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(c)
@@ -226,7 +226,14 @@ class CatOverlayService : Service() {
             setEnabled(this, false)
             stopSelf()
         }
-        return START_NOT_STICKY
+        // اگه سیستم یا کاربر پروسه رو بست، سیستم دوباره سرویس رو بالا میاره
+        return START_STICKY
+    }
+
+    // کاربر اپ رو از لیست اخیر پاک کرد: پاپی بمونه
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        startIfEnabled(applicationContext)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
