@@ -1,5 +1,6 @@
 package com.appdony.app.ui.components
 
+import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -57,6 +58,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -113,6 +116,17 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 
+/** جمله‌هایی که پشتیبان (وقتی جای گربه نشسته) هر ۱۰ ثانیه یکی‌شون رو می‌گه */
+private val SupportFloatPhrases = listOf(
+    "سلام! من پشتیبانم، هر مشکلی داری بهم بگو 👋",
+    "مشکل نصب یا دانلود داری؟ روم بزن و «چت با من» رو انتخاب کن.",
+    "اسم بازی یا برنامه‌ای که مشکل داره رو برام بنویس.",
+    "ذره‌بین دستمه، هر مشکلی باشه پیداش می‌کنم 🔍",
+    "اگه ایده‌ای برای اپدونی داری، با کمال میل می‌شنوم 💡",
+    "من همین‌جام، عجله نکن 😊",
+    "پیام‌هات توی چت می‌مونه؛ هر وقت خواستی ادامه بده."
+)
+
 // ───────────────────────── کامپوننت اصلی ─────────────────────────
 
 @Composable
@@ -132,7 +146,15 @@ fun FloatingAssistant(
     val yarnColors = remember(primary) { yarnPalette(primary) }
     val motion = remember { AvatarMotion() }
     val routeNow by rememberUpdatedState(currentRoute)
-    val visibleNow by rememberUpdatedState(visible)
+    // وقتی پشتیبان جای گربه نشسته، همین کامپوننت با ظاهر پشتیبان کار می‌کنه
+    // (کشیدن، چسبیدن به لبه، گیجی، منو، همه مثل گربه؛ فقط به‌جای کاموا سکه)
+    val supportOn = SupportPresence.phase == SupportPhase.ON
+    val routeOk = currentRoute != "ai_chat" && currentRoute != "chat" && currentRoute?.startsWith("support") != true
+    val shown = visible || (supportOn && routeOk)
+    val supportNow by rememberUpdatedState(supportOn)
+    val visibleNow by rememberUpdatedState(shown)
+    val look = remember { Animatable(0f) }                                      // ذره‌بین پشتیبان
+    var nowMs by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) } // برای تایمر دور آواتار
 
     var ready by remember { mutableStateOf(false) }
     var onRight by remember { mutableStateOf(false) }
@@ -149,9 +171,15 @@ fun FloatingAssistant(
     var chasing by remember { mutableStateOf(false) }   // گربه داره دنبال کاموا می‌دوه
     var joy by remember { mutableStateOf(false) }       // خوشحالی بعد از برداشتن کاموا
 
+    // «چت با من»: روی گربه چت هوش مصنوعی، روی پشتیبان چت پشتیبانی
+    val chatAction: () -> Unit = {
+        val open = SupportPresence.openSupport
+        if (SupportPresence.phase == SupportPhase.ON && open != null) open() else onChatClick()
+    }
+
     // ترتیب: چت، دانلودها، جستجو
     val items = listOf(
-        Triple(Icons.Outlined.ChatBubbleOutline, "چت با من", onChatClick),
+        Triple(Icons.Outlined.ChatBubbleOutline, "چت با من", chatAction),
         Triple(Icons.Outlined.Download, "دانلودها", onDownloadsClick),
         Triple(Icons.Outlined.Search, "جستجو", onSearchClick)
     )
@@ -210,8 +238,8 @@ fun FloatingAssistant(
             }
             val bodyAlpha by animateFloatAsState(if (hidden) 0.38f else 1f, tween(500), label = "assistant_alpha")
 
-            LaunchedEffect(activity, expanded, bubbleSay, dragging, hidden, ready, visible, chasing) {
-                if (ready && visible && !expanded && bubbleSay == null && !dragging && !hidden && !chasing && !motion.ballLost) {
+            LaunchedEffect(activity, expanded, bubbleSay, dragging, hidden, ready, shown, chasing, supportOn) {
+                if (ready && shown && !supportOn && !expanded && bubbleSay == null && !dragging && !hidden && !chasing && !motion.ballLost) {
                     delay(12_000)
                     hidden = true
                 }
@@ -261,6 +289,50 @@ fun FloatingAssistant(
                 if (bubbleSay === say) bubbleSay = null
             }
 
+            // متن‌های مربوط به کاموا وقتی پشتیبان اومده، «سکه» می‌شن
+            fun forMe(text: String): String =
+                if (supportNow) text.replace("کاموا", "سکه").replace("🧶", "🪙") else text
+
+            // موقع عوض شدن گربه ⇄ پشتیبان همه‌چیز تمیز می‌شه
+            LaunchedEffect(supportOn) {
+                motion.ballJob?.cancel()
+                motion.ballLost = false
+                expanded = false
+                offerOnly = false
+                showMenu = false
+                hidden = false
+                bubbleSay = null
+                motion.menuProg.forEach { it.snapTo(0f) }
+                look.snapTo(0f)
+            }
+
+            // تایمر دور آواتار پشتیبان
+            LaunchedEffect(supportOn) {
+                if (!supportOn) return@LaunchedEffect
+                while (true) {
+                    nowMs = SystemClock.elapsedRealtime()
+                    delay(200)
+                }
+            }
+
+            // پشتیبان هر ۱۰ ثانیه یا یه جمله می‌گه یا با ذره‌بین نگات می‌کنه
+            LaunchedEffect(ready, supportOn) {
+                if (!ready || !supportOn) return@LaunchedEffect
+                var n = 0
+                while (true) {
+                    delay(10_000)
+                    if (!visibleNow || expanded || dragging || bubbleSay != null || chasing) continue
+                    if (n++ % 2 == 0) {
+                        val phrase = SupportFloatPhrases.random()
+                        speak(AssistantSay(phrase), (phrase.length * 55L).coerceIn(2_400L, 4_500L))
+                    } else {
+                        look.animateTo(1f, tween(600))
+                        delay(1_800)
+                        look.animateTo(0f, tween(600))
+                    }
+                }
+            }
+
             // پرش‌های بازیگوشانه‌ی گربه تا وقتی لینک بررسی می‌شه
             LaunchedEffect(dlActive) {
                 if (dlActive) {
@@ -303,7 +375,7 @@ fun FloatingAssistant(
                             dlActive = true
                             startMs = System.currentTimeMillis()
                             scope.launch {
-                                val say = AssistantSay("این کاموا رو بگیر و باهاش بازی کن، تا لینکت رو چک کنم 🧶", SayKind.DOWNLOAD)
+                                val say = AssistantSay(forMe("این کاموا رو بگیر و باهاش بازی کن، تا لینکت رو چک کنم 🧶"), SayKind.DOWNLOAD)
                                 AssistantBus.noteShown(say.text)
                                 speak(say, 6_000)
                             }
@@ -342,7 +414,7 @@ fun FloatingAssistant(
                                 showMenu = true
                                 motion.menuProg.forEach { it.snapTo(0f) }
                                 scope.launch {
-                                    val say = AssistantSay("این کاموا رو بگیر، تو رو می‌بره بخش دانلودها 🧶", SayKind.DOWNLOAD)
+                                    val say = AssistantSay(forMe("این کاموا رو بگیر، تو رو می‌بره بخش دانلودها 🧶"), SayKind.DOWNLOAD)
                                     AssistantBus.noteShown(say.text)
                                     speak(say, 9_000)
                                 }
@@ -372,7 +444,7 @@ fun FloatingAssistant(
                 if (!ready) return@LaunchedEffect
                 delay(7_000)
                 while (true) {
-                    if (visibleNow && !expanded && !dragging && bubbleSay == null) {
+                    if (visibleNow && !supportNow && !expanded && !dragging && bubbleSay == null) {
                         val say = if (Random.nextFloat() < 0.15f) {
                             fetchSuggestion() ?: AssistantPhrases.next(routeNow)
                         } else {
@@ -595,7 +667,7 @@ fun FloatingAssistant(
                 }
             }
 
-            if (ready && visible) {
+            if (ready && shown) {
                 Layout(
                     modifier = Modifier.fillMaxSize(),
                     content = {
@@ -609,7 +681,7 @@ fun FloatingAssistant(
                             val u = 1.dp.toPx()
                             for (i in 0..2) {
                                 val a = threadData[i * 6 + 4]
-                                if (a <= 0.02f) continue
+                                if (a <= 0.02f || supportOn) continue
                                 val bx = threadData[i * 6]
                                 val by = threadData[i * 6 + 1]
                                 val ax = threadData[i * 6 + 2]
@@ -641,6 +713,7 @@ fun FloatingAssistant(
                                     say = lastSay,
                                     onRight = onRight,
                                     lowerHalf = lowerHalf,
+                                    neutral = supportOn,
                                     onClick = {
                                         val s = lastSay
                                         bubbleSay = null
@@ -655,12 +728,41 @@ fun FloatingAssistant(
                             }
                         }
 
-                        // ── گلوله‌های کاموا (منو) ──
+                        // ── گلوله‌های کاموا / سکه‌های منو ──
                         if (showMenu || dlActive) {
                             items.forEachIndexed { i, (icon, label, action) ->
                                 if (dlActive || !offerOnly || i == 1) {
                                     Box(modifier = Modifier.layoutId("item$i")) {
-                                        YarnButton(
+                                        val itemClick: () -> Unit = {
+                                            if (!dlActive) {
+                                                if (expanded) {
+                                                    expanded = false
+                                                    activity++
+                                                    action()
+                                                } else if (offerOnly) {
+                                                    offerOnly = false
+                                                    showMenu = false
+                                                    scope.launch { motion.menuProg[1].snapTo(0f) }
+                                                    activity++
+                                                    action()
+                                                }
+                                            }
+                                        }
+                                        if (supportOn) CoinButton(
+                                            icon = icon,
+                                            label = label,
+                                            progress = {
+                                                if (dlActive) dlAlpha(motion.dlPos[i].value)
+                                                else motion.menuProg[i].value
+                                            },
+                                            turn = {
+                                                val q = if (dlActive) motion.dlPos[i].value else motion.menuProg[i].value
+                                                (1f - q.coerceIn(0f, 1f)) * 720f
+                                            },
+                                            bob = { bob },
+                                            flip = if (i % 2 == 0) 1f else -1f,
+                                            onClick = itemClick
+                                        ) else YarnButton(
                                             icon = icon,
                                             label = label,
                                             tint = yarnColors[i],
@@ -674,28 +776,14 @@ fun FloatingAssistant(
                                             },
                                             bob = { bob },
                                             flip = if (i % 2 == 0) 1f else -1f,
-                                            onClick = {
-                                                if (!dlActive) {
-                                                    if (expanded) {
-                                                        expanded = false
-                                                        activity++
-                                                        action()
-                                                    } else if (offerOnly) {
-                                                        offerOnly = false
-                                                        showMenu = false
-                                                        scope.launch { motion.menuProg[1].snapTo(0f) }
-                                                        activity++
-                                                        action()
-                                                    }
-                                                }
-                                            }
+                                            onClick = itemClick
                                         )
                                     }
                                 }
                             }
                         }
 
-                        // ── خود گربه ──
+                        // ── خود گربه / پشتیبان ──
                         Box(
                             modifier = Modifier
                                 .layoutId("avatar")
@@ -752,7 +840,7 @@ fun FloatingAssistant(
 
                                             // تکون سریع: کاموا از پاش می‌افته
                                             if (motion.feedShake(drag.x, drag.y, now, shakeMinPx)) {
-                                                dropBall()
+                                                if (!supportNow) dropBall()
                                             }
 
                                             scope.launch {
@@ -820,52 +908,68 @@ fun FloatingAssistant(
                                     .semantics { contentDescription = "دستیار" },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Surface(
-                                    modifier = Modifier.matchParentSize(),
-                                    shape = AvatarShape,
-                                    color = surfaceColor,
-                                    border = BorderStroke(1.5.dp, primary),
-                                    shadowElevation = 10.dp,
-                                    content = {}
-                                )
-
-                                Canvas(modifier = Modifier.matchParentSize()) {
-                                    val u1 = 1.dp.toPx()
-                                    // وقتی کاموا از کنارش قل می‌خوره، پنجه‌اش بالا میاد
-                                    var reach = 0f
-                                    motion.menuProg.forEach { m ->
-                                        val v = m.value
-                                        if (v > 0f && v < 0.45f) {
-                                            val r = sin(Math.PI * v / 0.45).toFloat()
-                                            if (r > reach) reach = r
-                                        }
+                                if (supportOn) {
+                                    // پشتیبان: دایره‌ی نقاشی‌شده؛ بوردرش همون تایمره (رنگ ثابت، نه رنگ تم)
+                                    val ring = ((SupportPresence.endAt - nowMs).toFloat() / SupportPresence.HOLD_MS)
+                                        .coerceIn(0f, 1f)
+                                    Box(modifier = Modifier.matchParentSize().shadow(10.dp, CircleShape, clip = false)) {
+                                        SupportAvatar(
+                                            sizeDp = 60,
+                                            talking = bubbleSay != null,
+                                            look = look.value,
+                                            ring = ring,
+                                            dizzy = motion.dizzy.value,
+                                            dizzyPhase = dizzyPhase
+                                        )
                                     }
-                                    val busy = maxOf(playAmt, chaseAmt)
-                                    val tail = ((tailSlow - 0.5f) * 2f) * (1f - busy) +
-                                        ((tailFast - 0.5f) * 2f) * busy
-                                    val dz = motion.dizzy.value
-                                    val pose = CatPose(
-                                        face = face,
-                                        blink = motion.blink.value,
-                                        ear = motion.ear.value,
-                                        tail = tail,
-                                        mouth = maxOf(talk * speakAmt, reach * 0.7f, scare * 0.45f, dz * 0.35f),
-                                        paw = maxOf(reach, swat * playAmt, offerAmt * 0.75f, motion.grab.value),
-                                        lookX = ((bob - 0.5f) * 0.8f * (1f - playAmt) + (swat - 0.5f) * 2f * playAmt) *
-                                            (1f - chaseAmt) + chaseAmt,
-                                        lookY = -0.8f * playAmt + scare * 0.4f + chaseAmt * 0.7f,
-                                        scare = scare,
-                                        happy = happyAmt,
-                                        wiggle = (bob - 0.5f) * 2f * (1f + busy),
-                                        yarn = primary,
-                                        dizzy = dz,
-                                        spin = dizzyPhase,
-                                        ballOff = if (motion.ballLost) 1f else 0f,
-                                        ballX = (motion.ballWX.value - motion.offX.value) / u1,
-                                        ballY = (motion.ballWY.value - motion.offY.value) / u1,
-                                        ballSpin = motion.ballSpin.value
+                                } else {
+                                    Surface(
+                                        modifier = Modifier.matchParentSize(),
+                                        shape = AvatarShape,
+                                        color = surfaceColor,
+                                        border = BorderStroke(1.5.dp, primary),
+                                        shadowElevation = 10.dp,
+                                        content = {}
                                     )
-                                    drawCat(pose)
+
+                                    Canvas(modifier = Modifier.matchParentSize()) {
+                                        val u1 = 1.dp.toPx()
+                                        // وقتی کاموا از کنارش قل می‌خوره، پنجه‌اش بالا میاد
+                                        var reach = 0f
+                                        motion.menuProg.forEach { m ->
+                                            val v = m.value
+                                            if (v > 0f && v < 0.45f) {
+                                                val r = sin(Math.PI * v / 0.45).toFloat()
+                                                if (r > reach) reach = r
+                                            }
+                                        }
+                                        val busy = maxOf(playAmt, chaseAmt)
+                                        val tail = ((tailSlow - 0.5f) * 2f) * (1f - busy) +
+                                            ((tailFast - 0.5f) * 2f) * busy
+                                        val dz = motion.dizzy.value
+                                        val pose = CatPose(
+                                            face = face,
+                                            blink = motion.blink.value,
+                                            ear = motion.ear.value,
+                                            tail = tail,
+                                            mouth = maxOf(talk * speakAmt, reach * 0.7f, scare * 0.45f, dz * 0.35f),
+                                            paw = maxOf(reach, swat * playAmt, offerAmt * 0.75f, motion.grab.value),
+                                            lookX = ((bob - 0.5f) * 0.8f * (1f - playAmt) + (swat - 0.5f) * 2f * playAmt) *
+                                                (1f - chaseAmt) + chaseAmt,
+                                            lookY = -0.8f * playAmt + scare * 0.4f + chaseAmt * 0.7f,
+                                            scare = scare,
+                                            happy = happyAmt,
+                                            wiggle = (bob - 0.5f) * 2f * (1f + busy),
+                                            yarn = primary,
+                                            dizzy = dz,
+                                            spin = dizzyPhase,
+                                            ballOff = if (motion.ballLost) 1f else 0f,
+                                            ballX = (motion.ballWX.value - motion.offX.value) / u1,
+                                            ballY = (motion.ballWY.value - motion.offY.value) / u1,
+                                            ballSpin = motion.ballSpin.value
+                                        )
+                                        drawCat(pose)
+                                    }
                                 }
                             }
                         }
