@@ -15,6 +15,11 @@ import kotlin.math.abs
 internal class AvatarMotion {
     val offX = Animatable(0f)
     val offY = Animatable(0f)
+
+    init {
+        // فقط گربه‌ی داخل اپ (نه پاپیِ بیرونی که اپ توی پس‌زمینه‌ست) جای پشتیبان رو مشخص می‌کنه
+        if (com.appdony.app.util.AppForeground.inForeground.value) AssistantSlot.motion = this
+    }
     val hideShift = Animatable(0f)
     val tilt = Animatable(0f)
 
