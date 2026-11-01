@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 35
         // نسخه: زیربنا.قابلیت‌ها.دیباگ‌ها (فقط همین خط رو عوض کن؛ کد نسخه خودش از روی اون ساخته می‌شه)
-        versionName = "2.39.77"
+        versionName = "2.39.78"
         versionCode = versionName!!.split(".").let { (a, b, c) -> a.toInt() * 1_000_000 + b.toInt() * 1_000 + c.toInt() }
 
         // توکن هوش مصنوعی از متغیر محیطی AI_KEY (GitHub Secret) یا از local.properties می‌آد؛ توی ریپو نمی‌مونه
@@ -35,6 +35,8 @@ android {
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+            // فقط برای تست توی امولاتور گیت‌هاب (gradlew -PemuAbi=1)؛ APK ریلیز واقعی x86 نداره
+            if (project.hasProperty("emuAbi")) abiFilters.add("x86_64")
         }
     }
 
