@@ -5,6 +5,7 @@ set +e
 OUT=crash-logs
 mkdir -p "$OUT"
 PKG=com.appdony.app
+APK=apk/app-release-emu.apk
 
 adb logcat -c
 # لاگ زنده از همون ابتدا (حتی اگه اپ وسط کار بمیره، همه‌چیز ثبت شده)
@@ -12,7 +13,7 @@ adb logcat -v threadtime > "$OUT/logcat_live.txt" 2>&1 &
 LOGPID=$!
 
 echo "== install" | tee "$OUT/steps.txt"
-timeout 180 adb install -r apk/app-release.apk >> "$OUT/steps.txt" 2>&1
+timeout 180 adb install -r "$APK" >> "$OUT/steps.txt" 2>&1
 echo "install exit=$?" >> "$OUT/steps.txt"
 
 echo "== launch" >> "$OUT/steps.txt"
@@ -35,7 +36,8 @@ sleep 3
 kill $LOGPID 2>/dev/null
 timeout 60 adb logcat -d > "$OUT/logcat_full.txt" 2>&1
 timeout 60 adb logcat -d -b crash > "$OUT/logcat_crash.txt" 2>&1
-timeout 60 adb logcat -d -s AndroidRuntime:E ActivityManager:E DEBUG:F > "$OUT/logcat_errors.txt" 2>&1
+# فقط خطاهای خود اپ (نویزهای سیستم امولاتور مثل managedprovisioning حذف می‌شن)
+grep -E "AndroidRuntime|FATAL EXCEPTION|com\.appdony\.app" "$OUT/logcat_full.txt" | grep -E " E | F " > "$OUT/logcat_errors.txt" 2>&1
 timeout 60 adb shell dumpsys activity exit-info $PKG > "$OUT/exit-info.txt" 2>&1
 adb shell pidof $PKG > "$OUT/pid.txt" 2>&1
 timeout 30 adb exec-out screencap -p > "$OUT/screenshot.png" 2>/dev/null
