@@ -16,7 +16,7 @@ jobs:
   build:
     name: Build & Release
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.2.2
@@ -58,6 +58,26 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew assembleRelease --stacktrace 2>&1 | tee build-log.txt
+          mkdir -p dist dist-mapping
+          cp app/build/outputs/apk/release/app-release.apk dist/app-release.apk
+          cp -r app/build/outputs/mapping/release/. dist-mapping/ || true
+
+      # APK جدا فقط برای امولاتور (x86_64 هم داخلشه)؛ ریلیز واقعی همون APK بالاست
+      - name: Build Emulator APK
+        shell: bash
+        env:
+          KEYSTORE_FILE: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          AI_KEY: ${{ secrets.AI_KEY }}
+          SUPA_URL: ${{ secrets.SUPA_URL }}
+          SUPA_KEY: ${{ secrets.SUPA_KEY }}
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease -PemuAbi=1 --stacktrace 2>&1 | tee build-log-emu.txt
+          mkdir -p dist-emu
+          cp app/build/outputs/apk/release/app-release.apk dist-emu/app-release-emu.apk
 
       - name: Cleanup Keystore
         if: always()
@@ -70,7 +90,8 @@ jobs:
           name: build-logs
           path: |
             build-log.txt
-            app/build/outputs/mapping/release/**
+            build-log-emu.txt
+            dist-mapping/**
           retention-days: 14
           if-no-files-found: warn
 
@@ -86,7 +107,7 @@ jobs:
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
           body: "نسخه جدید اپدونی با آخرین تغییرات و بهینه‌سازی‌ها."
-          files: app/build/outputs/apk/release/app-release.apk
+          files: dist/app-release.apk
           draft: false
           prerelease: false
 
@@ -94,8 +115,16 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: appdony-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: dist/app-release.apk
           retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload Emulator APK Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: appdony-emulator-apk
+          path: dist-emu/app-release-emu.apk
+          retention-days: 3
           if-no-files-found: error
 
   crash-test:
@@ -107,10 +136,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.2.2
 
-      - name: Download APK
+      - name: Download Emulator APK
         uses: actions/download-artifact@v4
         with:
-          name: appdony-release-apk
+          name: appdony-emulator-apk
           path: apk
 
       - name: Enable KVM
