@@ -58,7 +58,7 @@ import com.appdony.app.ui.theme.AppdonyTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val CardWidth = 150.dp
+private val CardWidth = 122.dp
 
 /** اندروید مورد نیاز و نسخه‌ی پست؛ اگه قبلاً حساب شده باشه فوراً میاد، وگرنه پشت صحنه حساب می‌شه */
 @Composable
@@ -109,10 +109,10 @@ fun AppCard(
     val sizing = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(CardWidth)
 
     Column(
-        modifier = modifier.then(sizing).appdonyCard().clickable { onClick() }.padding(8.dp),
+        modifier = modifier.then(sizing).appdonyCard().clickable { onClick() }.padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(18.dp))) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp))) {
             SubcomposeAsyncImage(
                 model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
@@ -126,22 +126,22 @@ fun AppCard(
             if (isNew) NewBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = title, color = AppdonyTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            text = title, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            lineHeight = 18.sp, modifier = Modifier.fillMaxWidth()
+            lineHeight = 16.sp, modifier = Modifier.fillMaxWidth()
         )
 
         if (!category.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             NavChip(text = category)
         }
 
         if (androidReq != null || version != null) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -157,10 +157,10 @@ fun AppCard(
 @Composable
 private fun MetaItem(icon: ImageVector, text: String, tint: androidx.compose.ui.graphics.Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(12.dp))
         Spacer(modifier = Modifier.width(3.dp))
         Text(
-            text = text, color = AppdonyTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+            text = text, color = AppdonyTextMuted, fontSize = 10.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = TextStyle(textDirection = TextDirection.Ltr)
         )
