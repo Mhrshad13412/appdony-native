@@ -3,6 +3,7 @@ package com.appdony.app.data.repository
 import android.text.Html
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Post
+import com.appdony.app.util.LatestOnly
 
 data class HomeSection(
     val id: Int,
@@ -65,30 +66,33 @@ class HomeRepository {
 
     suspend fun loadFeatured(rootId: Int?): List<Post> {
         val posts = if (rootId != null) {
-            api.getPostsByCategory(categoryId = rootId, perPage = 14)
+            api.getPostsByCategory(categoryId = rootId, perPage = 30)
         } else {
-            api.getPosts(perPage = 14)
+            api.getPosts(perPage = 30)
         }
-        return posts.filterNot(::isPlusPost).take(8)
+        // از هر اپ فقط یک کارت (آخرین نسخه)
+        return LatestOnly.latestPerApp(posts.filterNot(::isPlusPost)).take(8)
     }
 
     /** بلاک «اپدونی پلاس»: فقط پست‌های دسته‌ی مخصوص همون تب */
     suspend fun loadPlus(isGames: Boolean): List<Post> {
         val id = if (isGames) PLUS_GAMES_ID else PLUS_APPS_ID
-        return api.getPostsByCategory(categoryId = id, perPage = 10)
+        return LatestOnly.latestPerApp(api.getPostsByCategory(categoryId = id, perPage = 20)).take(10)
     }
 
     suspend fun loadSection(section: HomeSection, rootId: Int?): List<Post> {
         val root = rootId
         return if (section.filterByRoot && root != null) {
-            api.getPostsByCategory(categoryId = section.id, perPage = 40)
-                .filter { root in it.categories }
-                .filterNot(::isPlusPost)
-                .take(12)
+            LatestOnly.latestPerApp(
+                api.getPostsByCategory(categoryId = section.id, perPage = 60)
+                    .filter { root in it.categories }
+                    .filterNot(::isPlusPost)
+            ).take(12)
         } else {
-            api.getPostsByCategory(categoryId = section.id, perPage = 16)
-                .filterNot(::isPlusPost)
-                .take(12)
+            LatestOnly.latestPerApp(
+                api.getPostsByCategory(categoryId = section.id, perPage = 40)
+                    .filterNot(::isPlusPost)
+            ).take(12)
         }
     }
 
