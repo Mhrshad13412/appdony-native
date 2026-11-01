@@ -78,6 +78,9 @@ import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppGuide
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
+import com.appdony.app.ui.components.SupportFloating
+import com.appdony.app.ui.components.SupportPhase
+import com.appdony.app.ui.components.SupportPresence
 import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.SplashScreen
@@ -400,15 +403,24 @@ fun MainContent(
         }
 
         // دکتر طاعون روی کل اپ (همه‌ی صفحه‌ها)، جز صفحه‌ی خود چت
+        LaunchedEffect(showAiAssistant) {
+            if (!showAiAssistant) SupportPresence.reset()
+        }
         if (showAiAssistant) {
+            val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support")
             FloatingAssistant(
                 currentRoute = currentRoute,
-                visible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support"),
+                // وقتی پشتیبان جای گربه نشسته، گربه قایمه
+                visible = assistantVisible && SupportPresence.phase == SupportPhase.OFF,
                 bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
                 onSearchClick = openSearch,
                 onDownloadsClick = { navController.navigateToTab("downloads") },
                 onHelpClick = { navController.navigateToTab("blog") },
                 onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
+            )
+            SupportFloating(
+                visible = assistantVisible,
+                onOpenSupport = { navController.navigate("support") { launchSingleTop = true } }
             )
         }
     }
