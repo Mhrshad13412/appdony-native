@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -53,46 +54,51 @@ class DetailViewModel(
                     Pair(HtmlParser.parseContent(rawHtml), HtmlParser.parsePostContent(rawHtml))
                 }
 
+                // اول محتوا نشون داده می‌شه؛ «مشابه‌ها» و لینک «نصب کردن» همزمان و جدا می‌آن
+                _state.value = DetailUiState.Success(
+                    post, if (isBlog) info else info.copy(linksChecked = false), emptyList(), blocks
+                )
+
                 val catId = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.id
-                val similar = if (!isBlog && catId != null) {
-                    repo.getPostsByCategory(catId, perPage = 8)
-                        .getOrNull()
-                        ?.filter { it.id != post.id }
-                        ?.take(6)
-                        ?: emptyList()
-                } else emptyList()
-
-                if (isBlog) {
-                    _state.value = DetailUiState.Success(post, info, similar, blocks)
-                    return@onSuccess
+                if (!isBlog && catId != null) {
+                    launch {
+                        val similar = repo.getPostsByCategory(catId, perPage = 8)
+                            .getOrNull()?.filter { it.id != post.id }?.take(6) ?: emptyList()
+                        _state.update { st -> (st as? DetailUiState.Success)?.copy(similar = similar) ?: st }
+                    }
                 }
+                if (isBlog) return@onSuccess
 
-                // اول محتوا نشون داده می‌شه، لینک «نصب کردن» از صفحه‌ی اصلی سایت جدا می‌آد
-                _state.value = DetailUiState.Success(post, info.copy(linksChecked = false), similar, blocks)
-
-                val found = InstallLinkFinder.find(post.id, post.link)
-                val current = _state.value as? DetailUiState.Success ?: return@onSuccess
-                found.onSuccess { r ->
-                    val all = (r.links + current.info.downloadLinks).distinctBy { it.url.ifBlank { "locked:" + it.title } }
-                    val real = all.filter { it.url.isNotBlank() }
-                    val locked = all.filter { it.url.isBlank() }
-                    // دکمه‌ی قفل فقط وقتی نشون داده می‌شه که لینک واقعی نداریم، یا اسم مشخص داره
-                    val merged = real + if (real.isEmpty()) locked else locked.filter { it.title != InstallLinkFinder.LOCKED_TITLE }
-                    _state.value = current.copy(
-                        info = current.info.copy(
-                            downloadLinks = merged,
-                            linksChecked = true,
-                            linkError = null,
-                            linkDebug = r.debug
+                launch {
+                    val found = InstallLinkFinder.find(post.id, post.link)
+                    _state.update { st ->
+                        val current = st as? DetailUiState.Success ?: return@update st
+                        found.fold(
+                            onSuccess = { r ->
+                                val all = (r.links + current.info.downloadLinks).distinctBy { it.url.ifBlank { "locked:" + it.title } }
+                                val real = all.filter { it.url.isNotBlank() }
+                                val locked = all.filter { it.url.isBlank() }
+                                // دکمه‌ی قفل فقط وقتی نشون داده می‌شه که لینک واقعی نداریم، یا اسم مشخص داره
+                                val merged = real + if (real.isEmpty()) locked else locked.filter { it.title != InstallLinkFinder.LOCKED_TITLE }
+                                current.copy(
+                                    info = current.info.copy(
+                                        downloadLinks = merged,
+                                        linksChecked = true,
+                                        linkError = null,
+                                        linkDebug = r.debug
+                                    )
+                                )
+                            },
+                            onFailure = { e ->
+                                current.copy(
+                                    info = current.info.copy(
+                                        linksChecked = true,
+                                        linkError = "اتصال به سایت برقرار نشد (${e.message ?: "خطا"})"
+                                    )
+                                )
+                            }
                         )
-                    )
-                }.onFailure { e ->
-                    _state.value = current.copy(
-                        info = current.info.copy(
-                            linksChecked = true,
-                            linkError = "اتصال به سایت برقرار نشد (${e.message ?: "خطا"})"
-                        )
-                    )
+                    }
                 }
             }.onFailure {
                 _state.value = DetailUiState.Error(it.message ?: "خطا در دریافت اطلاعات")
