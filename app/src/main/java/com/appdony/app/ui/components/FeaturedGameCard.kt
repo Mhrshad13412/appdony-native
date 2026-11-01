@@ -222,11 +222,11 @@ fun FeaturedGameCard(
     val scheme = MaterialTheme.colorScheme
 
     // فضای خالی (بیشتر پایین) برای اینکه نور زیر کارت بریده نشه
-    Box(modifier = modifier.padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 32.dp)) {
+    Box(modifier = modifier.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 24.dp)) {
         Box(
             modifier = Modifier
-                .width(300.dp)
-                .height(200.dp)
+                .width(248.dp)
+                .height(148.dp)
                 .plusGlow()
                 .appdonyCard()
                 .plusShine()
@@ -254,7 +254,7 @@ fun FeaturedGameCard(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
-                            startY = 120f
+                            startY = 90f
                         )
                     )
             )
@@ -266,13 +266,13 @@ fun FeaturedGameCard(
             if (!category.isNullOrBlank()) {
                 PlusChip(
                     text = category,
-                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
                 )
             }
 
             // «جدید» (تا ۴ روز بعد از انتشار یا ویرایش)
             if (isNew) {
-                PlusNewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
+                PlusNewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
             }
 
             // پایین کارت: آیکن برنامه (سمت راست، چون اپ راست‌به‌چپه) + اسم بازی
@@ -280,15 +280,15 @@ fun FeaturedGameCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(13.dp))
                         .background(scheme.surface)
-                        .border(1.5.dp, GoldColor, RoundedCornerShape(16.dp))
+                        .border(1.5.dp, GoldColor, RoundedCornerShape(13.dp))
                 ) {
                     if (!iconUrl.isNullOrBlank()) {
                         AsyncImage(
@@ -304,11 +304,11 @@ fun FeaturedGameCard(
                     Text(
                         text = title,
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 20.sp
+                        lineHeight = 17.sp
                     )
                     if (androidReq != null || version != null) {
                         Spacer(modifier = Modifier.height(4.dp))
