@@ -63,6 +63,18 @@ import com.appdony.app.ui.theme.AppdonyTextPrimary
 import com.appdony.app.util.DownloadHelper
 import java.io.File
 import java.util.Locale
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 
 private val StatusGreen = Color(0xFF34C77B)
 private val StatusYellow = Color(0xFFFFC53D)
@@ -137,34 +149,67 @@ private fun PillButton(text: String, icon: ImageVector?, color: Color, onClick: 
     }
 }
 
-// آیکون برنامه با حلقه‌ی پیشرفت دورش (مثل گوگل‌پلی)
+// نوار پیشرفتِ مربعیِ گرد‌گوشه دور آیکون (progress == null یعنی نامشخص)
+@Composable
+private fun SquircleProgress(progress: Float?, color: Color, track: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "sq")
+    val spin by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "spin"
+    )
+    Canvas(modifier = modifier) {
+        val stroke = 3.dp.toPx()
+        val half = stroke / 2f
+        val rect = RoundRect(
+            left = half, top = half, right = size.width - half, bottom = size.height - half,
+            cornerRadius = CornerRadius(18.dp.toPx())
+        )
+        val path = Path().apply { addRoundRect(rect) }
+        val measure = PathMeasure().apply { setPath(path, false) }
+        val len = measure.length
+        val style = Stroke(width = stroke, cap = StrokeCap.Round)
+        drawPath(path, track, style = style)
+        val seg = Path()
+        if (progress != null) {
+            val p = progress.coerceIn(0f, 1f)
+            if (p > 0f) {
+                measure.getSegment(0f, len * p, seg, true)
+                drawPath(seg, color, style = style)
+            }
+        } else {
+            val from = len * spin
+            val to = from + len * 0.28f
+            if (to <= len) {
+                measure.getSegment(from, to, seg, true)
+            } else {
+                measure.getSegment(from, len, seg, true)
+                measure.getSegment(0f, to - len, seg, true)
+            }
+            drawPath(seg, color, style = style)
+        }
+    }
+}
+
+// آیکون برنامه با نوار پیشرفت مربعیِ گرد‌گوشه دورش
 @Composable
 private fun IconWithRing(item: DownloadItem, done: Boolean, failed: Boolean) {
     val primary = MaterialTheme.colorScheme.primary
-    Box(modifier = Modifier.size(66.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.size(62.dp), contentAlignment = Alignment.Center) {
         when {
-            done -> CircularProgressIndicator(
-                progress = { 1f }, modifier = Modifier.fillMaxSize(),
-                color = StatusGreen, trackColor = StatusGreen.copy(alpha = 0.18f), strokeWidth = 3.dp
+            done -> SquircleProgress(1f, StatusGreen, StatusGreen.copy(alpha = 0.18f), Modifier.fillMaxSize())
+            failed -> SquircleProgress(
+                if (item.total > 0) item.progress / 100f else 0f,
+                StatusYellow, StatusYellow.copy(alpha = 0.22f), Modifier.fillMaxSize()
             )
-            failed -> CircularProgressIndicator(
-                progress = { if (item.total > 0) item.progress / 100f else 0f },
-                modifier = Modifier.fillMaxSize(),
-                color = StatusYellow, trackColor = StatusYellow.copy(alpha = 0.22f), strokeWidth = 3.dp
+            item.total > 0 && item.status == DownloadManager.STATUS_RUNNING -> SquircleProgress(
+                item.progress / 100f, primary, primary.copy(alpha = 0.18f), Modifier.fillMaxSize()
             )
-            item.total > 0 && item.status == DownloadManager.STATUS_RUNNING -> CircularProgressIndicator(
-                progress = { item.progress / 100f }, modifier = Modifier.fillMaxSize(),
-                color = primary, trackColor = primary.copy(alpha = 0.18f), strokeWidth = 3.dp
-            )
-            else -> CircularProgressIndicator(
-                modifier = Modifier.fillMaxSize(), color = primary,
-                trackColor = primary.copy(alpha = 0.18f), strokeWidth = 3.dp
-            )
+            else -> SquircleProgress(null, primary, primary.copy(alpha = 0.18f), Modifier.fillMaxSize())
         }
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .size(48.dp)
+                .clip(RoundedCornerShape(13.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             if (!item.iconUrl.isNullOrBlank()) {
@@ -197,60 +242,55 @@ private fun DownloadCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shadowElevation = 6.dp
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconWithRing(item, done, failed)
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconWithRing(item, done, failed)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = AppdonyTextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (done || failed) {
+                        Icon(
+                            if (done) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = null, tint = statusColor, modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                    }
                     Text(
-                        text = item.title,
-                        color = AppdonyTextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = statusText(item),
+                        color = statusColor,
+                        fontSize = 12.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(5.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (done || failed) {
-                            Icon(
-                                if (done) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                contentDescription = null, tint = statusColor, modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(Modifier.width(5.dp))
-                        }
-                        Text(
-                            text = statusText(item),
-                            color = statusColor,
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                }
+                if (done || failed) {
+                    Spacer(Modifier.height(8.dp))
+                    if (done) {
+                        val isApk = item.fileName.lowercase().endsWith(".apk")
+                        PillButton(if (isApk) "نصب" else "باز کردن", null, primary, onOpen)
+                    } else {
+                        PillButton("تلاش دوباره", Icons.Default.Refresh, StatusYellow, onRetry)
                     }
                 }
             }
-
-            Spacer(Modifier.height(12.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (done) {
-                    val isApk = item.fileName.lowercase().endsWith(".apk")
-                    PillButton(if (isApk) "نصب" else "باز کردن", null, primary, onOpen)
-                }
-                if (failed) {
-                    PillButton("تلاش دوباره", Icons.Default.Refresh, StatusYellow, onRetry)
-                }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
-                }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AppdonyTextMuted)
             }
         }
     }
