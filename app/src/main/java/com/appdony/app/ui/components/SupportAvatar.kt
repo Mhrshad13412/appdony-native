@@ -50,7 +50,8 @@ fun SupportAvatar(
     modifier: Modifier = Modifier,
     sizeDp: Int = 56,
     talking: Boolean = false,
-    look: Float = 0f
+    look: Float = 0f,
+    ring: Float = -1f   // ۰ تا ۱ = تایمر روی بوردر (پاد‌ساعت‌گرد کم می‌شه)؛ منفی = بدون تایمر
 ) {
     val infinite = rememberInfiniteTransition(label = "support_avatar")
     val bob by infinite.animateFloat(
@@ -90,11 +91,25 @@ fun SupportAvatar(
             modifier = Modifier
                 .size(sizeDp.dp)
                 .clip(CircleShape)
-                .border(2.dp, primary, CircleShape)
+                .border(2.dp, if (ring >= 0f) Color.Transparent else primary, CircleShape)
         ) {
             val k = size.width / 100f
             withTransform({ scale(k, k, Offset.Zero) }) {
                 drawPerson(open = talkT * talkAmt, blink = blink.value, look = look)
+            }
+        }
+        // تایمر: خود بوردر آواتار؛ پر شروع می‌شه و پاد‌ساعت‌گرد خالی می‌شه
+        if (ring >= 0f) {
+            val ringColor = if (ring in 0.0001f..0.125f) Color(0xFFF5A623) else primary
+            Canvas(modifier = Modifier.size(sizeDp.dp)) {
+                val sw = 3.5.dp.toPx()
+                val d = size.minDimension - sw
+                val tl = Offset(sw / 2f, sw / 2f)
+                val sz = Size(d, d)
+                drawArc(ringColor.copy(alpha = 0.22f), -90f, 360f, false, tl, sz, style = Stroke(width = sw))
+                if (ring > 0f) {
+                    drawArc(ringColor, -90f, 360f * ring.coerceAtMost(1f), false, tl, sz, style = Stroke(width = sw, cap = StrokeCap.Round))
+                }
             }
         }
         // ذره‌بین روی همه‌چیز، بدون بریدگی
