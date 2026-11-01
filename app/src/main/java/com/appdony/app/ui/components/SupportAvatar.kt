@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -37,6 +37,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * آواتار پشتیبان، کاملاً نقاشی‌شده با کد (بدون عکس).
@@ -44,6 +47,8 @@ import kotlinx.coroutines.delay
  * - پلک می‌زنه
  * - موقع [talking] لب‌هاش باز و بسته می‌شه
  * - [look] از ۰ تا ۱: ذره‌بین میاد جلوی چشم، چشم‌ها نگاه می‌کنن و سرش کمی کج می‌شه
+ * - [dizzy] گیجی بعد از خوردن به دیوار: چشم‌های مارپیچ و ستاره دور سر
+ * رنگ‌هاش ثابته و به رنگ تم برنامه وابسته نیست.
  */
 @Composable
 fun SupportAvatar(
@@ -51,7 +56,9 @@ fun SupportAvatar(
     sizeDp: Int = 56,
     talking: Boolean = false,
     look: Float = 0f,
-    ring: Float = -1f   // ۰ تا ۱ = تایمر روی بوردر (پاد‌ساعت‌گرد کم می‌شه)؛ منفی = بدون تایمر
+    ring: Float = -1f,  // ۰ تا ۱ = تایمر روی بوردر (پاد‌ساعت‌گرد کم می‌شه)؛ منفی = بدون تایمر
+    dizzy: Float = 0f,  // گیجی بعد از خوردن به دیوار: چشم‌های مارپیچ و ستاره دور سر
+    dizzyPhase: Float = 0f // زاویه‌ی چرخش مارپیچ و ستاره‌ها (درجه)
 ) {
     val infinite = rememberInfiniteTransition(label = "support_avatar")
     val bob by infinite.animateFloat(
@@ -77,8 +84,6 @@ fun SupportAvatar(
         }
     }
 
-    val primary = MaterialTheme.colorScheme.primary
-
     Box(
         modifier = modifier
             .size(sizeDp.dp)
@@ -91,16 +96,16 @@ fun SupportAvatar(
             modifier = Modifier
                 .size(sizeDp.dp)
                 .clip(CircleShape)
-                .border(2.dp, if (ring >= 0f) Color.Transparent else primary, CircleShape)
+                .border(2.dp, if (ring >= 0f) Color.Transparent else SupportRing, CircleShape)
         ) {
             val k = size.width / 100f
             withTransform({ scale(k, k, Offset.Zero) }) {
-                drawPerson(open = talkT * talkAmt, blink = blink.value, look = look)
+                drawPerson(open = talkT * talkAmt, blink = blink.value, look = look, dizzy = dizzy, phase = dizzyPhase)
             }
         }
         // تایمر: خود بوردر آواتار؛ پر شروع می‌شه و پاد‌ساعت‌گرد خالی می‌شه
         if (ring >= 0f) {
-            val ringColor = if (ring in 0.0001f..0.125f) Color(0xFFF5A623) else primary
+            val ringColor = if (ring in 0.0001f..0.125f) SupportRingLow else SupportRing
             Canvas(modifier = Modifier.size(sizeDp.dp)) {
                 val sw = 3.5.dp.toPx()
                 val d = size.minDimension - sw
@@ -117,17 +122,22 @@ fun SupportAvatar(
             val k = size.width / 100f
             withTransform({ scale(k, k, Offset.Zero) }) {
                 drawMagnifier(look)
+                drawDizzyStars(dizzy, dizzyPhase)
             }
         }
     }
 }
+
+// رنگ‌های ثابت پشتیبان (به رنگ تم برنامه وابسته نیستن)
+private val SupportRing = Color(0xFFFFB300)
+private val SupportRingLow = Color(0xFFFF5A4D)
 
 private val SkinColor = Color(0xFFD9A683)
 private val SkinDark = Color(0xFFB98562)
 private val HairColor = Color(0xFF17110F)
 private val FrameColor = Color(0xFF4A3A2C)
 
-private fun DrawScope.drawPerson(open: Float, blink: Float, look: Float) {
+private fun DrawScope.drawPerson(open: Float, blink: Float, look: Float, dizzy: Float, phase: Float) {
     // ── پس‌زمینه: کوچه‌ی تاریک با نورهای رنگی
     drawRect(
         brush = Brush.verticalGradient(listOf(Color(0xFF4A3150), Color(0xFF1E1522)), startY = 0f, endY = 100f),
@@ -225,7 +235,9 @@ private fun DrawScope.drawPerson(open: Float, blink: Float, look: Float) {
         val cy = 46.5f
         val ry = 2.5f * (1f - blink * 0.92f)
         drawOval(Color(0xFFF3EAE2), Offset(cx - 3.6f, cy - ry), Size(7.2f, ry * 2f))
-        if (blink < 0.5f) {
+        if (dizzy > 0.25f) {
+            drawSpiral(Offset(cx, cy), phase * (if (cx < 50f) 1f else -1f), (dizzy * 1.6f).coerceIn(0f, 1f))
+        } else if (blink < 0.5f) {
             val ix = cx + look * 1.2f
             val iy = cy + look * 0.5f
             drawCircle(Color(0xFF4A3426), 1.95f, Offset(ix, iy))
@@ -327,4 +339,40 @@ private fun DrawScope.drawMagnifier(look: Float) {
         size = Size(r * 1.32f, r * 1.32f),
         style = Stroke(1.2f, cap = StrokeCap.Round)
     )
+}
+
+/** مارپیچ گیجی توی چشم */
+private fun DrawScope.drawSpiral(c: Offset, phaseDeg: Float, alpha: Float) {
+    val rot = Math.toRadians(phaseDeg.toDouble()).toFloat()
+    val path = Path()
+    var t = 0f
+    var first = true
+    while (t <= 11f) {
+        val r = 0.3f + t * 0.17f
+        val x = c.x + r * cos(rot + t)
+        val y = c.y + r * sin(rot + t)
+        if (first) { path.moveTo(x, y); first = false } else path.lineTo(x, y)
+        t += 0.35f
+    }
+    drawPath(path, Color(0xFF2A1A14).copy(alpha = alpha), style = Stroke(0.7f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
+
+/** ستاره‌هایی که دور سر می‌چرخن */
+private fun DrawScope.drawDizzyStars(dizzy: Float, phaseDeg: Float) {
+    if (dizzy < 0.05f) return
+    val a = (dizzy * 2f).coerceIn(0f, 1f)
+    val base = Math.toRadians(phaseDeg.toDouble()).toFloat()
+    for (i in 0..2) {
+        val ang = base + i * (2f * PI.toFloat() / 3f)
+        val x = 50f + 24f * cos(ang)
+        val y = 15f + 5f * sin(ang)
+        val s = 3.4f
+        val k = 0.9f
+        val star = Path().apply {
+            moveTo(x, y - s); lineTo(x + k, y - k); lineTo(x + s, y); lineTo(x + k, y + k)
+            lineTo(x, y + s); lineTo(x - k, y + k); lineTo(x - s, y); lineTo(x - k, y - k)
+            close()
+        }
+        drawPath(star, Color(0xFFFFD54F).copy(alpha = a))
+    }
 }
