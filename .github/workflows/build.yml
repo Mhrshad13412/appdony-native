@@ -102,8 +102,11 @@ jobs:
     name: Run APK on Emulator
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.2.2
+
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
@@ -119,25 +122,41 @@ jobs:
       - name: Prepare log folder
         run: mkdir -p crash-logs
 
+      # اگه امولاتور بالا نیاد، همین‌جا ۲۲ دقیقه بعد قطع می‌شه و مرحله‌ی آپلود لاگ حتماً اجرا می‌شه
       - name: Install, launch and capture logs
+        timeout-minutes: 22
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 30
           arch: x86_64
-          target: google_apis
+          target: default
+          profile: pixel_3a
+          ram-size: 3072M
+          heap-size: 512M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: |
-            adb logcat -c
-            adb install -r apk/app-release.apk
-            adb shell am start -W -n com.appdony.app/.MainActivity
-            sleep 30
-            adb logcat -d > crash-logs/logcat_full.txt
-            adb logcat -d -b crash > crash-logs/logcat_crash.txt
-            adb shell dumpsys activity exit-info com.appdony.app > crash-logs/exit-info.txt
-            adb shell pidof com.appdony.app > crash-logs/pid.txt || true
-            adb exec-out screencap -p > crash-logs/screenshot.png
+          force-avd-creation: false
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-snapshot -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back none -camera-front none
+          script: bash .github/scripts/emu-test.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Emulator steps" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f crash-logs/steps.txt ]; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat crash-logs/steps.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Emulator did not boot, no logs were produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -s crash-logs/logcat_errors.txt ]; then
+            echo "### Errors" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 60 crash-logs/logcat_errors.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload Crash Logs
         if: always()
