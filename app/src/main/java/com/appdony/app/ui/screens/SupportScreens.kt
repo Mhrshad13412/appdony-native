@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,6 +46,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +60,7 @@ import com.appdony.app.data.api.SupportApi
 import com.appdony.app.data.api.SupportMessage
 import com.appdony.app.ui.components.CatAvatar
 import com.appdony.app.ui.components.SupportAvatar
+import com.appdony.app.ui.components.SupportPresence
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -136,6 +139,12 @@ fun SupportChatScreen(
             delay(1000)
             remaining--
         }
+    }
+
+    // ── وقتی کاربر از چت میاد بیرون، پشتیبان ۲ دقیقه جای گربه می‌شینه (انیمیشن عصا توی صفحه‌ی اصلی)
+    val idleNow by rememberUpdatedState(idle)
+    DisposableEffect(asAdmin) {
+        onDispose { if (!asAdmin && !idleNow) SupportPresence.activate() }
     }
 
     // ── حرف زدن هر ۱۰ ثانیه + نگاه با ذره‌بین
@@ -220,7 +229,7 @@ fun SupportChatScreen(
                     }
                 } else {
                     Box(modifier = Modifier.offset(y = (slide.value * 70f).dp)) {
-                        SupportAvatar(sizeDp = 54, talking = talking, look = look.value)
+                        SupportAvatar(sizeDp = 54, talking = talking, look = look.value, ring = remaining / IDLE_SECONDS.toFloat())
                     }
                     Box(
                         modifier = Modifier
@@ -250,7 +259,6 @@ fun SupportChatScreen(
                 )
             }
 
-            if (!asAdmin) IdleTimer(remaining = remaining, total = IDLE_SECONDS)
         }
 
         // ── حباب حرف پشتیبان
@@ -341,38 +349,6 @@ fun SupportChatScreen(
                 )
             }
         }
-    }
-}
-
-/** تایمر گرد: حلقه‌ی پیشرفت + زمان باقی‌مونده (mm:ss) */
-@Composable
-private fun IdleTimer(remaining: Int, total: Int) {
-    val primary = MaterialTheme.colorScheme.primary
-    val low = remaining in 1..15
-    val color = if (remaining <= 0) MaterialTheme.colorScheme.onSurfaceVariant else if (low) Color(0xFFF5A623) else primary
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(26.dp)) {
-            CircularProgressIndicator(
-                progress = { remaining.coerceAtLeast(0) / total.toFloat() },
-                modifier = Modifier.size(26.dp),
-                color = color,
-                trackColor = color.copy(alpha = 0.18f),
-                strokeWidth = 3.dp
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "%d:%02d".format(remaining.coerceAtLeast(0) / 60, remaining.coerceAtLeast(0) % 60),
-            color = color,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
