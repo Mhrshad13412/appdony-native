@@ -108,8 +108,11 @@ fun SupportChatScreen(
             .onSuccess { new ->
                 error = null
                 if (new.isNotEmpty()) {
-                    messages = messages + new
-                    lastId = new.last().id
+                    // refresh هم از حلقه و هم بعد از ارسال صدا زده می‌شه؛ پیام تکراری نباید وارد لیست شه
+                    val known = messages.mapTo(HashSet()) { it.id }
+                    val fresh = new.filter { known.add(it.id) }
+                    if (fresh.isNotEmpty()) messages = messages + fresh
+                    lastId = maxOf(lastId, new.maxOf { it.id })
                 }
             }
             .onFailure { error = it.message }
@@ -301,7 +304,7 @@ fun SupportChatScreen(
                     )
                 }
             }
-            items(messages, key = { it.id }) { msg ->
+            items(messages.distinctBy { it.id }, key = { it.id }) { msg ->
                 val mine = if (asAdmin) msg.sender == "support" else msg.sender == "user"
                 SupportBubble(msg.body, mine)
             }
@@ -460,7 +463,7 @@ fun SupportAdminScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(list, key = { it.thread }) { row ->
+                items(list.distinctBy { it.thread }, key = { it.thread }) { row ->
                     val primary = MaterialTheme.colorScheme.primary
                     Row(
                         modifier = Modifier
