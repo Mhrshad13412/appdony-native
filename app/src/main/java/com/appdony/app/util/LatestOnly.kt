@@ -5,7 +5,7 @@ import com.appdony.app.data.model.cleanTitle
 import java.net.URLDecoder
 
 /**
- * از هر اپ/بازی فقط جدیدترین پست (بر اساس تاریخ انتشار یا ویرایش) رو نگه می‌داره.
+ * از هر اپ/بازی فقط یک پست رو نگه می‌داره: بالاترین نسخه، و اگه نسخه نداشتن جدیدترین تاریخ (انتشار یا ویرایش).
  * هم‌اپ بودن از روی «اسکلت صامت» اسم تشخیص داده می‌شه، پس فارسی و انگلیسی یکی حساب می‌شن:
  * ماینکرافت = Minecraft = MNKRFT
  */
@@ -143,6 +143,37 @@ object LatestOnly {
 
     private fun stamp(p: Post): String = maxOf(p.date ?: "", p.modified ?: "")
 
+    private val dottedVersion = Regex("""(?<![\d.])v?(\d+(?:\.\d+)+)""")
+    private val shortVersion = Regex("""(?<![\w.])v(\d+)(?![\w])""")
+
+    /** شماره‌ی نسخه از روی عنوان (مثل 29.2.4 یا v41)؛ اگه نداشت null */
+    private fun version(p: Post): List<Int>? {
+        val t = normalizeDigits(p.cleanTitle().lowercase())
+        val m = dottedVersion.find(t)?.groupValues?.get(1) ?: shortVersion.find(t)?.groupValues?.get(1)
+        ?: return null
+        return m.split('.').map { it.toIntOrNull() ?: 0 }
+    }
+
+    private fun compareVersions(a: List<Int>, b: List<Int>): Int {
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val x = a.getOrElse(i) { 0 }
+            val y = b.getOrElse(i) { 0 }
+            if (x != y) return x.compareTo(y)
+        }
+        return 0
+    }
+
+    /** a از b بهتره؟ اگه هر دو نسخه دارن، نسخه‌ی بالاتر؛ وگرنه (یا نسخه‌ی مساوی) تاریخ جدیدتر */
+    private fun better(a: Post, b: Post): Boolean {
+        val va = version(a)
+        val vb = version(b)
+        if (va != null && vb != null) {
+            val c = compareVersions(va, vb)
+            if (c != 0) return c > 0
+        }
+        return stamp(a) > stamp(b)
+    }
+
     private class Cluster(val keys: MutableList<String>, val members: MutableList<Post>)
 
     fun latestPerApp(posts: List<Post>): List<Post> {
@@ -157,7 +188,7 @@ object LatestOnly {
                 hit.members.add(p)
             }
         }
-        // از هر گروه جدیدترین پست؛ جای گروه توی لیست همون جای اولین نتیجه‌ی خودش می‌مونه
-        return clusters.map { c -> c.members.maxByOrNull { stamp(it) } ?: c.members.first() }
+        // از هر گروه بهترین پست (بالاترین نسخه، بعد جدیدترین تاریخ)؛ جای گروه همون جای اولین نتیجه‌ی خودش می‌مونه
+        return clusters.map { c -> c.members.reduce { best, p -> if (better(p, best)) p else best } }
     }
 }
