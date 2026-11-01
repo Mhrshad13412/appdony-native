@@ -33,9 +33,9 @@ object InstallLinkFinder {
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .writeTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .protocols(listOf(Protocol.HTTP_1_1))
             .followRedirects(true)
             .build()
@@ -72,12 +72,19 @@ object InstallLinkFinder {
     // هر آدرس http توی متن خام صفحه (اسکریپت، data-attribute، ورودی مخفی و ...)
     private val URL_RAW = Regex("https?://[^\\s\"'<>\\\\]+")
 
+    // نتیجه‌ی موفق ۱۰ دقیقه توی حافظه می‌مونه؛ باز کردن دوباره‌ی همون صفحه فوریه
+    private const val CACHE_MS = 10L * 60 * 1000
+    private val memo = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, FindResult>>()
+
     suspend fun find(postId: Int, postLink: String?): Result<FindResult> =
         withContext(Dispatchers.IO) {
+            memo[postId]?.let { (t, r) ->
+                if (System.currentTimeMillis() - t < CACHE_MS) return@withContext Result.success(r)
+            }
             runCatching {
                 val valid = postLink != null && postLink.toHttpUrlOrNull() != null
                 val pageUrl = if (valid) postLink!! else SITE + "?p=" + postId
-                parse(fetch(pageUrl), pageUrl)
+                parse(fetch(pageUrl), pageUrl).also { memo[postId] = System.currentTimeMillis() to it }
             }.onFailure { e ->
                 if (e is CancellationException) throw e
             }
