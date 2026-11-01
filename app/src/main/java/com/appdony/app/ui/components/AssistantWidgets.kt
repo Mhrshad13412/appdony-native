@@ -25,6 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,10 +49,11 @@ internal fun SpeechBubble(
     say: AssistantSay,
     onRight: Boolean,
     lowerHalf: Boolean,
+    neutral: Boolean = false,   // پشتیبان: رنگ ثابت طلایی، نه رنگ تم
     onClick: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val accent = kindColor(say.kind, primary)
+    val accent = kindColor(say.kind, if (neutral) GoldColor else primary)
     val big = 18.dp
     val small = 6.dp
     val shape = AbsoluteRoundedCornerShape(
@@ -153,6 +158,97 @@ internal fun YarnButton(
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, primary.copy(alpha = 0.45f)),
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
+    }
+}
+
+/** یه سکه‌ی طلایی که آیکن و اسم هر گزینه روشه (جای کاموا، برای پشتیبان) */
+@Composable
+internal fun CoinButton(
+    icon: ImageVector,
+    label: String,
+    progress: () -> Float,
+    turn: () -> Float,      // زاویه‌ی چرخش سکه موقع اومدن؛ آخرش صفره
+    bob: () -> Float,
+    flip: Float,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .graphicsLayer {
+                val p = progress()
+                alpha = (p * 3f).coerceIn(0f, 1f)
+                val s = 0.35f + 0.65f * p
+                scaleX = s
+                scaleY = s
+                val wave = (bob() - 0.5f) * 2f
+                translationY = wave * 3.dp.toPx() * flip
+                rotationZ = wave * 4f * flip
+            }
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .graphicsLayer {
+                    rotationY = turn()
+                    cameraDistance = 14f * density
+                }
+                .drawBehind {
+                    val r = size.minDimension / 2f - 2.dp.toPx()
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    // لبه‌ی سکه
+                    drawCircle(Color(0xFFB77700), r, c)
+                    // رو‌ی سکه
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(Color(0xFFFFE082), Color(0xFFFFB300)),
+                            center = Offset(c.x - r * 0.25f, c.y - r * 0.3f),
+                            radius = r * 1.3f
+                        ),
+                        radius = r * 0.88f,
+                        center = c
+                    )
+                    // حلقه‌ی نازک داخل سکه
+                    drawCircle(Color(0xFFB77700).copy(alpha = 0.55f), r * 0.72f, c, style = Stroke(1.2.dp.toPx()))
+                    // برق سکه
+                    drawArc(
+                        color = Color.White.copy(alpha = 0.55f),
+                        startAngle = 200f,
+                        sweepAngle = 50f,
+                        useCenter = false,
+                        topLeft = Offset(c.x - r * 0.8f, c.y - r * 0.8f),
+                        size = Size(r * 1.6f, r * 1.6f),
+                        style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = Color(0xFF5A3A00),
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Rtl {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, GoldColor.copy(alpha = 0.6f)),
                 shadowElevation = 4.dp
             ) {
                 Text(
