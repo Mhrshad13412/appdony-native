@@ -66,9 +66,9 @@ class HomeRepository {
 
     suspend fun loadFeatured(rootId: Int?): List<Post> {
         val posts = if (rootId != null) {
-            api.getPostsByCategory(categoryId = rootId, perPage = 30)
+            api.getPostsByCategory(categoryId = rootId, perPage = 20)
         } else {
-            api.getPosts(perPage = 30)
+            api.getPosts(perPage = 20)
         }
         // از هر اپ فقط یک کارت (آخرین نسخه)
         return LatestOnly.latestPerApp(posts.filterNot(::isPlusPost)).take(8)
@@ -84,13 +84,13 @@ class HomeRepository {
         val root = rootId
         return if (section.filterByRoot && root != null) {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 60)
+                api.getPostsByCategory(categoryId = section.id, perPage = 30)
                     .filter { root in it.categories }
                     .filterNot(::isPlusPost)
             ).take(12)
         } else {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 40)
+                api.getPostsByCategory(categoryId = section.id, perPage = 20)
                     .filterNot(::isPlusPost)
             ).take(12)
         }
