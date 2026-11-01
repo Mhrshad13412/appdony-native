@@ -25,7 +25,9 @@ class AppdonyApp : Application(), ImageLoaderFactory {
         return ImageLoader.Builder(this)
             .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.25).build() }
             .diskCache { DiskCache.Builder().directory(cacheDir.resolve("image_cache")).maxSizeBytes(100L * 1024 * 1024).build() }
-            .crossfade(true)
+            .okHttpClient { ApiClient.imageClient() }
+            .allowRgb565(true) // حافظه‌ی کمتر و دیکد سریع‌تر؛ کیفیت کارت‌های کوچیک عملاً یکیه
+            .crossfade(150)
             .respectCacheHeaders(false)
             .build()
     }
