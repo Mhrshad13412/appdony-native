@@ -22,6 +22,18 @@ object AppForeground {
     private var startedCount = 0
     private var stoppedAt = 0L
 
+    /** بار اول، اجازه‌ی «نمایش روی سایر برنامه‌ها» رو می‌خواد تا پاپی همه‌جا کنار کاربر باشه */
+    private fun askOverlayPermissionOnce(activity: Activity) {
+        val prefs = activity.getSharedPreferences("cat_overlay", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("perm_asked", false)) return
+        if (!CatOverlayService.isEnabled(activity) || CatOverlayService.canDraw(activity)) return
+        prefs.edit().putBoolean("perm_asked", true).apply()
+        try {
+            activity.startActivity(CatOverlayService.permissionIntent(activity))
+        } catch (_: Exception) {
+        }
+    }
+
     fun install(app: Application) {
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) {
@@ -32,6 +44,7 @@ object AppForeground {
                 _inForeground.value = true
                 // اگه پاپیِ بیرونی روشنه، سرویسش همین‌جا (وقتی اپ جلوئه) بالا میاد
                 CatOverlayService.startIfEnabled(activity)
+                askOverlayPermissionOnce(activity)
             }
 
             override fun onActivityStopped(activity: Activity) {
