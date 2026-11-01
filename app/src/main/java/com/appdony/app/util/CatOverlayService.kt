@@ -113,6 +113,7 @@ import kotlin.math.roundToInt
 
 /**
  * پاپیِ بیرون از برنامه.
+ * پیش‌فرض خاموشه؛ فقط وقتی کاربر از تنظیمات روشنش کنه (و اجازه‌ی نمایش روی سایر برنامه‌ها رو بده) بالا میاد.
  * صرفه‌جویی باتری:
  *  - فقط وقتی صفحه روشنه و اپ جلوی کاربر نیست، پنجره وجود داره (وگرنه کلاً حذف می‌شه و هیچ انیمیشنی اجرا نمی‌شه)
  *  - بعد از ۱۵ ثانیه بی‌کاری می‌خوابه و همه‌ی حلقه‌های انیمیشن کامل متوقف می‌شن
@@ -131,8 +132,9 @@ class CatOverlayService : Service() {
         private const val NOTIF_ID = 4711
         const val ACTION_STOP = "com.appdony.app.CAT_STOP"
 
+        // پیش‌فرض خاموش: تا کاربر خودش روشن نکنه (و دسترسی نده) پاپی بیرونی بالا نمیاد
         fun isEnabled(c: Context): Boolean =
-            c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON, true)
+            c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON, false)
 
         fun canDraw(c: Context): Boolean =
             Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(c)
@@ -163,6 +165,8 @@ class CatOverlayService : Service() {
     private var owner: OverlayOwner? = null
     private var params: WindowManager.LayoutParams? = null
     private var attaching = false
+    private var chatOpen = false
+    private var chat: MiniChatWindow? = null
 
     private var screenOn = true
     private var lowBattery = false
@@ -245,6 +249,7 @@ class CatOverlayService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(receiver) }
+        closeChat()
         detach()
         scope.cancel()
         super.onDestroy()
@@ -282,9 +287,11 @@ class CatOverlayService : Service() {
     // ───────── نمایش / حذف پنجره ─────────
 
     private fun shouldShow() =
-        canDraw(this) && screenOn && !lowBattery && !AppForeground.inForeground.value
+        canDraw(this) && screenOn && !lowBattery && !AppForeground.inForeground.value && !chatOpen
 
     private fun refresh() {
+        // چت کوچیک فقط بیرون از برنامه و وقتی صفحه روشنه معنی داره
+        if (chatOpen && (AppForeground.inForeground.value || !screenOn || !canDraw(this))) closeChat()
         if (shouldShow()) {
             if (root == null && !attaching) {
                 attaching = true
@@ -315,7 +322,8 @@ class CatOverlayService : Service() {
                     dark = ts.mode == ThemeMode.DARK,
                     primaryColor = color,
                     onExpand = { onExpand(it) },
-                    onOpen = { openApp(it) }
+                    onOpen = { openApp(it) },
+                    onOpenChat = { openChat() }
                 )
             }
         }
@@ -443,6 +451,30 @@ class CatOverlayService : Service() {
         }
     }
 
+    // ───────── چت کوچیک شناور ─────────
+
+    private fun openChat() {
+        if (chatOpen || !canDraw(this)) return
+        chatOpen = true
+        detach() // گربه تا بسته شدن چت قایم می‌شه
+        scope.launch {
+            val ts = runCatching { ThemeManager(applicationContext).state.first() }
+                .getOrDefault(ThemeState())
+            if (!chatOpen) return@launch
+            val w = chat ?: MiniChatWindow(applicationContext, scope) {
+                // کاربر ✕ رو زد: چت بسته شد، گربه برگرده
+                chatOpen = false
+                refresh()
+            }.also { chat = it }
+            w.show(ts)
+        }
+    }
+
+    private fun closeChat() {
+        chatOpen = false
+        chat?.hide()
+    }
+
     private fun openApp(route: String?) {
         try {
             startActivity(
@@ -557,17 +589,23 @@ private fun OverlayCat(
     dark: Boolean,
     primaryColor: Long,
     onExpand: (Boolean) -> Unit,
-    onOpen: (String?) -> Unit
+    onOpen: (String?) -> Unit,
+    onOpenChat: () -> Unit
 ) {
     AppdonyTheme(darkTheme = dark, primaryColor = primaryColor) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            CatBody(ui, onExpand, onOpen)
+            CatBody(ui, onExpand, onOpen, onOpenChat)
         }
     }
 }
 
 @Composable
-private fun CatBody(ui: OverlayUi, onExpand: (Boolean) -> Unit, onOpen: (String?) -> Unit) {
+private fun CatBody(
+    ui: OverlayUi,
+    onExpand: (Boolean) -> Unit,
+    onOpen: (String?) -> Unit,
+    onOpenChat: () -> Unit
+) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val primary = MaterialTheme.colorScheme.primary
@@ -761,7 +799,8 @@ private fun CatBody(ui: OverlayUi, onExpand: (Boolean) -> Unit, onOpen: (String?
                             flip = if (i % 2 == 0) 1f else -1f,
                             onClick = {
                                 menuOpen = false
-                                onOpen(route)
+                                // «چت با من» همین‌جا توی پنجره‌ی کوچیک باز می‌شه، نه توی برنامه
+                                if (route == "ai_chat") onOpenChat() else onOpen(route)
                             }
                         )
                     }
