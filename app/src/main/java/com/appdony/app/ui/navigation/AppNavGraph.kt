@@ -174,14 +174,24 @@ fun AppNavGraph(
         composable("chat") {
             AiChatScreen(
                 onBack = { navController.popBackStack() },
-                onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") },
+                // چت هوش مصنوعی از پشته حذف می‌شه تا موقع برگشت از پشتیبانی یه‌راست بریم صفحه‌ی اصلی
+                onSupportClick = { admin ->
+                    navController.navigate(if (admin) "support_admin" else "support") {
+                        popUpTo("chat") { inclusive = true }
+                    }
+                },
                 onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }
             )
         }
         composable("ai_chat") {
             AiChatScreen(
                 onBack = { navController.popBackStack() },
-                onSupportClick = { admin -> navController.navigate(if (admin) "support_admin" else "support") },
+                // چت هوش مصنوعی از پشته حذف می‌شه تا موقع برگشت از پشتیبانی یه‌راست بریم صفحه‌ی اصلی
+                onSupportClick = { admin ->
+                    navController.navigate(if (admin) "support_admin" else "support") {
+                        popUpTo("ai_chat") { inclusive = true }
+                    }
+                },
                 onPostClick = { id -> navController.navigate("detail/$id?isBlog=false") }
             )
         }
