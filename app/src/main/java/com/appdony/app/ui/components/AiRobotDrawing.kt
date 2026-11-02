@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.appdony.app.ui.theme.AppdonyGreen
 
 // ───────────────────────── آیکن هوش مصنوعی اپدونی ─────────────────────────
-// ربات با هدفون. رنگ کادر و ربات از [CatPose.plate] و [CatPose.ink] می‌آد؛ پیش‌فرضشون سیاه‌وسفیده
-// (برای پاپیِ بیرونی)، ولی داخل اپ از رنگ تم پر می‌شن.
+// ربات با هدفون. رنگ‌ها از [CatPose.plate] و [CatPose.ink] می‌آن؛ اگه داده نشن،
+// از رنگ تم ([CatPose.yarn]) ساخته می‌شن، پس گربه‌ی شناور و پاپیِ بیرونی هم به رنگ تم درمیان.
 // اسم‌های CatPose و drawCat عمداً همون قبلی موندن تا FloatingAssistant، CatOverlayService
 // و SupportFloating دست نخورن؛ ولی چیزی که کشیده می‌شه فقط آیکن ربات هوش مصنوعیه.
 
@@ -31,7 +31,7 @@ internal class CatPose(
     val scare: Float,    // ترسیدن: چشم‌های درشت‌تر
     val happy: Float,    // چشم‌های خندون ^ ^
     val wiggle: Float,   // قدیمی؛ استفاده نمی‌شه
-    val yarn: Color = AppdonyGreen, // قدیمی؛ آیکن به رنگ تم وابسته نیست
+    val yarn: Color = AppdonyGreen, // رنگ تم؛ رنگ ربات و کادرش ازش ساخته می‌شه
     val fur: Color = catFurOf(yarn), // قدیمی؛ دیگه استفاده نمی‌شه
     val dizzy: Float = 0f,      // گیجی: چشم‌های مارپیچ و ستاره دور سر
     val spin: Float = 0f,       // زاویه‌ی چرخش مارپیچ و ستاره‌ها (درجه)
@@ -43,21 +43,21 @@ internal class CatPose(
     val waveT: Float = 0f,      // قدیمی؛ استفاده نمی‌شه
     val tilt: Float = 0f,       // کج شدن سر (‎-۱ تا ۱)
     val breath: Float = 0f,     // نفس کشیدن ۰ تا ۱
-    val plate: Color = RobotPlate, // رنگ کادر و صفحه‌ی صورت (باید مات باشه)
-    val ink: Color = RobotInk      // رنگ سر، گوشی‌ها و چشم‌ها
+    val plate: Color? = null,   // رنگ کادر و صفحه‌ی صورت (مات)؛ null = از yarn ساخته می‌شه
+    val ink: Color? = null      // رنگ سر، گوشی‌ها و چشم‌ها؛ null = همون yarn
 )
 
 internal fun catFurOf(theme: Color): Color = lerp(theme, Color.White, 0.30f)
 
-private val RobotPlate = Color(0xFF0B0B0C)
-private val RobotInk = Color(0xFFF4F4F4)
+/** پایه‌ی تیره‌ی کادر وقتی رنگ کادر جدا داده نشده؛ با کمی رنگ تم قاطی می‌شه */
+private val RobotPlateBase = Color(0xFF0E1114)
 
 /** آیکن ربات روی بوم ۶۰×۶۰ (واحد dp)؛ کادر، سر گرد، گوشی‌های دو طرف و دو چشم عمودی */
 internal fun DrawScope.drawCat(p: CatPose) {
     val u = 1.dp.toPx()
     val c = Offset(30f * u, 30f * u)
-    val plate = p.plate
-    val ink = p.ink
+    val ink = p.ink ?: p.yarn
+    val plate = p.plate ?: lerp(RobotPlateBase, p.yarn, 0.16f)
 
     drawRoundRect(plate, Offset.Zero, Size(60f * u, 60f * u), CornerRadius(24f * u))
 
