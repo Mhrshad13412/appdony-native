@@ -89,7 +89,6 @@ import com.appdony.app.MainActivity
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
-import com.appdony.app.ui.components.AssistantPhrases
 import com.appdony.app.ui.components.AvatarMotion
 import com.appdony.app.ui.components.AvatarShape
 import com.appdony.app.ui.components.AvatarSize
@@ -114,9 +113,10 @@ import kotlin.math.roundToInt
 /**
  * پاپیِ بیرون از برنامه.
  * پیش‌فرض خاموشه؛ فقط وقتی کاربر از تنظیمات روشنش کنه (و اجازه‌ی نمایش روی سایر برنامه‌ها رو بده) بالا میاد.
+ * بیرون از برنامه حرف نمی‌زنه؛ فقط خودش، دکمه‌های منو و «چت با من» رو داره.
  * صرفه‌جویی باتری:
  *  - فقط وقتی صفحه روشنه و اپ جلوی کاربر نیست، پنجره وجود داره (وگرنه کلاً حذف می‌شه و هیچ انیمیشنی اجرا نمی‌شه)
- *  - بعد از ۱۵ ثانیه بی‌کاری می‌خوابه و همه‌ی حلقه‌های انیمیشن کامل متوقف می‌شن
+ *  - بعد از ۱۵ ثانیه بی‌کاری می‌خوابه (تا نصفه می‌ره پشت لبه و کم‌رنگ می‌شه) و همه‌ی حلقه‌های انیمیشن کامل متوقف می‌شن
  *  - توی حالت «بهینه‌سازی باتری» و زیر ۱۵٪ شارژ، انیمیشن مداوم یا خود پاپی خاموشه
  *  - شبکه، wakelock و تایمر پس‌زمینه نداره
  */
@@ -173,6 +173,10 @@ class CatOverlayService : Service() {
     private var expandedWin = false
     private var catX = 0f
     private var catY = 0f
+
+    // وقتی پاپی خوابه، تا نصفه می‌ره پشت لبه‌ی صفحه (مثل داخل برنامه) و کم‌رنگ می‌شه
+    private var hideShift = 0f
+    private var hideAnim: ValueAnimator? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -322,6 +326,7 @@ class CatOverlayService : Service() {
                     dark = ts.mode == ThemeMode.DARK,
                     primaryColor = color,
                     onExpand = { onExpand(it) },
+                    onSleep = { onSleep(it) },
                     onOpen = { openApp(it) },
                     onOpenChat = { openChat() }
                 )
@@ -337,6 +342,7 @@ class CatOverlayService : Service() {
 
         frame.onDragStart = {
             ui.dragging = true
+            resetHide()
             ui.collapseSignal++
             if (expandedWin) {
                 expandedWin = false
@@ -363,6 +369,7 @@ class CatOverlayService : Service() {
             catPx + dp(16f), catPx + dp(16f), type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
@@ -380,6 +387,7 @@ class CatOverlayService : Service() {
         root = null
         params = null
         expandedWin = false
+        resetHide()
         owner?.destroy()
         owner = null
     }
@@ -403,7 +411,8 @@ class CatOverlayService : Service() {
         }
         lp.width = w
         lp.height = h
-        lp.x = xRaw.coerceIn(0, (screenW - w).coerceAtLeast(0))
+        lp.x = xRaw.coerceIn(0, (screenW - w).coerceAtLeast(0)) +
+            (if (expandedWin) 0 else hideShift.roundToInt())
         lp.y = yRaw.coerceIn(0, (screenH - h).coerceAtLeast(0))
         try {
             if (addIfNeeded) wm.addView(r, lp) else wm.updateViewLayout(r, lp)
@@ -418,9 +427,34 @@ class CatOverlayService : Service() {
     }
 
     private fun onExpand(expanded: Boolean) {
+        if (expanded) resetHide()
         if (expandedWin != expanded && root != null) {
             expandedWin = expanded
             applyLayout()
+        }
+    }
+
+    private fun resetHide() {
+        hideAnim?.cancel()
+        hideAnim = null
+        hideShift = 0f
+    }
+
+    /** خواب: آروم تا نصفه می‌ره پشت لبه‌ی نزدیک؛ بیداری: برمی‌گرده سر جاش */
+    private fun onSleep(asleep: Boolean) {
+        if (root == null) return
+        hideAnim?.cancel()
+        val side = if (ui.onRight) 1f else -1f
+        val target = if (asleep && !expandedWin && !ui.dragging) dp(43f) * side else 0f
+        val from = hideShift
+        hideAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 450
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                hideShift = from + (target - from) * (it.animatedValue as Float)
+                applyLayout()
+            }
+            start()
         }
     }
 
@@ -589,12 +623,13 @@ private fun OverlayCat(
     dark: Boolean,
     primaryColor: Long,
     onExpand: (Boolean) -> Unit,
+    onSleep: (Boolean) -> Unit,
     onOpen: (String?) -> Unit,
     onOpenChat: () -> Unit
 ) {
     AppdonyTheme(darkTheme = dark, primaryColor = primaryColor) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            CatBody(ui, onExpand, onOpen, onOpenChat)
+            CatBody(ui, onExpand, onSleep, onOpen, onOpenChat)
         }
     }
 }
@@ -603,6 +638,7 @@ private fun OverlayCat(
 private fun CatBody(
     ui: OverlayUi,
     onExpand: (Boolean) -> Unit,
+    onSleep: (Boolean) -> Unit,
     onOpen: (String?) -> Unit,
     onOpenChat: () -> Unit
 ) {
@@ -633,6 +669,9 @@ private fun CatBody(
 
     // اندازه‌ی پنجره با باز بودن منو یا بالن هماهنگ می‌شه
     LaunchedEffect(menuVisible, bubble != null) { onExpand(menuVisible || bubble != null) }
+
+    // خوابیدن/بیدار شدن: پنجره تا نصفه پشت لبه می‌ره و برمی‌گرده
+    LaunchedEffect(asleep) { onSleep(asleep) }
 
     // کلیک بیرون یا شروع کشیدن: همه‌چیز بسته می‌شه
     LaunchedEffect(ui.collapseSignal) {
@@ -709,36 +748,10 @@ private fun CatBody(
         if (ui.landTick > 0) motion.landSquash()
     }
 
-    // جمله‌ی گاه‌به‌گاه (فقط بیدار و بدون حالت بهینه‌سازی باتری)
-    LaunchedEffect(ui.active) {
-        if (!ui.active) return@LaunchedEffect
-        delay(25_000)
-        while (true) {
-            if (!menuOpen && !ui.dragging && bubble == null) {
-                val say = AssistantPhrases.next(null)
-                AssistantBus.noteShown(say.text)
-                lastSay = say
-                bubble = say
-                delay(6_500)
-                if (bubble === say) bubble = null
-            }
-            delay((60_000L..90_000L).random())
-        }
-    }
+    // بیرون از برنامه حرف نمی‌زنه؛ جمله‌های تصادفی و خبرها فقط داخل برنامه‌ان.
+    // اینجا فقط خودش، چت و دکمه‌هاست.
 
-    // خبرهای فوری اپ (مثلاً تموم شدن دانلود)
-    LaunchedEffect(Unit) {
-        AssistantBus.events.collect { say ->
-            if (!menuOpen && !ui.dragging) {
-                lastSay = say
-                bubble = say
-                delay(8_000)
-                if (bubble === say) bubble = null
-            }
-        }
-    }
-
-    val bodyAlpha by animateFloatAsState(if (asleep) 0.55f else 1f, tween(500), label = "alpha")
+    val bodyAlpha by animateFloatAsState(if (asleep) 0.38f else 1f, tween(500), label = "alpha")
     val speakAmt by animateFloatAsState(if (bubble != null) 1f else 0f, tween(300), label = "speak")
     val scare by animateFloatAsState(
         if (ui.dragging) 1f else 0f, spring(0.6f, Spring.StiffnessLow), label = "scare"
@@ -759,7 +772,7 @@ private fun CatBody(
 
     Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
 
-        // بالن پیام یا منوی کاموا (کنار گربه)
+        // بالن پیام (بیرون از برنامه پیامی نمی‌آد، ولی ساختارش مونده)
         Column(
             modifier = Modifier
                 .align(corner)
@@ -786,24 +799,35 @@ private fun CatBody(
                     )
                 }
             }
-            if (menuVisible) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
-                    items.forEachIndexed { i, (icon, label, route) ->
-                        YarnButton(
-                            icon = icon,
-                            label = label,
-                            tint = yarn[i],
-                            progress = { motion.menuProg[i].value },
-                            spin = { motion.menuProg[i].value * 600f },
-                            bob = { bob.value },
-                            flip = if (i % 2 == 0) 1f else -1f,
-                            onClick = {
-                                menuOpen = false
-                                // «چت با من» همین‌جا توی پنجره‌ی کوچیک باز می‌شه، نه توی برنامه
-                                if (route == "ai_chat") onOpenChat() else onOpen(route)
-                            }
-                        )
-                    }
+        }
+
+        // دکمه‌های منو: کنار گربه، به سمت وسط صفحه (نه زیرش)
+        if (menuVisible) {
+            Row(
+                modifier = Modifier
+                    .align(corner)
+                    .padding(
+                        start = if (ui.onRight) 0.dp else AvatarSize + 8.dp,
+                        end = if (ui.onRight) AvatarSize + 8.dp else 0.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                items.forEachIndexed { i, (icon, label, route) ->
+                    YarnButton(
+                        icon = icon,
+                        label = label,
+                        tint = yarn[i],
+                        progress = { motion.menuProg[i].value },
+                        spin = { motion.menuProg[i].value * 600f },
+                        bob = { bob.value },
+                        flip = if (i % 2 == 0) 1f else -1f,
+                        onClick = {
+                            menuOpen = false
+                            // «چت با من» همین‌جا توی پنجره‌ی کوچیک باز می‌شه، نه توی برنامه
+                            if (route == "ai_chat") onOpenChat() else onOpen(route)
+                        }
+                    )
                 }
             }
         }
