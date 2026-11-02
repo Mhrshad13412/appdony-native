@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -88,6 +89,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val fixedAi by settingsManager.fixedAi.collectAsStateWithLifecycle(initialValue = true)
     val beta by settingsManager.beta.collectAsStateWithLifecycle(initialValue = false)
     val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
@@ -239,6 +241,10 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         item {
             SettingsGroup("دستیار هوش مصنوعی") {
+                SettingsSwitchRow("هوش مصنوعی ثابت", Icons.Outlined.AutoAwesome, fixedAi) {
+                    scope.launch { settingsManager.setFixedAi(it) }
+                }
+                RowDivider()
                 SettingsSwitchRow("نمایش پاپی", Icons.Outlined.Visibility, showAiAssistant) {
                     scope.launch { settingsManager.setShowAiAssistant(it) }
                 }
