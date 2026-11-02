@@ -1,5 +1,6 @@
 package com.appdony.app.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -41,11 +46,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdony.app.data.model.Comment
 import com.appdony.app.ui.screens.CommentsUiState
 import com.appdony.app.ui.screens.CommentsViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * نظرات: همه می‌تونن بخونن، ولی فقط کاربرِ واردشده می‌تونه نظر بنویسه.
  * برای مهمان دکمه‌ی «+» اصلاً نشون داده نمی‌شه.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CommentsSection(
     postId: Int,
@@ -67,6 +75,8 @@ fun CommentsSection(
     val sending by vm.sending.collectAsStateWithLifecycle()
     var showComposer by remember { mutableStateOf(false) }
     var commentText by remember { mutableStateOf("") }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -97,13 +107,18 @@ fun CommentsSection(
         Spacer(Modifier.height(12.dp))
         if (isLoggedIn && showComposer) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoViewRequester),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = commentText,
                     onValueChange = { commentText = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).onFocusEvent { f ->
+                        if (f.isFocused) scope.launch {
+                            delay(350) // صبر می‌کنیم کیبورد کامل بالا بیاد
+                            bringIntoViewRequester.bringIntoView()
+                        }
+                    },
                     placeholder = { Text("نظر خود را بنویسید...", fontSize = 12.sp) },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
