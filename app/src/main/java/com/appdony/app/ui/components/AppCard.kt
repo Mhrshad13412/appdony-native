@@ -69,7 +69,7 @@ fun rememberPostMeta(post: Post): PostMeta {
     return meta
 }
 
-/** کارت بازی/برنامه از روی خود پست: عکس، «جدید»، اسم، دسته، اندروید و نسخه */
+/** کارت بازی/برنامه از روی خود پست: عکس، «جدید»، اسم، اندروید و نسخه */
 @Composable
 fun PostCard(post: Post, onClick: () -> Unit, modifier: Modifier = Modifier, fillWidth: Boolean = false) {
     val meta = rememberPostMeta(post)
@@ -112,7 +112,7 @@ fun AppCard(
         modifier = modifier.then(sizing).appdonyCard().clickable { onClick() }.padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp))) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1.12f).clip(RoundedCornerShape(16.dp))) {
             SubcomposeAsyncImage(
                 model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
@@ -126,22 +126,17 @@ fun AppCard(
             if (isNew) NewBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = title, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            lineHeight = 16.sp, modifier = Modifier.fillMaxWidth()
+            lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
         )
 
-        if (!category.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            NavChip(text = category)
-        }
-
         if (androidReq != null || version != null) {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
