@@ -57,6 +57,8 @@ import coil.compose.AsyncImage
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.ui.components.DownloadCardSkeleton
+import com.appdony.app.ui.components.glassBorder
+import com.appdony.app.ui.components.glassStroke
 import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
@@ -136,7 +138,7 @@ private fun PillButton(text: String, icon: ImageVector?, color: Color, onClick: 
         modifier = Modifier
             .clip(shape)
             .background(color.copy(alpha = 0.14f))
-            .border(1.5.dp, color, shape)
+            .glassBorder(1.5.dp, color, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -244,7 +246,7 @@ private fun DownloadCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        border = glassStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shadowElevation = 6.dp
     ) {
         Row(
