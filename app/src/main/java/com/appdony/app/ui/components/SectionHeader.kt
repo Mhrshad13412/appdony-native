@@ -34,6 +34,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appdony.app.ui.theme.TitleFont
 
 // عنوان بلوک ویژه؛ اگه همین باشه با ظاهر طلاییِ پلاس نشون داده می‌شه
 private const val PLUS_TITLE = "اپدونی پلاس"
@@ -66,6 +67,7 @@ fun SectionHeader(
             text = title,
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 16.sp,
+            fontFamily = TitleFont,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.weight(1f))
@@ -110,6 +112,7 @@ private fun PlusHeader(title: String) {
             text = title,
             color = color,
             fontSize = 16.sp,
+            fontFamily = TitleFont,
             fontWeight = FontWeight.Bold,
             style = TextStyle(
                 shadow = Shadow(
