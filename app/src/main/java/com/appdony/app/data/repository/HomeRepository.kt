@@ -1,6 +1,8 @@
 package com.appdony.app.data.repository
 
 import android.text.Html
+import java.text.SimpleDateFormat
+import java.util.Locale
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.CategoryNames
 import com.appdony.app.data.model.Post
@@ -34,6 +36,9 @@ class HomeRepository {
         const val SEC_POPULAR = -1
         const val SEC_NEWEST = -2
         const val SEC_UPDATED = -3
+
+        // حداقل فاصله‌ی انتشار تا ویرایش برای حساب شدن به‌عنوان «به‌روز» (۱ روز)
+        private const val EDIT_GAP_MS = 24L * 60 * 60 * 1000
     }
 
     suspend fun loadStructure(isGames: Boolean): HomeStructure {
@@ -125,8 +130,11 @@ class HomeRepository {
             else -> {
                 if (root == null) return emptyList()
                 // آخرین ویرایش واقعی سایت: ۶۰ پست اخیرِ مرتب‌شده بر اساس ویرایش، بعد گروه‌بندی هر اپ
+                // فقط پست‌هایی که واقعاً بعد از انتشار ویرایش شدن (نه پست تازه‌منتشرشده)، تا با «جدیدترین‌ها» یکی نشه
                 LatestOnly.latestPerAppByEdit(
-                    api.getPostsByCategory(categoryId = root, perPage = 60, orderBy = "modified").filterNot(::isPlusPost)
+                    api.getPostsByCategory(categoryId = root, perPage = 60, orderBy = "modified")
+                        .filterNot(::isPlusPost)
+                        .filter(::isEditedAfterPublish)
                 )
             }
         }
@@ -134,6 +142,22 @@ class HomeRepository {
     }
 
     private fun isPlusPost(post: Post): Boolean = post.categories.any { it in PLUS_IDS }
+
+    /** آخرین ویرایش حداقل یک روز بعد از انتشار باشه؛ یعنی پست واقعاً آپدیت شده */
+    private fun isEditedAfterPublish(post: Post): Boolean {
+        val published = parseDate(post.date) ?: return false
+        val edited = parseDate(post.modified) ?: return false
+        return edited - published >= EDIT_GAP_MS
+    }
+
+    private fun parseDate(raw: String?): Long? {
+        if (raw.isNullOrBlank() || raw.length < 19) return null
+        return try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).parse(raw.take(19))?.time
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private fun cleanName(name: String): String {
         return CategoryNames.pretty(Html.fromHtml(name, Html.FROM_HTML_MODE_LEGACY).toString().trim())
