@@ -19,6 +19,7 @@ class SettingsManager(private val context: Context) {
         private val KEY_START_PAGE = stringPreferencesKey("start_page")
         private val KEY_SHOW_AI = booleanPreferencesKey("show_ai_assistant") // 👈 جدید
         private val KEY_UI_STYLE = stringPreferencesKey("ui_style") // "glass" | "classic"
+        private val KEY_BETA = booleanPreferencesKey("beta_enabled")
 
         const val STYLE_GLASS = "glass"
         const val STYLE_CLASSIC = "classic"
@@ -32,6 +33,13 @@ class SettingsManager(private val context: Context) {
 
     // فعلاً پیش‌فرض شیشه‌ای؛ وقتی کلاسیک کامل شد پیش‌فرض می‌شه کلاسیک
     val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[KEY_UI_STYLE] ?: STYLE_GLASS }
+
+    // بتا: پیش‌فرض خاموش؛ وقتی روشن باشه بلوک‌های اپدونی پلاس نشون داده می‌شن
+    val beta: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_BETA] ?: false }
+
+    suspend fun setBeta(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_BETA] = enabled }
+    }
 
     suspend fun setUiStyle(style: String) {
         context.settingsDataStore.edit { it[KEY_UI_STYLE] = style }
