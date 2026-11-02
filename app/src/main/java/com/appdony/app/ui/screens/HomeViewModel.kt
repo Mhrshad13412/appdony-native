@@ -54,7 +54,7 @@ class HomeViewModel(
                 // «به‌روزترین‌ها» اپ‌هایی که همین الان تو «جدیدترین‌ها» هستن رو تکرار نمی‌کنه
                 val shown = if (s.id == HomeRepository.SEC_UPDATED) {
                     val newestIds = raw[HomeRepository.SEC_NEWEST].orEmpty().mapTo(HashSet<Int>()) { it.id }
-                    posts.filter { it.id !in newestIds }
+                    posts.filter { it.id !in newestIds }.take(12)
                 } else posts
                 return@mapNotNull if (shown.isEmpty()) null else SectionState(s, shown)
             }
