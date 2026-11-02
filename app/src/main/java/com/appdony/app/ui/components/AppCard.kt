@@ -167,7 +167,7 @@ private fun MetaItem(icon: ImageVector, text: String, tint: androidx.compose.ui.
     }
 }
 
-/** چیپ هم‌سبک اندیکاتور منوی پایین: زمینه‌ی کم‌رنگ primary + خط دور primary */
+/** چیپ هم‌سبک اندیکاتور منوی پایین: زمینه‌ی کم‌رنگ primary + خط دور primary (خط فقط در شیشه‌ای) */
 @Composable
 internal fun NavChip(text: String, modifier: Modifier = Modifier, onImage: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
@@ -177,7 +177,7 @@ internal fun NavChip(text: String, modifier: Modifier = Modifier, onImage: Boole
             .clip(shape)
             .then(if (onImage) Modifier.background(scheme.surface.copy(alpha = 0.92f)) else Modifier)
             .background(scheme.primary.copy(alpha = 0.14f))
-            .border(1.dp, scheme.primary, shape)
+            .glassBorder(1.dp, scheme.primary, shape)
             .padding(horizontal = 10.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -195,7 +195,7 @@ internal fun NewBadge(modifier: Modifier = Modifier) {
             .clip(shape)
             .background(scheme.surface.copy(alpha = 0.92f))
             .background(scheme.primary.copy(alpha = 0.14f))
-            .border(1.dp, scheme.primary, shape)
+            .glassBorder(1.dp, scheme.primary, shape)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
