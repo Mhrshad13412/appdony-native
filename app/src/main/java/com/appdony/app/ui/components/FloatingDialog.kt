@@ -115,7 +115,7 @@ fun FloatingDialog(
                     shape = RoundedCornerShape(28.dp),
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 24.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+                    border = glassStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
                 ) {
                     Column(
                         modifier = Modifier
