@@ -138,7 +138,7 @@ fun DownloadCardSkeleton() {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        border = glassStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
