@@ -74,6 +74,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val plus by viewModel.plus.collectAsStateWithLifecycle()
+    // بتا خاموشه مگه کاربر از تنظیمات روشنش کنه؛ بلوک اپدونی پلاس فقط با بتا میاد
+    val homeContext = androidx.compose.ui.platform.LocalContext.current
+    val beta by androidx.compose.runtime.remember { com.appdony.app.data.preferences.SettingsManager(homeContext) }
+        .beta.collectAsStateWithLifecycle(initialValue = false)
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val hasError by viewModel.hasError.collectAsStateWithLifecycle()
@@ -98,8 +102,10 @@ fun HomeScreen(
         // پایین لیست جا می‌ذاریم تا آخرین ردیف زیر منوی شیشه‌ای نمونه
         contentPadding = PaddingValues(bottom = 24.dp + LocalBottomBarClearance.current)
     ) {
-        item(key = "plus") {
-            PlusBlock(posts = plus, onPostClick = onPostClick)
+        if (beta) {
+            item(key = "plus") {
+                PlusBlock(posts = plus, onPostClick = onPostClick)
+            }
         }
 
         if (isLoading) {
