@@ -72,6 +72,7 @@ fun AppdonyTheme(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         MaterialTheme(
             colorScheme = colors,
+            typography = AppTypography,
             shapes = AppShapes,
             content = content
         )
