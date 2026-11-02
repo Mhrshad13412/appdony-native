@@ -410,7 +410,9 @@ fun MainContent(
                 onTabSelected = { route -> navController.navigateToTab(route) },
                 // هوش مصنوعی ثابت: دکمه‌ی گرد وسط منو (شیشه‌ای و کلاسیک) چت هوش مصنوعی رو باز می‌کنه
                 fixedAi = fixedAi,
-                onAiClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
+                onAiClick = { navController.navigate("ai_chat") { launchSingleTop = true } },
+                // پشتیبان توی حالت ثابت جای آیکن وسط منو می‌شینه و با زدنش چت پشتیبانی باز می‌شه
+                onSupportClick = { navController.navigate("support") { launchSingleTop = true } }
             )
         }
 
@@ -422,7 +424,7 @@ fun MainContent(
             val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support")
             FloatingAssistant(
                 currentRoute = currentRoute,
-                // وقتی پشتیبان جای آدمک نشسته، آدمک قایمه؛ هوش مصنوعی ثابت هم جاش رو به دکمه‌ی وسط منو می‌ده
+                // وقتی پشتیبان جای آیکن نشسته، آیکن قایمه؛ هوش مصنوعی ثابت هم جاش رو به دکمه‌ی وسط منو می‌ده
                 visible = assistantVisible && !fixedAi && SupportPresence.phase == SupportPhase.OFF,
                 bottomBarHeight = if (isMainRoute) (if (fixedAi) AiNavTotalHeight else 88.dp) else 0.dp,
                 onSearchClick = openSearch,
@@ -430,8 +432,9 @@ fun MainContent(
                 onHelpClick = { navController.navigateToTab("blog") },
                 onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
             )
+            // توی حالت ثابت، پشتیبان جای آیکن وسط منو می‌شینه و دیگه شناور نمی‌شه
             SupportFloating(
-                visible = assistantVisible,
+                visible = assistantVisible && !fixedAi,
                 onOpenSupport = { navController.navigate("support") { launchSingleTop = true } }
             )
         }
