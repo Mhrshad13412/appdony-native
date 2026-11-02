@@ -3,6 +3,7 @@ package com.appdony.app.data.repository
 import android.text.Html
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.Post
+import com.appdony.app.data.model.sortedByPopularity
 import com.appdony.app.util.LatestOnly
 
 data class HomeSection(
@@ -66,12 +67,12 @@ class HomeRepository {
 
     suspend fun loadFeatured(rootId: Int?): List<Post> {
         val posts = if (rootId != null) {
-            api.getPostsByCategory(categoryId = rootId, perPage = 20)
+            api.getPostsByCategory(categoryId = rootId, perPage = 40)
         } else {
-            api.getPosts(perPage = 20)
+            api.getPosts(perPage = 40)
         }
         // از هر اپ فقط یک کارت (آخرین نسخه)
-        return LatestOnly.latestPerApp(posts.filterNot(::isPlusPost)).take(8)
+        return LatestOnly.latestPerApp(posts.filterNot(::isPlusPost)).sortedByPopularity().take(8)
     }
 
     /** بلاک «اپدونی پلاس»: فقط پست‌های دسته‌ی مخصوص همون تب */
@@ -84,15 +85,15 @@ class HomeRepository {
         val root = rootId
         return if (section.filterByRoot && root != null) {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 30)
+                api.getPostsByCategory(categoryId = section.id, perPage = 50)
                     .filter { root in it.categories }
                     .filterNot(::isPlusPost)
-            ).take(12)
+            ).sortedByPopularity().take(12)
         } else {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 20)
+                api.getPostsByCategory(categoryId = section.id, perPage = 40)
                     .filterNot(::isPlusPost)
-            ).take(12)
+            ).sortedByPopularity().take(12)
         }
     }
 
