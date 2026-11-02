@@ -39,7 +39,7 @@ fun SingleFeatureCard(title: String, description: String, imageUrl: String?, onC
     Box(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(18.dp))
             .background(Brush.horizontalGradient(colors = listOf(AppdonyCardBg, AppdonyGreen.copy(alpha = 0.35f))))
-            .border(1.dp, AppdonyGreen.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+            .glassBorder(1.dp, AppdonyGreen.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
             .clickable { onClick() }
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
