@@ -5,10 +5,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+
+/** حالت ظاهر برنامه: true = شیشه‌ای (بلور و بوردر)، false = کلاسیک (مات و بدون بوردر) */
+val LocalGlassMode = compositionLocalOf { true }
 
 /** گوشه‌ی گرد مشترک همه‌ی کارت‌ها؛ هم‌خانواده با منوی پایین (که ۳۲dp گرده) */
 val AppdonyCardShape = RoundedCornerShape(24.dp)
@@ -20,9 +24,9 @@ val AppdonyCardShape = RoundedCornerShape(24.dp)
 @Composable
 fun Modifier.appdonyCard(shape: Shape = AppdonyCardShape): Modifier {
     val scheme = MaterialTheme.colorScheme
-    return this
+    val glass = LocalGlassMode.current
+    val base = this
         .clip(shape)
         .background(scheme.surface)
-        .border(1.dp, scheme.outline.copy(alpha = 0.35f), shape)
+    return if (glass) base.border(1.dp, scheme.outline.copy(alpha = 0.35f), shape) else base
 }
-
