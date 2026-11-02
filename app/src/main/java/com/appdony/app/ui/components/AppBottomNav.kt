@@ -1,5 +1,7 @@
 package com.appdony.app.ui.components
 
+import android.os.SystemClock
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -30,14 +32,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +60,7 @@ import com.appdony.app.ui.navigation.bottomNavItems
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
+import kotlinx.coroutines.delay
 
 private val NavInnerPadding = 6.dp
 private val NavItemHeight = 56.dp
@@ -85,7 +88,8 @@ fun AppBottomNav(
     hazeState: HazeState,
     onTabSelected: (String) -> Unit,
     fixedAi: Boolean = false,
-    onAiClick: () -> Unit = {}
+    onAiClick: () -> Unit = {},
+    onSupportClick: () -> Unit = {}
 ) {
     val selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val surface = MaterialTheme.colorScheme.surface
@@ -95,7 +99,7 @@ fun AppBottomNav(
     val bump = if (fixedAi) AiBump else 0.dp
 
     if (!glass) {
-        ClassicBottomNav(selectedIndex, currentRoute, onTabSelected, fixedAi, onAiClick)
+        ClassicBottomNav(selectedIndex, currentRoute, onTabSelected, fixedAi, onAiClick, onSupportClick)
         return
     }
 
@@ -138,6 +142,7 @@ fun AppBottomNav(
         if (fixedAi) {
             AiNavButton(
                 onClick = onAiClick,
+                onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
             )
         }
@@ -151,7 +156,8 @@ private fun ClassicBottomNav(
     currentRoute: String?,
     onTabSelected: (String) -> Unit,
     fixedAi: Boolean,
-    onAiClick: () -> Unit
+    onAiClick: () -> Unit,
+    onSupportClick: () -> Unit
 ) {
     val bump = if (fixedAi) AiBump else 0.dp
 
@@ -176,7 +182,11 @@ private fun ClassicBottomNav(
         }
 
         if (fixedAi) {
-            AiNavButton(onClick = onAiClick, modifier = Modifier.align(Alignment.TopCenter))
+            AiNavButton(
+                onClick = onAiClick,
+                onSupportClick = onSupportClick,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 }
@@ -197,6 +207,7 @@ private fun NavTabsArea(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val half = bottomNavItems.size / 2
+    val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
 
     BoxWithConstraints {
         val aiWidth = if (fixedAi) AiSlotWidth else 0.dp
@@ -231,7 +242,7 @@ private fun NavTabsArea(
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         Text(
-                            text = "هوش مصنوعی",
+                            text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
                             fontSize = 10.sp,
                             color = primary,
                             maxLines = 1,
@@ -251,13 +262,17 @@ private fun NavTabsArea(
 }
 
 /**
- * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه، حلقه‌ی دورش مثل بریدگی منو دیده می‌شه
- * و تو دایره‌ی وسطش آدمک اپدونی (سر و شونه) زنده‌ست؛ پلک می‌زنه، نفس می‌کشه و گاهی سلام می‌ده.
+ * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه و حلقه‌ی دورش مثل بریدگی منو دیده می‌شه.
+ * تو دایره‌ی وسطش آیکن ربات هوش مصنوعیه (سیاه‌وسفید، پلک می‌زنه و نفس می‌کشه).
+ * وقتی پشتیبان میاد، همین‌جا جای آیکن رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
-private fun AiNavButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun AiNavButton(
+    onClick: () -> Unit,
+    onSupportClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val scheme = MaterialTheme.colorScheme
-    val primary = scheme.primary
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -273,6 +288,23 @@ private fun AiNavButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         label = "ai_pulse_value"
     )
 
+    // پشتیبان توی حالت ثابت جای آیکن هوش مصنوعی می‌شینه؛ ENTER و ON هر دو یعنی فعال
+    val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
+    val nowMs = remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(supportOn) {
+        if (!supportOn) return@LaunchedEffect
+        while (true) {
+            nowMs.longValue = SystemClock.elapsedRealtime()
+            if (nowMs.longValue >= SupportPresence.endAt) {
+                SupportPresence.reset()
+                break
+            }
+            delay(200)
+        }
+    }
+
+    val pulseColor = scheme.onBackground
+
     Box(
         modifier = modifier
             .size(AiRingSize)
@@ -283,45 +315,39 @@ private fun AiNavButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .drawBehind {
                 val t = pulse.value
                 drawCircle(
-                    color = primary.copy(alpha = 0.30f * (1f - t)),
+                    color = pulseColor.copy(alpha = 0.18f * (1f - t)),
                     radius = size.minDimension / 2f + 10.dp.toPx() * t
                 )
             }
             .clip(CircleShape)
             .background(scheme.background)
             .glassBorder(1.dp, scheme.outline.copy(alpha = 0.35f), CircleShape)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics { contentDescription = "هوش مصنوعی" },
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = if (supportOn) onSupportClick else onClick
+            )
+            .semantics { contentDescription = if (supportOn) "پشتیبانی" else "هوش مصنوعی" },
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(AiButtonSize)
-                .clip(CircleShape)
-                .background(scheme.surface)
-                .background(primary.copy(alpha = 0.16f))
-                .border(2.dp, primary, CircleShape)
-        ) {
-            BuddyCanvas(modifier = Modifier.size(AiButtonSize), bust = true)
-        }
-
-        // نشان «هوش مصنوعی» گوشه‌ی دکمه
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 4.dp, end = 4.dp)
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(primary)
-                .border(1.5.dp, scheme.background, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(11.dp)
-            )
+        Crossfade(targetState = supportOn, animationSpec = tween(350), label = "ai_support_swap") { support ->
+            if (support) {
+                val ring = ((SupportPresence.endAt - nowMs.longValue).toFloat() / SupportPresence.HOLD_MS)
+                    .coerceIn(0f, 1f)
+                Box(modifier = Modifier.size(AiButtonSize).clip(CircleShape)) {
+                    SupportAvatar(sizeDp = AiButtonSize.value.toInt(), ring = ring)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(AiButtonSize)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0B0B0C))
+                        .border(1.5.dp, scheme.outline.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    BuddyCanvas(modifier = Modifier.size(AiButtonSize))
+                }
+            }
         }
     }
 }
