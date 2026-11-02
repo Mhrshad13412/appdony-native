@@ -176,7 +176,7 @@ object LatestOnly {
 
     private class Cluster(val keys: MutableList<String>, val members: MutableList<Post>)
 
-    fun latestPerApp(posts: List<Post>): List<Post> {
+    private fun cluster(posts: List<Post>): List<Cluster> {
         val clusters = ArrayList<Cluster>()
         for (p in posts) {
             val ks = keysOf(p)
@@ -188,7 +188,25 @@ object LatestOnly {
                 hit.members.add(p)
             }
         }
+        return clusters
+    }
+
+    private fun bestOf(c: Cluster): Post = c.members.reduce { best, p -> if (better(p, best)) p else best }
+
+    fun latestPerApp(posts: List<Post>): List<Post> {
         // از هر گروه بهترین پست (بالاترین نسخه، بعد جدیدترین تاریخ)؛ جای گروه همون جای اولین نتیجه‌ی خودش می‌مونه
-        return clusters.map { c -> c.members.reduce { best, p -> if (better(p, best)) p else best } }
+        return cluster(posts).map(::bestOf)
+    }
+
+    /**
+     * برای ردیف «به‌روزترین‌ها»: از هر اپ همون بهترین پست (بالاترین نسخه) نشون داده می‌شه،
+     * ولی ترتیب از روی «آخرین ویرایش» هر پستی از همون اپ در سایت تعیین می‌شه؛
+     * یعنی ممکنه آخرین نسخه ویرایش نشده باشه و یه پست قدیمی‌ترِ همون اپ ویرایش شده باشه.
+     */
+    fun latestPerAppByEdit(posts: List<Post>): List<Post> {
+        return cluster(posts)
+            .map { c -> bestOf(c) to (c.members.maxOfOrNull { it.modified ?: "" } ?: "") }
+            .sortedByDescending { it.second }
+            .map { it.first }
     }
 }
