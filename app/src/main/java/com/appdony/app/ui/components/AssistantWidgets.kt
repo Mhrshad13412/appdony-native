@@ -25,10 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -104,7 +100,7 @@ internal fun SpeechBubble(
     }
 }
 
-/** یه گلوله‌ی کاموا که آیکن و اسم هر گزینه روشه */
+/** یه حباب که آیکن و اسم هر گزینه روشه */
 @Composable
 internal fun YarnButton(
     icon: ImageVector,
@@ -140,9 +136,9 @@ internal fun YarnButton(
                 .drawBehind {
                     val r = size.minDimension / 2f - 2.dp.toPx()
                     val c = Offset(size.width / 2f, size.height / 2f)
-                    drawYarnBall(c, r, tint, spin() + (bob() - 0.5f) * 24f)
+                    drawBubble(c, r, tint, spin() + (bob() - 0.5f) * 24f)
                     // سایه‌ی نرم پشت آیکن تا همیشه خوانا باشه
-                    drawCircle(Color.Black.copy(alpha = 0.28f), r * 0.46f, c)
+                    drawCircle(Color.Black.copy(alpha = 0.24f), r * 0.46f, c)
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -172,13 +168,13 @@ internal fun YarnButton(
     }
 }
 
-/** یه سکه‌ی طلایی که آیکن و اسم هر گزینه روشه (جای کاموا، برای پشتیبان) */
+/** یه حباب (برای پشتیبان) که آیکن و اسم هر گزینه روشه؛ [turn] فقط برق حباب رو موقع اومدن می‌چرخونه */
 @Composable
 internal fun CoinButton(
     icon: ImageVector,
     label: String,
     progress: () -> Float,
-    turn: () -> Float,      // زاویه‌ی چرخش سکه موقع اومدن؛ آخرش صفره
+    turn: () -> Float,      // زاویه‌ی چرخش برق حباب موقع اومدن؛ آخرش صفره
     bob: () -> Float,
     flip: Float,
     onClick: () -> Unit
@@ -203,45 +199,20 @@ internal fun CoinButton(
         Box(
             modifier = Modifier
                 .size(58.dp)
-                .graphicsLayer {
-                    rotationY = turn()
-                    cameraDistance = 14f * density
-                }
                 .drawBehind {
                     val r = size.minDimension / 2f - 2.dp.toPx()
                     val c = Offset(size.width / 2f, size.height / 2f)
-                    // لبه‌ی سکه
-                    drawCircle(Color(0xFFB77700), r, c)
-                    // رو‌ی سکه
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(Color(0xFFFFE082), Color(0xFFFFB300)),
-                            center = Offset(c.x - r * 0.25f, c.y - r * 0.3f),
-                            radius = r * 1.3f
-                        ),
-                        radius = r * 0.88f,
-                        center = c
-                    )
-                    // حلقه‌ی نازک داخل سکه
-                    drawCircle(Color(0xFFB77700).copy(alpha = 0.55f), r * 0.72f, c, style = Stroke(1.2.dp.toPx()))
-                    // برق سکه
-                    drawArc(
-                        color = Color.White.copy(alpha = 0.55f),
-                        startAngle = 200f,
-                        sweepAngle = 50f,
-                        useCenter = false,
-                        topLeft = Offset(c.x - r * 0.8f, c.y - r * 0.8f),
-                        size = Size(r * 1.6f, r * 1.6f),
-                        style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
-                    )
+                    drawBubble(c, r, GoldColor, turn() + (bob() - 0.5f) * 24f)
+                    // سایه‌ی نرم پشت آیکن تا همیشه خوانا باشه
+                    drawCircle(Color.Black.copy(alpha = 0.24f), r * 0.46f, c)
                 },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = Color(0xFF5A3A00),
-                modifier = Modifier.size(22.dp)
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
             )
         }
         Rtl {
