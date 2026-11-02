@@ -131,6 +131,7 @@ fun AppRoot() {
 
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
@@ -210,6 +211,9 @@ fun AppRoot() {
 
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
         AppdonyTheme(darkTheme = isDark, primaryColor = primaryColor) {
+          CompositionLocalProvider(
+            com.appdony.app.ui.components.LocalGlassMode provides (uiStyle == SettingsManager.STYLE_GLASS)
+          ) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 Box(
                     modifier = Modifier
@@ -312,6 +316,7 @@ fun AppRoot() {
                     )
                 }
             }
+          }
         }
     }
 }
