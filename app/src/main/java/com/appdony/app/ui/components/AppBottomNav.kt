@@ -3,6 +3,7 @@ package com.appdony.app.ui.components
 import android.os.SystemClock
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -39,28 +40,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import com.appdony.app.ui.navigation.BottomNavItem
 import com.appdony.app.ui.navigation.bottomNavItems
+import com.appdony.app.util.AssistantBus
+import com.appdony.app.util.AssistantSay
+import com.appdony.app.util.SayKind
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
 private val NavItemHeight = 56.dp
@@ -141,6 +159,7 @@ fun AppBottomNav(
 
         if (fixedAi) {
             AiNavButton(
+                route = currentRoute,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
@@ -183,6 +202,7 @@ private fun ClassicBottomNav(
 
         if (fixedAi) {
             AiNavButton(
+                route = currentRoute,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter)
@@ -261,13 +281,55 @@ private fun NavTabsArea(
     }
 }
 
+// ───────────────────────── حرف زدن ربات وسط منو ─────────────────────────
+
+private val BuddyLines = listOf(
+    "سلام! من هوش مصنوعی اپدونی‌ام؛ هر سؤالی داری بزن روم.",
+    "دنبال بازی یا برنامه‌ای می‌گردی؟ بزن روم تا پیداش کنیم.",
+    "من همین پایین منتظرم؛ هر وقت خواستی چت کنیم.",
+    "بازی خوب پیدا نمی‌کنی؟ من برات انتخاب می‌کنم.",
+    "گوشی‌ها رو گذاشتم روی گوشم تا حرفات رو خوب بشنوم.",
+    "چشم‌هام رو دیدی؟ همیشه بیدارم!",
+    "یه نفس عمیق بکش، بعد بریم سراغ دانلود.",
+    "اگه نصب بازی گیر کرد، از من بپرس."
+).map { AssistantSay(it) }
+
+// جمله‌هایی که مخصوص گربه‌ی شناورن و به ربات ثابت نمی‌خورن
+private val BuddyBanned = listOf("منو بگیر", "توپ", "مخفی", "کاموا")
+
+private fun nextBuddySay(route: String?): AssistantSay {
+    if (Random.nextBoolean()) return BuddyLines.random()
+    repeat(5) {
+        val s = AssistantPhrases.next(route)
+        if (BuddyBanned.none { it in s.text }) return s
+    }
+    return BuddyLines.random()
+}
+
+/** حباب همیشه درست بالای دکمه می‌شینه و از لبه‌های صفحه بیرون نمی‌زنه */
+private object BubbleAbove : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize
+    ): IntOffset {
+        val maxX = (windowSize.width - popupContentSize.width - 12).coerceAtLeast(12)
+        val x = (anchorBounds.center.x - popupContentSize.width / 2).coerceIn(12, maxX)
+        val y = (anchorBounds.top - popupContentSize.height - 12).coerceAtLeast(0)
+        return IntOffset(x, y)
+    }
+}
+
 /**
  * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه و حلقه‌ی دورش مثل بریدگی منو دیده می‌شه.
- * تو دایره‌ی وسطش آیکن ربات هوش مصنوعیه (سیاه‌وسفید، پلک می‌زنه و نفس می‌کشه).
- * وقتی پشتیبان میاد، همین‌جا جای آیکن رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
+ * تو دایره‌ی وسطش ربات هوش مصنوعیه که به رنگ تم برنامه‌ست و زندگی خودش رو داره:
+ * هر چند ثانیه حرف می‌زنه (حباب میاد)، می‌پره، می‌خوره به لبه‌ی دایره و گیج می‌شه یا می‌ترسه.
+ * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
 private fun AiNavButton(
+    route: String?,
     onClick: () -> Unit,
     onSupportClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -303,7 +365,75 @@ private fun AiNavButton(
         }
     }
 
-    val pulseColor = scheme.onBackground
+    // ── جان ربات ──
+    val buddy = remember { BuddyState() }
+    var say by remember { mutableStateOf<AssistantSay?>(null) }
+    var talking by remember { mutableStateOf(false) }
+    var wasSupport by remember { mutableStateOf(supportOn) }
+    val routeNow by rememberUpdatedState(route)
+
+    suspend fun speak(s: AssistantSay, extraMs: Long = 1_800L) {
+        say = s
+        talking = true
+        delay((s.text.length * 55L).coerceIn(1_500L, 5_000L))
+        talking = false
+        delay(extraMs)
+        if (say === s) say = null
+    }
+
+    // کارهای تصادفی ربات؛ وقتی پشتیبان اومده ساکت می‌شه
+    LaunchedEffect(supportOn) {
+        if (supportOn) {
+            say = null
+            talking = false
+            wasSupport = true
+            return@LaunchedEffect
+        }
+        if (wasSupport) {
+            // پشتیبان رفته و ربات برگشته
+            wasSupport = false
+            delay(500)
+            launch { buddy.jump() }
+            launch { buddy.cheer() }
+            speak(AssistantSay("برگشتم! پشتیبان رفت سر کارش."))
+        } else {
+            delay(3_500)
+        }
+        while (true) {
+            if (say == null) {
+                when ((0..99).random()) {
+                    in 0..44 -> speak(nextBuddySay(routeNow))
+                    in 45..64 -> {
+                        launch { buddy.jump() }
+                        buddy.cheer()
+                    }
+                    in 65..84 -> {
+                        launch { buddy.bonk(if (Random.nextBoolean()) 1f else -1f) }
+                        delay(450)
+                        speak(AssistantSay("آخ! خوردم به دیوار... سرم گیج می‌ره"), extraMs = 1_200L)
+                    }
+                    else -> {
+                        launch { buddy.startle() }
+                        speak(AssistantSay("هی! ترسیدم!"), extraMs = 900L)
+                    }
+                }
+            }
+            delay((9_000L..16_000L).random())
+        }
+    }
+
+    // خبرهای فوری اپ (مثلاً تموم شدن دانلود) رو ربات خودش اعلام می‌کنه
+    LaunchedEffect(supportOn) {
+        if (supportOn) return@LaunchedEffect
+        AssistantBus.events.collect { s ->
+            if (s.kind == SayKind.DONE) launch { buddy.jump() }
+            speak(s, extraMs = 6_000L)
+        }
+    }
+
+    // رنگ‌های دکمه از تم برنامه می‌آن
+    val fill = lerp(scheme.background, scheme.primary, 0.16f)
+    val pulseColor = scheme.primary
 
     Box(
         modifier = modifier
@@ -311,11 +441,12 @@ private fun AiNavButton(
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
+                translationY = -buddy.hop.value * 10.dp.toPx()
             }
             .drawBehind {
                 val t = pulse.value
                 drawCircle(
-                    color = pulseColor.copy(alpha = 0.18f * (1f - t)),
+                    color = pulseColor.copy(alpha = 0.22f * (1f - t)),
                     radius = size.minDimension / 2f + 10.dp.toPx() * t
                 )
             }
@@ -325,7 +456,10 @@ private fun AiNavButton(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = if (supportOn) onSupportClick else onClick
+                onClick = {
+                    say = null
+                    if (supportOn) onSupportClick() else onClick()
+                }
             )
             .semantics { contentDescription = if (supportOn) "پشتیبانی" else "هوش مصنوعی" },
         contentAlignment = Alignment.Center
@@ -342,10 +476,46 @@ private fun AiNavButton(
                     modifier = Modifier
                         .size(AiButtonSize)
                         .clip(CircleShape)
-                        .background(Color(0xFF0B0B0C))
-                        .border(1.5.dp, scheme.outline.copy(alpha = 0.5f), CircleShape)
+                        .background(fill)
+                        .border(1.5.dp, scheme.primary.copy(alpha = 0.55f), CircleShape)
                 ) {
-                    BuddyCanvas(modifier = Modifier.size(AiButtonSize))
+                    BuddyCanvas(
+                        modifier = Modifier.size(AiButtonSize),
+                        talking = talking,
+                        plate = fill,
+                        ink = scheme.primary,
+                        state = buddy
+                    )
+                }
+            }
+        }
+
+        // حباب حرف‌های ربات؛ پنجره‌ی جدا که از لبه‌ی دکمه بیرون بزنه و بریده نشه
+        val shown = say
+        if (shown != null && !supportOn) {
+            key(shown) {
+                Popup(
+                    popupPositionProvider = BubbleAbove,
+                    properties = PopupProperties(focusable = false, clippingEnabled = false)
+                ) {
+                    val pop = remember { Animatable(0f) }
+                    LaunchedEffect(Unit) { pop.animateTo(1f, spring(0.55f, Spring.StiffnessMedium)) }
+                    Box(
+                        modifier = Modifier.graphicsLayer {
+                            val s = 0.8f + 0.2f * pop.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = pop.value.coerceIn(0f, 1f)
+                            transformOrigin = TransformOrigin(0.5f, 1f)
+                        }
+                    ) {
+                        SpeechBubble(
+                            say = shown,
+                            onRight = false,
+                            lowerHalf = true,
+                            onClick = { say = null }
+                        )
+                    }
                 }
             }
         }
