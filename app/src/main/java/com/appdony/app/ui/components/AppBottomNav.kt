@@ -65,6 +65,13 @@ fun AppBottomNav(
     val surface = MaterialTheme.colorScheme.surface
     val background = MaterialTheme.colorScheme.background
     val outline = MaterialTheme.colorScheme.outline
+    val glass = LocalGlassMode.current
+
+    if (!glass) {
+        ClassicBottomNav(selectedIndex, currentRoute, onTabSelected)
+        return
+    }
+
     val barShape = RoundedCornerShape(32.dp)
 
     Box(
@@ -119,6 +126,55 @@ fun AppBottomNav(
                             modifier = Modifier.width(itemWidth)
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/** حالت کلاسیک: نوار مات، چسبیده به لبه‌های صفحه، بدون بلور و بدون بوردر */
+@Composable
+private fun ClassicBottomNav(
+    selectedIndex: Int,
+    currentRoute: String?,
+    onTabSelected: (String) -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val indicatorShape = RoundedCornerShape(22.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 12.dp)
+    ) {
+        BoxWithConstraints {
+            val itemWidth = maxWidth / bottomNavItems.size
+            val indicatorX by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
+                label = "classic_nav_indicator_x"
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorX)
+                    .width(itemWidth)
+                    .height(NavItemHeight)
+                    .clip(indicatorShape)
+                    .background(primary.copy(alpha = 0.14f))
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                bottomNavItems.forEachIndexed { index, item ->
+                    NavTab(
+                        item = item,
+                        selected = index == selectedIndex,
+                        onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
+                        modifier = Modifier.width(itemWidth)
+                    )
                 }
             }
         }
