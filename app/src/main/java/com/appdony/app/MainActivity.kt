@@ -74,6 +74,7 @@ import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AboutDialog
 import com.appdony.app.ui.components.AccountSheet
+import com.appdony.app.ui.components.AiNavTotalHeight
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppGuide
 import com.appdony.app.ui.components.AppTopBar
@@ -131,6 +132,7 @@ fun AppRoot() {
 
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val fixedAi by settingsManager.fixedAi.collectAsStateWithLifecycle(initialValue = true)
     val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
@@ -237,6 +239,7 @@ fun AppRoot() {
                             username = username,
                             displayName = displayName,
                             showAiAssistant = showAiAssistant,
+                            fixedAi = fixedAi,
                             onLoginClick = { showLoginSheet = true },
                             onAccountClick = { showAccountSheet = true }
                         )
@@ -274,7 +277,7 @@ fun AppRoot() {
                     val startRoute = remember { navController.currentDestination?.route ?: "games" }
                     AppGuide(
                         sceneLayer = sceneLayer,
-                        showPoppyStep = showAiAssistant,
+                        showPoppyStep = showAiAssistant && !fixedAi,
                         startRoute = startRoute,
                         onNavigate = { navController.navigateToTab(it) },
                         onFinish = {
@@ -328,6 +331,7 @@ fun MainContent(
     username: String,
     displayName: String,
     showAiAssistant: Boolean,
+    fixedAi: Boolean,
     onLoginClick: () -> Unit,
     onAccountClick: () -> Unit
 ) {
@@ -403,7 +407,10 @@ fun MainContent(
             AppBottomNav(
                 currentRoute = currentRoute,
                 hazeState = hazeState,
-                onTabSelected = { route -> navController.navigateToTab(route) }
+                onTabSelected = { route -> navController.navigateToTab(route) },
+                // هوش مصنوعی ثابت: دکمه‌ی گرد وسط منو (شیشه‌ای و کلاسیک) چت هوش مصنوعی رو باز می‌کنه
+                fixedAi = fixedAi,
+                onAiClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
             )
         }
 
@@ -415,9 +422,9 @@ fun MainContent(
             val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support")
             FloatingAssistant(
                 currentRoute = currentRoute,
-                // وقتی پشتیبان جای گربه نشسته، گربه قایمه
-                visible = assistantVisible && SupportPresence.phase == SupportPhase.OFF,
-                bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
+                // وقتی پشتیبان جای آدمک نشسته، آدمک قایمه؛ هوش مصنوعی ثابت هم جاش رو به دکمه‌ی وسط منو می‌ده
+                visible = assistantVisible && !fixedAi && SupportPresence.phase == SupportPhase.OFF,
+                bottomBarHeight = if (isMainRoute) (if (fixedAi) AiNavTotalHeight else 88.dp) else 0.dp,
                 onSearchClick = openSearch,
                 onDownloadsClick = { navController.navigateToTab("downloads") },
                 onHelpClick = { navController.navigateToTab("blog") },
