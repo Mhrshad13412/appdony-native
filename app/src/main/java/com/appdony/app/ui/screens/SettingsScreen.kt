@@ -88,6 +88,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val beta by settingsManager.beta.collectAsStateWithLifecycle(initialValue = false)
     val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
@@ -224,6 +225,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                         selected = uiStyle == SettingsManager.STYLE_CLASSIC,
                         modifier = Modifier.weight(1f)
                     ) { scope.launch { settingsManager.setUiStyle(SettingsManager.STYLE_CLASSIC) } }
+                }
+            }
+        }
+
+        item {
+            SettingsGroup("آزمایشی") {
+                SettingsSwitchRow("بتا (نمایش اپدونی پلاس)", Icons.Outlined.Visibility, beta) {
+                    scope.launch { settingsManager.setBeta(it) }
                 }
             }
         }
