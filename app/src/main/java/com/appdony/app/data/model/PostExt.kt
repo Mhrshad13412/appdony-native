@@ -81,6 +81,20 @@ fun Post.isNew(now: Long = System.currentTimeMillis()): Boolean {
 fun Post.cardCategory(): String? {
     val name = embedded?.terms?.firstOrNull()?.firstOrNull()?.name ?: return null
     return Html.fromHtml(name, Html.FROM_HTML_MODE_LEGACY).toString().trim().ifBlank { null }
+        ?.let { CategoryNames.pretty(it) }
+}
+
+/** تازه منتشر شده (۴ روز) */
+fun Post.isJustPublished(now: Long = System.currentTimeMillis()): Boolean {
+    val published = parseWpDate(date) ?: return false
+    return now - published <= NEW_WINDOW_MS
+}
+
+/** قدیمی‌تره ولی تازه آپدیت شده (۴ روز) */
+fun Post.isJustUpdated(now: Long = System.currentTimeMillis()): Boolean {
+    if (isJustPublished(now)) return false
+    val edited = parseWpDate(modified) ?: return false
+    return now - edited <= NEW_WINDOW_MS
 }
 
 data class PostMeta(val androidReq: String? = null, val version: String? = null)
