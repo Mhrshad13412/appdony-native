@@ -34,6 +34,8 @@ class HomeViewModel(
     val hasError: StateFlow<Boolean> = _hasError.asStateFlow()
 
     private var rootId: Int? = null
+    /** آی‌دی دسته‌ی اصلی تب؛ برای دکمه‌ی «بیشتر» ردیف‌های ویژه */
+    val rootCategoryId: Int? get() = rootId
     private var loadedTab: Boolean? = null
     private val requested = mutableSetOf<Int>()
 
@@ -43,10 +45,12 @@ class HomeViewModel(
 
     private fun rebuild() {
         // از هر اپ فقط بهترین پست (بالاترین نسخه) توی کل صفحه می‌مونه، و فقط توی اولین ردیفش
-        val keep = LatestOnly.latestPerApp(base.flatMap { raw[it.id].orEmpty() }).mapTo(HashSet<Int>()) { it.id }
+        val keep = LatestOnly.latestPerApp(base.filter { it.id > 0 }.flatMap { raw[it.id].orEmpty() }).mapTo(HashSet<Int>()) { it.id }
         val seen = HashSet<Int>()
         _sections.value = base.mapNotNull { s ->
             val posts = raw[s.id] ?: return@mapNotNull SectionState(s)
+            // ردیف‌های ویژه‌ی بالا (پربازدید/جدید/به‌روز) تکراری‌گیری نمی‌شن
+            if (s.id < 0) return@mapNotNull if (posts.isEmpty()) null else SectionState(s, posts)
             val unique = posts.filter { it.id in keep && seen.add(it.id) }
             if (unique.isEmpty()) null else SectionState(s, unique)
         }
