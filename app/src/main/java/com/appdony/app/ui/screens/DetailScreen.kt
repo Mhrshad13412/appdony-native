@@ -47,6 +47,7 @@ import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.DetailSkeleton
+import com.appdony.app.ui.components.glassBorder
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.components.ShimmerBox
@@ -431,7 +432,7 @@ private fun DetailContent(
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(16.dp)).border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp)).glassBorder(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
                         .background(AppdonyCardBg).padding(16.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
