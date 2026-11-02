@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +52,8 @@ import com.appdony.app.data.model.cardCategory
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.gameCardName
-import com.appdony.app.data.model.isNew
+import com.appdony.app.data.model.isJustPublished
+import com.appdony.app.data.model.isJustUpdated
 import com.appdony.app.data.model.meta
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
@@ -77,7 +79,8 @@ fun PostCard(post: Post, onClick: () -> Unit, modifier: Modifier = Modifier, fil
     val title = remember(post.id) { post.cleanTitle() }
     val image = remember(post.id) { try { post.featuredImageUrl() } catch (e: Exception) { null } }
     val category = remember(post.id) { post.cardCategory() }
-    val isNew = remember(post.id, post.date, post.modified) { post.isNew() }
+    val isNew = remember(post.id, post.date, post.modified) { post.isJustPublished() }
+    val isUpdated = remember(post.id, post.date, post.modified) { post.isJustUpdated() }
 
     AppCard(
         title = title,
@@ -88,6 +91,7 @@ fun PostCard(post: Post, onClick: () -> Unit, modifier: Modifier = Modifier, fil
         androidReq = meta.androidReq,
         version = meta.version,
         isNew = isNew,
+        isUpdated = isUpdated,
         fillWidth = fillWidth
     )
 }
@@ -102,6 +106,7 @@ fun AppCard(
     androidReq: String? = null,
     version: String? = null,
     isNew: Boolean = false,
+    isUpdated: Boolean = false,
     fillWidth: Boolean = false
 ) {
     val context = LocalContext.current
@@ -126,6 +131,7 @@ fun AppCard(
                 success = { SubcomposeAsyncImageContent() }
             )
             if (isNew) NewBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
+            else if (isUpdated) UpdatedBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -134,6 +140,14 @@ fun AppCard(
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
         )
+        // اسم دسته درست زیر اسم بازی/برنامه
+        if (!category.isNullOrBlank()) {
+            Text(
+                text = category, color = primary, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         if (androidReq != null || version != null) {
             Spacer(modifier = Modifier.height(4.dp))
@@ -199,5 +213,25 @@ internal fun NewBadge(modifier: Modifier = Modifier) {
         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(11.dp))
         Spacer(modifier = Modifier.width(3.dp))
         Text(text = "جدید", color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** نشان «به‌روز شد» برای کارت‌هایی که تازه آپدیت شدن */
+@Composable
+internal fun UpdatedBadge(modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(scheme.surface.copy(alpha = 0.92f))
+            .background(scheme.primary.copy(alpha = 0.14f))
+            .glassBorder(1.dp, scheme.primary, shape)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.Update, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(11.dp))
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(text = "به‌روز شد", color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
