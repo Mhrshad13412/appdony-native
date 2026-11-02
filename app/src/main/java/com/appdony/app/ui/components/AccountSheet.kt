@@ -129,7 +129,7 @@ private fun AccountRow(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                .glassBorder(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
                 .background(tint.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center
         ) {
