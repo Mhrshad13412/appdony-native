@@ -50,6 +50,7 @@ import com.appdony.app.data.model.cachedMeta
 import com.appdony.app.data.model.cardCategory
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
+import com.appdony.app.data.model.gameCardName
 import com.appdony.app.data.model.isNew
 import com.appdony.app.data.model.meta
 import com.appdony.app.ui.theme.AppdonyCardBg
@@ -105,6 +106,7 @@ fun AppCard(
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
+    val shownTitle = remember(title) { title.gameCardName() }
     val imageRequest = remember(imageUrl) { ImageRequest.Builder(context).data(imageUrl).size(320).crossfade(150).build() }
     val sizing = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(CardWidth)
 
@@ -114,7 +116,7 @@ fun AppCard(
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1.12f).clip(RoundedCornerShape(16.dp))) {
             SubcomposeAsyncImage(
-                model = imageRequest, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                model = imageRequest, contentDescription = shownTitle, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
                 error = {
                     Box(modifier = Modifier.fillMaxSize().background(AppdonyCardBg), contentAlignment = Alignment.Center) {
@@ -128,7 +130,7 @@ fun AppCard(
 
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = title, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+            text = shownTitle, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
         )
