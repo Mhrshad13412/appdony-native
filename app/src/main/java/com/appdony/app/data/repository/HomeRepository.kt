@@ -2,6 +2,7 @@ package com.appdony.app.data.repository
 
 import android.text.Html
 import com.appdony.app.data.api.ApiClient
+import com.appdony.app.data.model.CategoryNames
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.data.model.sortedByFame
@@ -28,6 +29,11 @@ class HomeRepository {
         const val PLUS_GAMES_ID = 1515 // تب بازی‌ها (قبلاً «پوشیدنی‌ها»)
         const val PLUS_APPS_ID = 1528 // تب برنامه‌ها (قبلاً «تقویم»)
         private val PLUS_IDS = setOf(PLUS_GAMES_ID, PLUS_APPS_ID)
+
+        // ردیف‌های ویژه‌ی بالای صفحه (آی‌دی منفی یعنی دسته‌ی واقعی نیست)
+        const val SEC_POPULAR = -1
+        const val SEC_NEWEST = -2
+        const val SEC_UPDATED = -3
     }
 
     suspend fun loadStructure(isGames: Boolean): HomeStructure {
@@ -55,6 +61,9 @@ class HomeRepository {
         }
 
         val sections = buildList {
+            add(HomeSection(SEC_POPULAR, "پربازدیدترین‌ها", false))
+            add(HomeSection(SEC_NEWEST, "جدیدترین‌ها", false))
+            add(HomeSection(SEC_UPDATED, "به‌روزترین‌ها", false))
             if (uncategorized != null) {
                 add(HomeSection(uncategorized.id, cleanName(uncategorized.name), root != null))
             }
@@ -86,6 +95,7 @@ class HomeRepository {
     suspend fun loadSection(section: HomeSection, rootId: Int?): List<Post> {
         PopularityRemote.ensureFresh()
         val root = rootId
+        if (section.id < 0) return loadSpecial(section.id, root)
         return if (section.filterByRoot && root != null) {
             LatestOnly.latestPerApp(
                 api.getPostsByCategory(categoryId = section.id, perPage = 50)
@@ -100,9 +110,31 @@ class HomeRepository {
         }
     }
 
+    /** ردیف‌های «پربازدیدترین‌ها»، «جدیدترین‌ها» و «به‌روزترین‌ها» */
+    private suspend fun loadSpecial(id: Int, root: Int?): List<Post> {
+        val posts = when (id) {
+            SEC_POPULAR -> {
+                PopularityRemote.ensureFresh()
+                val list = if (root != null) api.getPostsByCategory(categoryId = root, perPage = 40) else api.getPosts(perPage = 40)
+                LatestOnly.latestPerApp(list.filterNot(::isPlusPost)).sortedByFame()
+            }
+            SEC_NEWEST -> {
+                val list = if (root != null) api.getPostsByCategory(categoryId = root, perPage = 40) else api.getPosts(perPage = 40)
+                LatestOnly.latestPerApp(list.filterNot(::isPlusPost))
+            }
+            else -> {
+                if (root == null) return emptyList()
+                LatestOnly.latestPerApp(
+                    api.getPostsByCategory(categoryId = root, perPage = 40, orderBy = "modified").filterNot(::isPlusPost)
+                )
+            }
+        }
+        return posts.take(12)
+    }
+
     private fun isPlusPost(post: Post): Boolean = post.categories.any { it in PLUS_IDS }
 
     private fun cleanName(name: String): String {
-        return Html.fromHtml(name, Html.FROM_HTML_MODE_LEGACY).toString().trim()
+        return CategoryNames.pretty(Html.fromHtml(name, Html.FROM_HTML_MODE_LEGACY).toString().trim())
     }
 }
