@@ -124,8 +124,9 @@ class HomeRepository {
             }
             else -> {
                 if (root == null) return emptyList()
-                LatestOnly.latestPerApp(
-                    api.getPostsByCategory(categoryId = root, perPage = 40, orderBy = "modified").filterNot(::isPlusPost)
+                // آخرین ویرایش واقعی سایت: ۶۰ پست اخیرِ مرتب‌شده بر اساس ویرایش، بعد گروه‌بندی هر اپ
+                LatestOnly.latestPerAppByEdit(
+                    api.getPostsByCategory(categoryId = root, perPage = 60, orderBy = "modified").filterNot(::isPlusPost)
                 )
             }
         }
