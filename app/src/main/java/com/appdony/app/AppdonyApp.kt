@@ -7,6 +7,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.local.AppDatabase
+import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.util.AppForeground
 import com.appdony.app.util.CrashReporter
 
@@ -18,6 +19,7 @@ class AppdonyApp : Application(), ImageLoaderFactory {
         super.onCreate()
         CrashReporter.install(this)
         ApiClient.init(this)
+        PopularityRemote.init(this)
         AppForeground.install(this)
     }
 
