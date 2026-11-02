@@ -177,7 +177,7 @@ private fun UpdateDialog(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp).fillMaxWidth(),
                     shape = RoundedCornerShape(32.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                    border = glassStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     shadowElevation = 8.dp
                 ) {
                   Box {
@@ -292,7 +292,7 @@ private fun VersionChip(text: String) {
         modifier = Modifier
             .clip(shape)
             .background(primary.copy(alpha = 0.14f))
-            .border(1.5.dp, primary, shape)
+            .glassBorder(1.5.dp, primary, shape)
             .padding(horizontal = 14.dp, vertical = 4.dp)
     ) {
         Text(text, color = primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -336,7 +336,7 @@ private fun ProgressPill(progress: Float) {
             .height(52.dp)
             .clip(shape)
             .background(primary.copy(alpha = 0.14f))
-            .border(1.5.dp, primary, shape),
+            .glassBorder(1.5.dp, primary, shape),
         contentAlignment = Alignment.Center
     ) {
         Box(
