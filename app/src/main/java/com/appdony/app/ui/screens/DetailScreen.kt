@@ -376,7 +376,7 @@ private fun DetailContent(
         }
     }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
