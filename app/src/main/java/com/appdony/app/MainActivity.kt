@@ -422,16 +422,20 @@ fun MainContent(
         }
         if (showAiAssistant) {
             val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support")
-            FloatingAssistant(
-                currentRoute = currentRoute,
-                // وقتی پشتیبان جای آیکن نشسته، آیکن قایمه؛ هوش مصنوعی ثابت هم جاش رو به دکمه‌ی وسط منو می‌ده
-                visible = assistantVisible && !fixedAi && SupportPresence.phase == SupportPhase.OFF,
-                bottomBarHeight = if (isMainRoute) (if (fixedAi) AiNavTotalHeight else 88.dp) else 0.dp,
-                onSearchClick = openSearch,
-                onDownloadsClick = { navController.navigateToTab("downloads") },
-                onHelpClick = { navController.navigateToTab("blog") },
-                onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
-            )
+            // توی حالت «هوش مصنوعی ثابت» دستیار شناور اصلاً ساخته نمی‌شه؛ ربات و پشتیبان فقط توی دکمه‌ی
+            // وسط منو هستن. قبلاً اینجا هم یه آواتار پشتیبان شناور کنار دکمه‌ی وسط ظاهر می‌شد (دوتایی).
+            if (!fixedAi) {
+                FloatingAssistant(
+                    currentRoute = currentRoute,
+                    // وقتی پشتیبان جای آیکن نشسته، آیکن قایمه
+                    visible = assistantVisible && SupportPresence.phase == SupportPhase.OFF,
+                    bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
+                    onSearchClick = openSearch,
+                    onDownloadsClick = { navController.navigateToTab("downloads") },
+                    onHelpClick = { navController.navigateToTab("blog") },
+                    onChatClick = { navController.navigate("ai_chat") { launchSingleTop = true } }
+                )
+            }
             // توی حالت ثابت، پشتیبان جای آیکن وسط منو می‌شینه و دیگه شناور نمی‌شه
             SupportFloating(
                 visible = assistantVisible && !fixedAi,
