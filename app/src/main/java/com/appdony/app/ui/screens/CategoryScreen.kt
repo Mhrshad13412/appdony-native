@@ -56,6 +56,9 @@ fun CategoryScreen(
     val currentSort by vm.currentSort.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
 
+    // توی صفحه‌ی «به‌روزترین‌ها» تب اول بر اساس آخرین ویرایش مرتب می‌شه، پس برچسبش هم همین رو می‌گه
+    val updatedMode = categoryName == "به‌روزترین‌ها"
+
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()
@@ -96,7 +99,12 @@ fun CategoryScreen(
                 FilterChip(
                     selected = currentSort == option,
                     onClick = { vm.setSort(option) },
-                    label = { Text(option.title, fontSize = 13.sp) },
+                    label = {
+                        Text(
+                            if (updatedMode && option == SortOption.NEWEST) "آخرین ویرایش" else option.title,
+                            fontSize = 13.sp
+                        )
+                    },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
