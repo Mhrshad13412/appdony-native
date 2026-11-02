@@ -126,7 +126,11 @@ fun HomeScreen(
             CategorySection(
                 state = state,
                 onPostClick = onPostClick,
-                onMoreClick = { onCategoryClick(state.section.id, state.section.title) }
+                onMoreClick = {
+                    // ردیف‌های ویژه دسته‌ی واقعی ندارن؛ دسته‌ی اصلی تب باز می‌شه
+                    val target = if (state.section.id < 0) viewModel.rootCategoryId else state.section.id
+                    if (target != null) onCategoryClick(target, state.section.title)
+                }
             )
         }
 
