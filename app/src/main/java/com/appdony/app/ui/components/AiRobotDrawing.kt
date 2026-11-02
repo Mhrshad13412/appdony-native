@@ -13,7 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.appdony.app.ui.theme.AppdonyGreen
 
 // ───────────────────────── آیکن هوش مصنوعی اپدونی ─────────────────────────
-// ربات سیاه‌وسفید با هدفون، دقیقاً مثل عکس مرجع و بدون هیچ رنگ تم.
+// ربات با هدفون. رنگ کادر و ربات از [CatPose.plate] و [CatPose.ink] می‌آد؛ پیش‌فرضشون سیاه‌وسفیده
+// (برای پاپیِ بیرونی)، ولی داخل اپ از رنگ تم پر می‌شن.
 // اسم‌های CatPose و drawCat عمداً همون قبلی موندن تا FloatingAssistant، CatOverlayService
 // و SupportFloating دست نخورن؛ ولی چیزی که کشیده می‌شه فقط آیکن ربات هوش مصنوعیه.
 
@@ -23,7 +24,7 @@ internal class CatPose(
     val blink: Float,    // پلک
     val ear: Float,      // تکون خوردن گوشی‌ها
     val tail: Float,     // قدیمی؛ استفاده نمی‌شه
-    val mouth: Float,    // تپش چشم‌ها موقع حرف زدن
+    val mouth: Float,    // تپش چشم‌ها و گوشی‌ها موقع حرف زدن
     val paw: Float,      // قدیمی؛ استفاده نمی‌شه
     val lookX: Float,    // نگاه چپ/راست
     val lookY: Float,    // نگاه بالا/پایین
@@ -32,8 +33,8 @@ internal class CatPose(
     val wiggle: Float,   // قدیمی؛ استفاده نمی‌شه
     val yarn: Color = AppdonyGreen, // قدیمی؛ آیکن به رنگ تم وابسته نیست
     val fur: Color = catFurOf(yarn), // قدیمی؛ دیگه استفاده نمی‌شه
-    val dizzy: Float = 0f,      // گیجی: چشم‌های مارپیچ
-    val spin: Float = 0f,       // زاویه‌ی چرخش مارپیچ (درجه)
+    val dizzy: Float = 0f,      // گیجی: چشم‌های مارپیچ و ستاره دور سر
+    val spin: Float = 0f,       // زاویه‌ی چرخش مارپیچ و ستاره‌ها (درجه)
     val ballOff: Float = 0f,    // ۱ = حباب از کنار آیکن جدا شده
     val ballX: Float = 0f,      // جای حباب آزاد نسبت به آیکن (dp)
     val ballY: Float = 0f,
@@ -41,7 +42,9 @@ internal class CatPose(
     val wave: Float = 0f,       // قدیمی؛ استفاده نمی‌شه
     val waveT: Float = 0f,      // قدیمی؛ استفاده نمی‌شه
     val tilt: Float = 0f,       // کج شدن سر (‎-۱ تا ۱)
-    val breath: Float = 0f      // نفس کشیدن ۰ تا ۱
+    val breath: Float = 0f,     // نفس کشیدن ۰ تا ۱
+    val plate: Color = RobotPlate, // رنگ کادر و صفحه‌ی صورت (باید مات باشه)
+    val ink: Color = RobotInk      // رنگ سر، گوشی‌ها و چشم‌ها
 )
 
 internal fun catFurOf(theme: Color): Color = lerp(theme, Color.White, 0.30f)
@@ -49,12 +52,14 @@ internal fun catFurOf(theme: Color): Color = lerp(theme, Color.White, 0.30f)
 private val RobotPlate = Color(0xFF0B0B0C)
 private val RobotInk = Color(0xFFF4F4F4)
 
-/** آیکن ربات روی بوم ۶۰×۶۰ (واحد dp)؛ کادر مشکی، سر سفید گرد، گوشی‌های دو طرف و دو چشم عمودی */
+/** آیکن ربات روی بوم ۶۰×۶۰ (واحد dp)؛ کادر، سر گرد، گوشی‌های دو طرف و دو چشم عمودی */
 internal fun DrawScope.drawCat(p: CatPose) {
     val u = 1.dp.toPx()
     val c = Offset(30f * u, 30f * u)
+    val plate = p.plate
+    val ink = p.ink
 
-    drawRoundRect(RobotPlate, Offset.Zero, Size(60f * u, 60f * u), CornerRadius(24f * u))
+    drawRoundRect(plate, Offset.Zero, Size(60f * u, 60f * u), CornerRadius(24f * u))
 
     val sway = Math.sin(Math.toRadians(p.spin.toDouble())).toFloat()
     val grow = 1f + 0.025f * (p.breath - 0.5f) + 0.04f * p.scare
@@ -65,18 +70,18 @@ internal fun DrawScope.drawCat(p: CatPose) {
         val half = 14.2f * u
         val ring = 2.3f * u
 
-        // گوشی‌ها (موقع تکون خوردن کمی بیرون می‌زنن)
+        // گوشی‌ها (موقع تکون خوردن و حرف زدن کمی بیرون می‌زنن)
         val cupW = 5.5f * u
         val cupH = 12.4f * u
         val cupY = c.y + 1.2f * u - cupH / 2f
-        val push = p.ear * 0.8f * u
-        drawRoundRect(RobotInk, Offset(c.x - half - 2.9f * u - push, cupY), Size(cupW, cupH), CornerRadius(2.8f * u))
-        drawRoundRect(RobotInk, Offset(c.x + half + 2.9f * u - cupW + push, cupY), Size(cupW, cupH), CornerRadius(2.8f * u))
+        val push = (p.ear * 0.8f + p.mouth * 1.1f) * u
+        drawRoundRect(ink, Offset(c.x - half - 2.9f * u - push, cupY), Size(cupW, cupH), CornerRadius(2.8f * u))
+        drawRoundRect(ink, Offset(c.x + half + 2.9f * u - cupW + push, cupY), Size(cupW, cupH), CornerRadius(2.8f * u))
 
-        // سر: حلقه‌ی سفید دور صفحه‌ی مشکی
-        drawRoundRect(RobotInk, Offset(c.x - half, c.y - half), Size(half * 2f, half * 2f), CornerRadius(11.5f * u))
+        // سر: حلقه‌ی رنگی دور صفحه
+        drawRoundRect(ink, Offset(c.x - half, c.y - half), Size(half * 2f, half * 2f), CornerRadius(11.5f * u))
         val inner = half - ring
-        drawRoundRect(RobotPlate, Offset(c.x - inner, c.y - inner), Size(inner * 2f, inner * 2f), CornerRadius(9.2f * u))
+        drawRoundRect(plate, Offset(c.x - inner, c.y - inner), Size(inner * 2f, inner * 2f), CornerRadius(9.2f * u))
 
         // چشم‌ها
         val lx = p.lookX.coerceIn(-1f, 1f) * 1.8f * u
@@ -90,7 +95,7 @@ internal fun DrawScope.drawCat(p: CatPose) {
             val ex = c.x + side * 4.6f * u + lx
             if (pillA > 0.01f) {
                 drawRoundRect(
-                    RobotInk.copy(alpha = pillA),
+                    ink.copy(alpha = pillA),
                     Offset(ex - w / 2f, ey - h / 2f),
                     Size(w, h),
                     CornerRadius(w / 2f)
@@ -98,7 +103,7 @@ internal fun DrawScope.drawCat(p: CatPose) {
             }
             if (happyA > 0.01f && dizzyA < 0.5f) {
                 drawArc(
-                    color = RobotInk.copy(alpha = happyA),
+                    color = ink.copy(alpha = happyA),
                     startAngle = 200f,
                     sweepAngle = 140f,
                     useCenter = false,
@@ -109,7 +114,7 @@ internal fun DrawScope.drawCat(p: CatPose) {
             }
             if (dizzyA > 0.01f) {
                 drawArc(
-                    color = RobotInk.copy(alpha = dizzyA),
+                    color = ink.copy(alpha = dizzyA),
                     startAngle = p.spin + side * 40f,
                     sweepAngle = 280f,
                     useCenter = false,
@@ -118,6 +123,18 @@ internal fun DrawScope.drawCat(p: CatPose) {
                     style = Stroke(2f * u, cap = StrokeCap.Round)
                 )
             }
+        }
+    }
+
+    // ستاره‌هایی که موقع گیجی دور سر می‌چرخن
+    if (p.dizzy > 0.05f) {
+        val a = (p.dizzy * 2f).coerceIn(0f, 1f)
+        val base = Math.toRadians(p.spin.toDouble()).toFloat()
+        for (i in 0..2) {
+            val ang = base + i * (2f * Math.PI.toFloat() / 3f)
+            val sx = c.x + 18f * u * kotlin.math.cos(ang)
+            val sy = 7.5f * u + 2.5f * u * kotlin.math.sin(ang)
+            drawCircle(ink.copy(alpha = a), 1.7f * u, Offset(sx, sy))
         }
     }
 
