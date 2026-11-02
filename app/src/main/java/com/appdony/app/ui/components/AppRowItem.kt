@@ -27,12 +27,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.runtime.remember
+import com.appdony.app.data.model.gameCardName
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
 fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, showRank: Boolean = true) {
+    val shownTitle = remember(title) { title.gameCardName() }
     Row(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).appdonyCard().clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showRank) {
             Text(text = rank.toString(), color = AppdonyTextMuted, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
@@ -40,14 +43,14 @@ fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit,
         }
         Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(AppdonyCardBg), contentAlignment = Alignment.Center) {
             if (!imageUrl.isNullOrBlank()) {
-                AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                AsyncImage(model = imageUrl, contentDescription = shownTitle, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
                 Icon(Icons.Default.Phone, contentDescription = null, tint = AppdonyTextMuted, modifier = Modifier.size(26.dp))
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(text = shownTitle, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(2.dp))
             Text(text = "رایگان", color = AppdonyTextMuted, fontSize = 12.sp)
         }
