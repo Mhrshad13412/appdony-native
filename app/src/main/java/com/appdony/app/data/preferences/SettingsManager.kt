@@ -20,6 +20,7 @@ class SettingsManager(private val context: Context) {
         private val KEY_SHOW_AI = booleanPreferencesKey("show_ai_assistant") // 👈 جدید
         private val KEY_UI_STYLE = stringPreferencesKey("ui_style") // "glass" | "classic"
         private val KEY_BETA = booleanPreferencesKey("beta_enabled")
+        private val KEY_FIXED_AI = booleanPreferencesKey("fixed_ai") // دکمه‌ی ثابت هوش مصنوعی وسط منو
 
         const val STYLE_GLASS = "glass"
         const val STYLE_CLASSIC = "classic"
@@ -36,6 +37,13 @@ class SettingsManager(private val context: Context) {
 
     // بتا: پیش‌فرض خاموش؛ وقتی روشن باشه بلوک‌های اپدونی پلاس نشون داده می‌شن
     val beta: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_BETA] ?: false }
+
+    // هوش مصنوعی ثابت: پیش‌فرض روشن؛ دکمه‌ی گرد هوش مصنوعی وسط منوی پایین (شیشه‌ای و کلاسیک)
+    val fixedAi: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_FIXED_AI] ?: true }
+
+    suspend fun setFixedAi(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_FIXED_AI] = enabled }
+    }
 
     suspend fun setBeta(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_BETA] = enabled }
