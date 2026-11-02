@@ -88,6 +88,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
+    val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
     var overlayOn by remember {
@@ -206,6 +207,28 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         item {
+            SettingsGroup("حالت") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ModeTile(
+                        title = "شیشه‌ای",
+                        icon = Icons.Outlined.Palette,
+                        selected = uiStyle == SettingsManager.STYLE_GLASS,
+                        modifier = Modifier.weight(1f)
+                    ) { scope.launch { settingsManager.setUiStyle(SettingsManager.STYLE_GLASS) } }
+                    ModeTile(
+                        title = "کلاسیک",
+                        icon = Icons.Outlined.Visibility,
+                        selected = uiStyle == SettingsManager.STYLE_CLASSIC,
+                        modifier = Modifier.weight(1f)
+                    ) { scope.launch { settingsManager.setUiStyle(SettingsManager.STYLE_CLASSIC) } }
+                }
+            }
+        }
+
+        item {
             SettingsGroup("دستیار هوش مصنوعی") {
                 SettingsSwitchRow("نمایش پاپی", Icons.Outlined.Visibility, showAiAssistant) {
                     scope.launch { settingsManager.setShowAiAssistant(it) }
@@ -291,6 +314,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
 @Composable
 private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val glass = com.appdony.app.ui.components.LocalGlassMode.current
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             text = title,
@@ -304,7 +328,10 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)), RoundedCornerShape(20.dp)),
+                .then(
+                    if (glass) Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)), RoundedCornerShape(20.dp))
+                    else Modifier
+                ),
             content = content
         )
     }
