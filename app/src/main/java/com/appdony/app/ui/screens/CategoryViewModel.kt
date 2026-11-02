@@ -43,6 +43,12 @@ class CategoryViewModel(
     private val _currentSort = MutableStateFlow(SortOption.NEWEST)
     val currentSort: StateFlow<SortOption> = _currentSort.asStateFlow()
 
+    // «مشاهده همه»ی ردیف «به‌روزترین‌ها» با همین اسم باز می‌شه؛ پس تب پیش‌فرض بر اساس آخرین ویرایش مرتب می‌شه
+    private val updatedMode = categoryName == "به‌روزترین‌ها"
+
+    private fun apiSort(sort: SortOption): String =
+        if (updatedMode && sort == SortOption.NEWEST) "modified" else sort.apiValue
+
     private var currentPage = 1
     private var isEndReached = false
     private var isLoadingData = false
@@ -69,7 +75,7 @@ class CategoryViewModel(
                 categoryId = categoryId, 
                 page = 1, 
                 perPage = 24,
-                orderBy = sort.apiValue,
+                orderBy = apiSort(sort),
                 order = sort.order
             ).onSuccess { posts ->
                 // از هر اپ/بازی فقط جدیدترین نسخه
@@ -95,7 +101,7 @@ class CategoryViewModel(
                 categoryId = categoryId, 
                 page = currentPage, 
                 perPage = 24,
-                orderBy = sort.apiValue,
+                orderBy = apiSort(sort),
                 order = sort.order
             ).onSuccess { newPosts ->
                 if (newPosts.isEmpty()) {
