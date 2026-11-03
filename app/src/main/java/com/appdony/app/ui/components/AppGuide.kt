@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,6 +53,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -80,6 +85,9 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -89,10 +97,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appdony.app.data.preferences.SettingsManager
 import kotlinx.coroutines.delay
 
+/**
+ * وضعیت راهنما و جای واقعی بخش‌های رابط.
+ * هر بخش (تب‌ها، دکمه‌ی هوش مصنوعی، جستجو، منو) با [guideTarget] جای خودش رو ثبت می‌کنه
+ * تا دایره‌ی راهنما دقیقاً روی همون بخش بیفته، توی هر دو حالت کلاسیک و شیشه‌ای.
+ */
+object GuideState {
+    /** تا وقتی راهنما بازه true می‌مونه؛ ربات و دستیارها توش حرف تصادفی نمی‌زنن */
+    var active by mutableStateOf(false)
+    val rects = mutableStateMapOf<String, Rect>()
+}
+
+fun Modifier.guideTarget(key: String): Modifier = onGloballyPositioned { c ->
+    val r = c.boundsInRoot()
+    if (GuideState.rects[key] != r) GuideState.rects[key] = r
+}
+
 private enum class GuideTarget {
-    POPPY, BOTTOM_NAV, TAB_GAMES, TAB_APPS, TAB_BLOG, TAB_DOWNLOADS, SEARCH, ACCOUNT,
+    POPPY, BOTTOM_NAV, AI_BUTTON, TAB_GAMES, TAB_APPS, TAB_BLOG, TAB_DOWNLOADS, SEARCH, ACCOUNT,
     /** ناحیه‌ی محتوای صفحه؛ فقط وقتی کاربر روی تب می‌زنه و توضیح «داخلش» نشون داده می‌شه */
     CONTENT
 }
@@ -101,7 +126,7 @@ private class GuideStep(
     val title: String,
     val icon: ImageVector,
     val text: String,
-    /** توضیح داخلی؛ وقتی کاربر روی بخش روشن بزنه نشون داده می‌شه */
+    /** توضیح داخلی؛ با لمس بعدی نشون داده می‌شه */
     val inner: String?,
     /** اگه true باشه، موقع توضیح داخلی دایره می‌ره روی محتوای صفحه */
     val innerContent: Boolean,
@@ -109,7 +134,7 @@ private class GuideStep(
     val route: String? = null
 )
 
-private fun buildSteps(showPoppy: Boolean): List<GuideStep> = buildList {
+private fun buildSteps(showPoppy: Boolean, fixedAi: Boolean): List<GuideStep> = buildList {
     if (showPoppy) {
         add(
             GuideStep(
@@ -127,6 +152,15 @@ private fun buildSteps(showPoppy: Boolean): List<GuideStep> = buildList {
             null, false, GuideTarget.BOTTOM_NAV
         )
     )
+    if (fixedAi) {
+        add(
+            GuideStep(
+                "هوش مصنوعی", Icons.Outlined.ChatBubbleOutline,
+                "این دکمه‌ی گرد وسط منوئه. با زدنش چت هوش مصنوعی اپدونی باز می‌شه.",
+                null, false, GuideTarget.AI_BUTTON
+            )
+        )
+    }
     add(
         GuideStep(
             "بازی‌ها", Icons.Outlined.SportsEsports,
@@ -202,6 +236,8 @@ private class HoleShape(private val hole: Rect, private val corner: Float) : Sha
 /**
  * راهنمای اولین ورود: بیرونِ دایره بلور و مات، داخلش شفاف.
  * پاپی با ابر پیام خودش (همون استایل حرف‌های همیشگی‌ش) سمت مخالفِ دایره توضیح می‌ده.
+ * جای دایره‌ها از خودِ رابط خونده می‌شه (guideTarget)، پس همیشه دقیقاً روی همون بخشیه که توضیحش داده می‌شه.
+ * هر لمسی، هرجای صفحه (بلور، دایره، ابر پیام)، متن بعدی رو می‌خونه.
  * sceneLayer باید کل رابط (نوار بالا، منوی پایین، پاپی و محتوا) رو ضبط کرده باشه.
  */
 @Composable
@@ -217,7 +253,16 @@ fun AppGuide(
     val density = LocalDensity.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    val steps = remember(showPoppyStep) { buildSteps(showPoppyStep) }
+    val context = LocalContext.current
+    val fixedAi by remember { SettingsManager(context) }.fixedAi.collectAsState(initial = true)
+    val steps = remember(showPoppyStep, fixedAi) { buildSteps(showPoppyStep, fixedAi) }
+
+    // تا راهنما بازه، ربات منو و دستیارها حرف تصادفی نمی‌زنن
+    DisposableEffect(Unit) {
+        GuideState.active = true
+        onDispose { GuideState.active = false }
+    }
+
     var step by remember { mutableIntStateOf(0) }
     var innerShown by remember(step) { mutableStateOf(false) }
     val current = steps[step]
@@ -243,13 +288,25 @@ fun AppGuide(
     }
     val typing = shown < fullText.length
 
-    // فقط دکمه‌ها می‌تونن راهنما رو ببندن
+    // فقط دکمه‌ها و لمس صفحه می‌تونن راهنما رو جلو ببرن یا ببندن
     BackHandler(enabled = true) { }
 
     val close = {
         onNavigate(startRoute)
         onFinish()
     }
+
+    // هر لمسی (روی بلور، روی دایره، روی ابر پیام) = خوندن بعدی: اول توضیح داخلی، بعد مرحله‌ی بعد
+    val advance: () -> Unit = {
+        if (canExplain) {
+            innerShown = true
+        } else if (last) {
+            close()
+        } else {
+            step++
+        }
+    }
+    val advanceNow by rememberUpdatedState(advance)
 
     val pulseT = rememberInfiniteTransition(label = "guide_pulse")
     val pulse by pulseT.animateFloat(
@@ -276,14 +333,18 @@ fun AppGuide(
 
         val barTop = statusTop + px(10.dp)
         val barH = px(44.dp)
-        val glassBottom = h - navInset - px(10.dp)
-        val glassTop = glassBottom - px(68.dp)
 
-        fun tabRect(index: Int): Rect {
-            val innerW = w - px(32.dp) - px(12.dp)
-            val itemW = innerW / 4f
-            val x = physX(px(22.dp) + itemW * index, itemW)
-            return Rect(x, glassTop + px(6.dp), x + itemW, glassTop + px(62.dp))
+        // جای واقعی هر بخش از خودِ رابط می‌آد؛ اگه هنوز ثبت نشده بود، یه جای تقریبی استفاده می‌شه
+        fun reg(key: String): Rect? = GuideState.rects[key]?.takeIf { it.width > 0f && it.height > 0f }
+
+        val navBottom = h - navInset - px(6.dp)
+        val navTopFallback = navBottom - px(60.dp)
+
+        fun tabRect(index: Int, route: String): Rect {
+            reg("tab_$route")?.let { return it }
+            val itemW = (w - px(8.dp)) / 4f
+            val x = physX(px(4.dp) + itemW * index, itemW)
+            return Rect(x, navTopFallback, x + itemW, navBottom)
         }
 
         fun rectFor(t: GuideTarget): Rect = when (t) {
@@ -295,23 +356,39 @@ fun AppGuide(
                 val y = (bottomLimit - px(24.dp)).coerceIn(topLimit, bottomLimit)
                 Rect(margin, y, margin + size, y + size)
             }
-            GuideTarget.BOTTOM_NAV -> Rect(px(16.dp), glassTop, w - px(16.dp), glassBottom)
-            GuideTarget.TAB_GAMES -> tabRect(0)
-            GuideTarget.TAB_APPS -> tabRect(1)
-            GuideTarget.TAB_BLOG -> tabRect(2)
-            GuideTarget.TAB_DOWNLOADS -> tabRect(3)
-            GuideTarget.SEARCH -> {
+            GuideTarget.BOTTOM_NAV -> {
+                val nav = reg("nav") ?: Rect(px(4.dp), navTopFallback, w - px(4.dp), navBottom)
+                val ai = if (fixedAi) reg("ai") else null
+                if (ai == null) nav
+                else Rect(
+                    minOf(nav.left, ai.left), minOf(nav.top, ai.top),
+                    maxOf(nav.right, ai.right), maxOf(nav.bottom, ai.bottom)
+                )
+            }
+            GuideTarget.AI_BUTTON -> {
+                val b = reg("ai") ?: Rect(Offset(w / 2f, navTopFallback), px(27.dp))
+                // اسم «هوش مصنوعی» زیر دکمه‌ست؛ دایره هر دو رو می‌گیره
+                Rect(b.left, b.top, b.right, b.bottom + px(20.dp))
+            }
+            GuideTarget.TAB_GAMES -> tabRect(0, "games")
+            GuideTarget.TAB_APPS -> tabRect(1, "apps")
+            GuideTarget.TAB_BLOG -> tabRect(2, "blog")
+            GuideTarget.TAB_DOWNLOADS -> tabRect(3, "downloads")
+            GuideTarget.SEARCH -> reg("search") ?: run {
                 val width = w - px(78.dp)
                 val x = physX(px(12.dp), width)
                 Rect(x, barTop, x + width, barTop + barH)
             }
-            GuideTarget.ACCOUNT -> {
+            GuideTarget.ACCOUNT -> reg("account") ?: run {
                 val x = physX(w - px(56.dp), px(44.dp))
                 Rect(x, barTop, x + px(44.dp), barTop + barH)
             }
             GuideTarget.CONTENT -> {
-                val top = barTop + barH + px(10.dp)
-                Rect(px(8.dp), top, w - px(8.dp), top + h * 0.30f)
+                // از زیر نوار بالا تا بالای منوی پایین؛ نیمه‌ی بالایش که ردیف‌های اول محتواست
+                val top = (reg("search")?.bottom ?: (barTop + barH)) + px(12.dp)
+                val bottom = (reg("nav")?.top ?: navTopFallback) - px(12.dp)
+                val height = ((bottom - top) * 0.5f).coerceAtLeast(px(120.dp))
+                Rect(px(8.dp), top, w - px(8.dp), top + height)
             }
         }
 
@@ -384,14 +461,12 @@ fun AppGuide(
             )
         }
 
-        // ۴) جلوی لمس اپ زیر راهنما رو می‌گیره. زدن روی بخش روشن = توضیح داخلی
+        // ۴) جلوی لمس اپ زیر راهنما رو می‌گیره. هر لمسی = خوندن بعدی
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(targetHole, canExplain) {
-                    detectTapGestures { offset ->
-                        if (canExplain && targetHole.contains(offset)) innerShown = true
-                    }
+                .pointerInput(Unit) {
+                    detectTapGestures { advanceNow() }
                 }
         )
 
@@ -424,7 +499,12 @@ fun AppGuide(
                 total = steps.size,
                 fullText = fullText,
                 shownText = fullText.take(shown),
-                showHint = canExplain,
+                hint = when {
+                    canExplain -> "هر جا بزنی، توضیح بیشتر نشون داده می‌شه"
+                    last -> "هر جا بزنی، راهنما تموم می‌شه"
+                    else -> "هر جا بزنی، می‌ره مرحله‌ی بعد"
+                },
+                onTap = advance,
                 last = last,
                 onNext = { if (last) close() else step++ },
                 onSkip = { close() }
@@ -441,7 +521,8 @@ private fun GuideBubble(
     total: Int,
     fullText: String,
     shownText: String,
-    showHint: Boolean,
+    hint: String,
+    onTap: () -> Unit,
     last: Boolean,
     onNext: () -> Unit,
     onSkip: () -> Unit
@@ -454,7 +535,11 @@ private fun GuideBubble(
         topLeft = small, topRight = big, bottomRight = big, bottomLeft = big
     )
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onTap
+        ),
         color = scheme.surface,
         shape = shape,
         border = BorderStroke(1.dp, primary.copy(alpha = 0.65f)),
@@ -506,15 +591,13 @@ private fun GuideBubble(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            if (showHint) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "برای جزئیات، روی بخش روشن بزن",
-                    color = primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = hint,
+                color = primary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
