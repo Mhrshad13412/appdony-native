@@ -21,6 +21,7 @@ class SettingsManager(private val context: Context) {
         private val KEY_UI_STYLE = stringPreferencesKey("ui_style") // "glass" | "classic"
         private val KEY_BETA = booleanPreferencesKey("beta_enabled")
         private val KEY_FIXED_AI = booleanPreferencesKey("fixed_ai") // دکمه‌ی ثابت هوش مصنوعی وسط منو
+        private val KEY_AI_CORNER = booleanPreferencesKey("ai_corner") // دکمه‌ی ثابت هوش مصنوعی گوشه‌ی صفحه
 
         const val STYLE_GLASS = "glass"
         const val STYLE_CLASSIC = "classic"
@@ -41,6 +42,13 @@ class SettingsManager(private val context: Context) {
     // هوش مصنوعی ثابت: پیش‌فرض روشن؛ دکمه‌ی گرد هوش مصنوعی وسط منوی پایین (شیشه‌ای و کلاسیک)
     val fixedAi: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_FIXED_AI] ?: true }
 
+    // هوش مصنوعی ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): پیش‌فرض خاموش
+    val aiCorner: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AI_CORNER] ?: false }
+
+    suspend fun setAiCorner(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_AI_CORNER] = enabled }
+    }
+
     suspend fun setFixedAi(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_FIXED_AI] = enabled }
     }
@@ -48,3 +56,28 @@ class SettingsManager(private val context: Context) {
     suspend fun setBeta(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_BETA] = enabled }
     }
+
+    suspend fun setUiStyle(style: String) {
+        context.settingsDataStore.edit { it[KEY_UI_STYLE] = style }
+    }
+
+    suspend fun setWifiOnly(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_WIFI_ONLY] = enabled }
+    }
+
+    suspend fun setNotifyBlog(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_NOTIFY_BLOG] = enabled }
+    }
+
+    suspend fun setNotifyUpdates(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_NOTIFY_UPDATES] = enabled }
+    }
+
+    suspend fun setStartPage(page: String) {
+        context.settingsDataStore.edit { it[KEY_START_PAGE] = page }
+    }
+
+    suspend fun setShowAiAssistant(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_SHOW_AI] = enabled }
+    }
+}
