@@ -40,6 +40,7 @@ import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
+import com.appdony.app.data.model.gameCardName
 import com.appdony.app.data.model.primaryCategoryName
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.session.SessionManager
@@ -66,6 +67,12 @@ import com.appdony.app.util.TelegramLinks
 import com.appdony.app.util.TelegramRedirect
 import kotlinx.coroutines.launch
 
+// ⚠️ مهم — لود اولویت‌دار صفحه‌ی جزئیات (از ساده به سخت)؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
+// ۱) اگه پست قبلاً تو لیستی دیده شده (PostMemory): عکس، اسم تمیز و دسته همون لحظه میاد (DetailPreview) و بقیه اسکلته
+// ۲) بعد مشخصات و توضیحات (بعد از دریافت و پارس محتوا)  ۳) بعد لینک‌های نصب، با لودینگ جدا
+// ۴) بعد تصاویر، مشابه‌ها و کامنت‌ها، هر کدوم مستقل و به محض آماده شدن
+// هیچ تأخیر ساختگی‌ای نیست و اگه شبکه قطع بود، دکمه‌ی «تلاش دوباره» هست.
+// اسم برنامه/بازی با همون فیلتر کارت‌ها (gameCardName) تمیز می‌شه؛ عنوان مقاله‌های وبلاگ دست نمی‌خوره.
 @Composable
 fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClick: (Int) -> Unit) {
     val vm: DetailViewModel = viewModel(
@@ -111,9 +118,18 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
-            is DetailUiState.Loading -> if (isBlog) BlogCardSkeleton() else DetailSkeleton()
+            is DetailUiState.Loading -> {
+                val preview = s.preview
+                if (isBlog) BlogCardSkeleton()
+                else if (preview != null) DetailPreview(preview)
+                else DetailSkeleton()
+            }
             is DetailUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.message, color = AppdonyTextMuted)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(s.message, color = AppdonyTextMuted)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { vm.load() }) { Text("تلاش دوباره") }
+                }
             }
             is DetailUiState.Success -> {
                 DetailContent(
@@ -345,6 +361,55 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
         }
     }
 }
+
+/** پیش‌نمایش فوری: عکس و اسم و دسته از لیست میاد، مشخصات و لینک‌ها اسکلتن تا لود بشن */
+@Composable
+private fun DetailPreview(post: Post) {
+    val featured = remember(post.id) { post.featuredImageUrl() }
+    val title = remember(post.id) { post.cleanTitle().gameCardName() }
+    val category = remember(post.id) { post.primaryCategoryName() }
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(280.dp)
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+        ) {
+            AsyncImage(model = featured, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))
+                )
+            )
+        }
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = featured, contentDescription = null,
+                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, color = AppdonyTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(4.dp))
+                    Text(category, color = primaryColor, fontSize = 13.sp)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            ShimmerBox(modifier = Modifier.width(90.dp).height(18.dp), cornerRadius = 6)
+            Spacer(Modifier.height(10.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth().height(110.dp), cornerRadius = 20)
+            Spacer(Modifier.height(20.dp))
+            ShimmerBox(modifier = Modifier.width(70.dp).height(18.dp), cornerRadius = 6)
+            Spacer(Modifier.height(10.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth().height(54.dp), cornerRadius = 16)
+        }
+    }
+}
+
 @Composable
 private fun DetailContent(
     post: Post, info: AppInfo, similar: List<Post>, contentBlocks: List<ContentBlock>,
@@ -358,6 +423,8 @@ private fun DetailContent(
     val textColor = AppdonyTextPrimary
     val tocItems = contentBlocks.filterIsInstance<ContentBlock.Header>().filter { it.level == 2 }
     val featured = post.featuredImageUrl()
+    // اسم تمیز بازی/برنامه (همون فیلتر کارت‌ها)
+    val appTitle = remember(post.id) { post.cleanTitle().gameCardName() }
 
     // برای بازی/برنامه عکس‌ها توی گالری نشون داده می‌شن نه توی متن
     val description = if (isBlog) contentBlocks else contentBlocks.filter { it !is ContentBlock.Image }
@@ -407,7 +474,7 @@ private fun DetailContent(
                             )
                             Spacer(Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(post.cleanTitle(), color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(appTitle, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
                                 Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
                             }
