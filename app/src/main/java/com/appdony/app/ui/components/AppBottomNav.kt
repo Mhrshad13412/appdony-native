@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -57,7 +56,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -234,13 +232,19 @@ private fun ClassicBottomNav(
                 .drawBehind {
                     // فقط خط لبه‌ی بالا و دور برش؛ کناره‌ها و پایین بی‌خط می‌مونن
                     val edge = barShape.createOutline(size, layoutDirection, this)
-                    clipRect(
-                        left = 2.dp.toPx(),
-                        top = 0f,
-                        right = size.width - 2.dp.toPx(),
-                        bottom = 48.dp.toPx()
-                    ) {
-                        drawOutline(edge, color = lineColor, style = Stroke(width = 2.dp.toPx()))
+                    if (edge is Outline.Generic) {
+                        clipRect(
+                            left = 2.dp.toPx(),
+                            top = 0f,
+                            right = size.width - 2.dp.toPx(),
+                            bottom = 48.dp.toPx()
+                        ) {
+                            drawPath(
+                                path = edge.path,
+                                color = lineColor,
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+                        }
                     }
                 }
                 .navigationBarsPadding()
