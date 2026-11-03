@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,9 +65,10 @@ import kotlinx.coroutines.withContext
 
 private val CardWidth = 122.dp
 
-// جای ثابت ردیف دسته و ردیف اندروید/نسخه؛ حتی وقتی خالین رزرو می‌شن تا همه‌ی کارت‌ها هم‌قد باشن
-private val CardCategoryHeight = 14.dp
-private val CardMetaHeight = 24.dp
+// جای ردیف دسته و ردیف اندروید/نسخه همیشه رزرو می‌شه تا کارت‌ها هم‌قد باشن.
+// این‌ها «حداقل» ارتفاعن نه ارتفاع ثابت: متن فارسی هیچ‌وقت از پایین بریده نمی‌شه
+private val CardCategoryMinHeight = 18.dp
+private val CardMetaMinHeight = 24.dp
 
 // ════════════════════════════════════════════════════════════════════════════
 // ⚠️ مهم — لود اولویت‌دار کارت‌ها (از ساده به سخت)؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
@@ -168,9 +170,9 @@ fun AppCard(
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
         )
-        // اسم دسته درست زیر اسم بازی/برنامه؛ جاش همیشه رزروئه تا ارتفاع کارت‌ها یکی باشه
+        // اسم دسته درست زیر اسم بازی/برنامه؛ جاش همیشه رزروئه ولی بدون برش، تا حروف فارسی له نشن
         Box(
-            modifier = Modifier.fillMaxWidth().height(CardCategoryHeight),
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = CardCategoryMinHeight),
             contentAlignment = Alignment.Center
         ) {
             if (!category.isNullOrBlank()) {
@@ -184,7 +186,7 @@ fun AppCard(
 
         // ردیف اندروید/نسخه؛ جاش همیشه رزروئه (چه لودینگ، چه آماده، چه خالی) تا کارت‌ها هم‌قد بمونن
         Box(
-            modifier = Modifier.fillMaxWidth().height(CardMetaHeight),
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = CardMetaMinHeight),
             contentAlignment = Alignment.BottomCenter
         ) {
             if (metaLoading) {
