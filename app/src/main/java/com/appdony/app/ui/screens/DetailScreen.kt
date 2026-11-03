@@ -49,6 +49,7 @@ import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.DetailSkeleton
 import com.appdony.app.ui.components.glassBorder
+import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.components.ShimmerBox
@@ -120,6 +121,9 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
     val toggleFavorite: () -> Unit = { scope.launch { favoritesManager.toggle(postId) } }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+      Column(modifier = Modifier.fillMaxSize()) {
+        if (!isBlog) BackRow(onBack)
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
         when (val s = state) {
             is DetailUiState.Loading -> {
                 val preview = s.preview
@@ -151,15 +155,17 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
                 )
             }
         }
-
-        Box(
-            modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { onBack() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color.White)
         }
-        // برای وبلاگ، اشتراک و نشانک همچنان روی عکسِ بالا میمونن؛ برای بازی/برنامه توی ردیف دکمه‌ها هستن
+      }
+
+        // برای وبلاگ، بازگشت و اشتراک و نشانک همچنان روی عکسِ بالا میمونن؛ برای بازی/برنامه ردیف «بازگشت» بالای صفحه‌ست و اشتراک و نشانک توی ردیف دکمه‌ها
         if (isBlog) {
+            Box(
+                modifier = Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color.White)
+            }
             Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(
                     modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() },
@@ -275,11 +281,24 @@ private fun InfoTable(rows: List<Pair<String, String>>) {
     }
 }
 
+/** ردیف «بازگشت» زیر نوار بالا (مثل سایت): فلش + متن، سمت راست */
+@Composable
+private fun BackRow(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onBack() }.padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = AppdonyTextPrimary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("بازگشت", color = AppdonyTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
 /** بالای صفحه: آیکون گرد (سمت راست) + اسم و دسته */
 @Composable
 private fun AppHeader(imageUrl: String?, title: String, category: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 60.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
@@ -295,24 +314,28 @@ private fun AppHeader(imageUrl: String?, title: String, category: String) {
     }
 }
 
-/** ردیف مشخصات کوتاه: هر آیتم (مقدار، عنوان) */
+/** ردیف مشخصات کوتاه (مثل سایت): خط بالا و پایین، هر آیتم (مقدار، عنوان) با جداکننده‌ی عمودی */
 @Composable
 private fun StatsRow(items: List<Pair<String, String>>) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
-            .clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        items.forEachIndexed { index, (value, label) ->
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(4.dp))
-                Text(label, color = AppdonyTextMuted, fontSize = 12.sp)
-            }
-            if (index != items.lastIndex) {
-                Box(Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)))
+    val line = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        HorizontalDivider(color = line)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { index, (value, label) ->
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(4.dp))
+                    Text(label, color = AppdonyTextMuted, fontSize = 12.sp)
+                }
+                if (index != items.lastIndex) {
+                    Box(Modifier.width(1.dp).height(32.dp).background(line))
+                }
             }
         }
+        HorizontalDivider(color = line)
     }
 }
 
@@ -525,7 +548,7 @@ private fun DetailContent(
         }
     }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + LocalBottomBarClearance.current)) {
         if (isBlog) {
             item {
                 Box(
