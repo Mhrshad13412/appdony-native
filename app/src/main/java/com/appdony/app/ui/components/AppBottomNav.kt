@@ -772,4 +772,27 @@ private fun NavTab(
     Column(
         modifier = modifier
             .height(NavItemHeight)
-            .guideTarget("tab_${i
+            .guideTarget("tab_${item.route}")
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        val iconTop = if (glass) GlassContentTop else NavPillTop + (NavPillHeight - NavIconSize) / 2
+        val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
+        Spacer(Modifier.height(iconTop))
+        TabIcon(item = item, selected = selected, tint = tint)
+        Spacer(Modifier.height(labelTop - iconTop - NavIconSize))
+        Text(
+            text = item.label,
+            fontSize = 11.sp,
+            color = tint,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
