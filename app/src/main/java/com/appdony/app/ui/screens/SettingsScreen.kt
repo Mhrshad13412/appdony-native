@@ -40,6 +40,8 @@ import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Visibility
 import com.appdony.app.ui.components.AiMode
 import com.appdony.app.ui.components.AiModeSelector
+import com.appdony.app.ui.components.PillOption
+import com.appdony.app.ui.components.PillSelector
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -156,23 +158,14 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         item {
             SettingsGroup("ظاهر برنامه") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ModeTile(
-                        title = "تاریک",
-                        icon = Icons.Outlined.DarkMode,
-                        selected = themeState.mode == ThemeMode.DARK,
-                        modifier = Modifier.weight(1f)
-                    ) { scope.launch { themeManager.setMode(ThemeMode.DARK) } }
-                    ModeTile(
-                        title = "روشن",
-                        icon = Icons.Outlined.LightMode,
-                        selected = themeState.mode == ThemeMode.LIGHT,
-                        modifier = Modifier.weight(1f)
-                    ) { scope.launch { themeManager.setMode(ThemeMode.LIGHT) } }
-                }
+                PillSelector(
+                    options = listOf(
+                        PillOption("تاریک", "پس‌زمینه‌ی تیره؛ برای چشم راحت‌تر، مخصوصاً شب‌ها.", Icons.Outlined.DarkMode),
+                        PillOption("روشن", "پس‌زمینه‌ی روشن؛ مناسب روز و نور زیاد.", Icons.Outlined.LightMode)
+                    ),
+                    selectedIndex = if (themeState.mode == ThemeMode.DARK) 0 else 1,
+                    onSelect = { i -> scope.launch { themeManager.setMode(if (i == 0) ThemeMode.DARK else ThemeMode.LIGHT) } }
+                )
                 RowDivider()
 
                 Column(modifier = Modifier.padding(14.dp)) {
@@ -208,62 +201,33 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
                 RowDivider()
 
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.FormatSize, null, tint = primary, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("اندازه فونت", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FontSize.values().forEach { size ->
-                            val selected = themeState.fontSize == size
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (selected) primary else MaterialTheme.colorScheme.background)
-                                    .border(1.dp, if (selected) primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-                                    .clickable { scope.launch { themeManager.setFontSize(size) } }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = when (size) {
-                                        FontSize.SMALL -> "کوچک"
-                                        FontSize.MEDIUM -> "متوسط"
-                                        FontSize.LARGE -> "بزرگ"
-                                    },
-                                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-                }
+                val fontSizes = FontSize.values()
+                PillSelector(
+                    options = listOf(
+                        PillOption("فونت کوچک", "نوشته‌ها کوچیک‌تر می‌شن و جای بیشتری روی صفحه جا می‌شه.", Icons.Outlined.FormatSize, 18.dp),
+                        PillOption("فونت متوسط", "اندازه‌ی پیش‌فرض و متعادل برنامه.", Icons.Outlined.FormatSize, 24.dp),
+                        PillOption("فونت بزرگ", "نوشته‌ها درشت‌تر می‌شن تا راحت‌تر خونده بشن.", Icons.Outlined.FormatSize, 30.dp)
+                    ),
+                    selectedIndex = fontSizes.indexOf(themeState.fontSize).coerceAtLeast(0),
+                    onSelect = { i -> scope.launch { themeManager.setFontSize(fontSizes[i]) } }
+                )
             }
         }
 
         item {
             SettingsGroup("حالت") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ModeTile(
-                        title = "شیشه‌ای",
-                        icon = Icons.Outlined.Palette,
-                        selected = uiStyle == SettingsManager.STYLE_GLASS,
-                        modifier = Modifier.weight(1f)
-                    ) { scope.launch { settingsManager.setUiStyle(SettingsManager.STYLE_GLASS) } }
-                    ModeTile(
-                        title = "کلاسیک",
-                        icon = Icons.Outlined.Visibility,
-                        selected = uiStyle == SettingsManager.STYLE_CLASSIC,
-                        modifier = Modifier.weight(1f)
-                    ) { scope.launch { settingsManager.setUiStyle(SettingsManager.STYLE_CLASSIC) } }
-                }
+                PillSelector(
+                    options = listOf(
+                        PillOption("شیشه‌ای", "منوی پایین نیمه‌شفاف و محو، مثل شیشه.", Icons.Outlined.Palette),
+                        PillOption("کلاسیک", "منوی پایین ساده و مات، مثل گوگل پلی.", Icons.Outlined.Visibility)
+                    ),
+                    selectedIndex = if (uiStyle == SettingsManager.STYLE_GLASS) 0 else 1,
+                    onSelect = { i ->
+                        scope.launch {
+                            settingsManager.setUiStyle(if (i == 0) SettingsManager.STYLE_GLASS else SettingsManager.STYLE_CLASSIC)
+                        }
+                    }
+                )
             }
         }
 
@@ -380,30 +344,6 @@ private fun RowDivider() {
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     )
-}
-
-@Composable
-private fun ModeTile(title: String, icon: ImageVector, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val primary = MaterialTheme.colorScheme.primary
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.background)
-            .border(1.5.dp, if (selected) primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-            .padding(vertical = 14.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(
-            title,
-            color = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-        )
-    }
 }
 
 @Composable
