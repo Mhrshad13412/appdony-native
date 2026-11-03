@@ -38,6 +38,8 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Visibility
+import com.appdony.app.ui.components.AiMode
+import com.appdony.app.ui.components.AiModeSelector
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -90,8 +92,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
     val fixedAi by settingsManager.fixedAi.collectAsStateWithLifecycle(initialValue = true)
+    val aiCorner by settingsManager.aiCorner.collectAsStateWithLifecycle(initialValue = false)
     val beta by settingsManager.beta.collectAsStateWithLifecycle(initialValue = false)
-    val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_GLASS)
+    val uiStyle by settingsManager.uiStyle.collectAsStateWithLifecycle(initialValue = SettingsManager.STYLE_CLASSIC)
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     var cacheSize by remember { mutableStateOf("در حال محاسبه...") }
     var overlayOn by remember {
@@ -99,6 +102,33 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
+
+    // حالت فعلی دستیار از روی تنظیم‌ها درمیاد (مثل دنده‌ی اتومات: همیشه فقط یکی فعاله)
+    val aiMode = when {
+        aiCorner -> AiMode.CORNER
+        fixedAi -> AiMode.MENU
+        showAiAssistant && overlayOn -> AiMode.OUTSIDE
+        showAiAssistant -> AiMode.FLOATING
+        else -> AiMode.OFF
+    }
+    val applyAiMode: (AiMode) -> Unit = { m ->
+        scope.launch {
+            settingsManager.setShowAiAssistant(m == AiMode.MENU || m == AiMode.FLOATING || m == AiMode.OUTSIDE)
+            settingsManager.setFixedAi(m == AiMode.MENU)
+            settingsManager.setAiCorner(m == AiMode.CORNER)
+        }
+        val wantOverlay = m == AiMode.OUTSIDE
+        if (wantOverlay != overlayOn) {
+            overlayOn = wantOverlay
+            if (wantOverlay && !CatOverlayService.canDraw(context)) {
+                // اول اجازه‌ی «نمایش روی سایر برنامه‌ها»؛ بعد از برگشتن، سرویس خودش بالا میاد
+                context.startActivity(
+                    CatOverlayService.permissionIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            CatOverlayService.setEnabled(context, wantOverlay)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -247,24 +277,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         item {
             SettingsGroup("دستیار هوش مصنوعی") {
-                SettingsSwitchRow("هوش مصنوعی ثابت", Icons.Outlined.AutoAwesome, fixedAi) {
-                    scope.launch { settingsManager.setFixedAi(it) }
-                }
-                RowDivider()
-                SettingsSwitchRow("نمایش پاپی", Icons.Outlined.Visibility, showAiAssistant) {
-                    scope.launch { settingsManager.setShowAiAssistant(it) }
-                }
-                RowDivider()
-                SettingsSwitchRow("پاپی بیرون از برنامه", Icons.Outlined.Visibility, overlayOn) { on ->
-                    overlayOn = on
-                    if (on && !CatOverlayService.canDraw(context)) {
-                        // اول اجازه‌ی «نمایش روی سایر برنامه‌ها»؛ بعد از برگشتن، سرویس خودش بالا میاد
-                        context.startActivity(
-                            CatOverlayService.permissionIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
-                    CatOverlayService.setEnabled(context, on)
-                }
+                AiModeSelector(selected = aiMode, onSelect = applyAiMode)
             }
         }
 
