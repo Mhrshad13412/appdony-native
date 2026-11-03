@@ -2,6 +2,8 @@ package com.appdony.app.ui.navigation
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
@@ -13,46 +15,87 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
-// آیکن‌های متریال گوگل (۲۴×۲۴): نسخه‌ی خطی برای حالت عادی و نسخه‌ی تو‌پر برای تب انتخاب‌شده
-// رنگ نهایی از بیرون با tint تعیین می‌شود
-private fun materialIcon(name: String, vararg paths: String): ImageVector {
-    val builder = ImageVector.Builder(
-        name = name,
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f
-    )
+/** ضخامت خط آیکن‌های انتخاب‌نشده (۲۴×۲۴) */
+private const val StrokeW = 1.9f
+
+private fun builder(name: String) = ImageVector.Builder(
+    name = name,
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+)
+
+/** آیکن تو‌پر (حالت انتخاب‌شده)؛ سوراخ‌ها با جهت مخالف مسیر ساخته شدن. رنگ نهایی با tint میاد */
+private fun filledIcon(name: String, vararg paths: String): ImageVector {
+    val b = builder(name)
     paths.forEach { d ->
-        builder.addPath(
+        b.addPath(
             pathData = PathParser().parsePathString(d).toNodes(),
             fill = SolidColor(Color.Black)
         )
     }
-    return builder.build()
+    return b.build()
 }
 
-// بازی‌ها (videogame_asset)
-private val GamesOutlined = materialIcon(
-    "games_outlined",
-    "M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h18v8z",
-    "M6 15h2v-2h2v-2H8V9H6v2H4v2h2z",
-    "M14.5 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z",
-    "M18.5 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"
+/** آیکن خطی با گوشه‌های گرد (حالت انتخاب‌نشده)؛ dots دایره‌های کوچیک تو‌پرن */
+private fun lineIcon(name: String, lines: List<String>, dots: List<String> = emptyList()): ImageVector {
+    val b = builder(name)
+    lines.forEach { d ->
+        b.addPath(
+            pathData = PathParser().parsePathString(d).toNodes(),
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = StrokeW,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round
+        )
+    }
+    dots.forEach { d ->
+        b.addPath(
+            pathData = PathParser().parsePathString(d).toNodes(),
+            fill = SolidColor(Color.Black)
+        )
+    }
+    return b.build()
+}
+
+// ───────── بازی‌ها: دسته‌ی بازی (sports_esports) ─────────
+private const val GamepadBody =
+    "M21.58 16.09l-1.09-7.66C20.21 6.46 18.52 5 16.53 5H7.47C5.48 5 3.79 6.46 3.51 8.43l-1.09 7.66C2.2 17.63 3.39 19 4.94 19c.68 0 1.32-.27 1.8-.75L9 16h6l2.25 2.25c.48.48 1.13.75 1.8.75 1.56 0 2.75-1.37 2.53-2.91z"
+
+private val GamesOutlined = lineIcon(
+    name = "games_outlined",
+    lines = listOf(
+        GamepadBody,
+        "M6.5 10.5h4",
+        "M8.5 8.5v4"
+    ),
+    dots = listOf(
+        "M15 7.9a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z",
+        "M17 10.9a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z"
+    )
 )
 
-private val GamesFilled = materialIcon(
+private val GamesFilled = filledIcon(
     "games_filled",
-    "M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+    "$GamepadBody" +
+        "M11 11H9v2H8v-2H6v-1h2V8h1v2h2v1z" +
+        "m4-1c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z" +
+        "m2 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
 )
 
-// برنامه‌ها (grid_view)؛ نسخه‌ی تو‌پر مثل پلی‌استور: چهار مربع با گوشه‌ی گرد
-private val AppsOutlined = materialIcon(
-    "apps_outlined",
-    "M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z"
+// ───────── برنامه‌ها: چهار مربع گرد ─────────
+private val AppsOutlined = lineIcon(
+    name = "apps_outlined",
+    lines = listOf(
+        "M6 4h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+        "M16 4h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+        "M6 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z",
+        "M16 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z"
+    )
 )
 
-private val AppsFilled = materialIcon(
+private val AppsFilled = filledIcon(
     "apps_filled",
     "M5 3h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
     "M15 3h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
@@ -60,24 +103,33 @@ private val AppsFilled = materialIcon(
     "M15 13h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z"
 )
 
-// وبلاگ (article)
-private val BlogOutlined = materialIcon(
-    "blog_outlined",
-    "M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+// ───────── وبلاگ: مقاله (article) ─────────
+private val BlogOutlined = lineIcon(
+    name = "blog_outlined",
+    lines = listOf(
+        "M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4z",
+        "M8 8h8",
+        "M8 12h8",
+        "M8 16h5"
+    )
 )
 
-private val BlogFilled = materialIcon(
+private val BlogFilled = filledIcon(
     "blog_filled",
     "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
 )
 
-// دانلودها (file_download)
-private val DownloadsOutlined = materialIcon(
-    "downloads_outlined",
-    "M19 9h-4V3H9v6H5l7 7 7-7zM11 11V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5z"
+// ───────── دانلودها: فلش رو به پایین با سینی ─────────
+private val DownloadsOutlined = lineIcon(
+    name = "downloads_outlined",
+    lines = listOf(
+        "M12 4.5v10",
+        "M7.5 10.5l4.5 4.5 4.5-4.5",
+        "M5 19.5h14"
+    )
 )
 
-private val DownloadsFilled = materialIcon(
+private val DownloadsFilled = filledIcon(
     "downloads_filled",
     "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
 )
