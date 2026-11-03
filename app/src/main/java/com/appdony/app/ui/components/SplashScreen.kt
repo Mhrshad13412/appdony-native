@@ -2,6 +2,7 @@ package com.appdony.app.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appdony.app.R
 
 @Composable
 fun SplashScreen() {
@@ -38,13 +41,15 @@ fun SplashScreen() {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // آواتار دکتر طاعون به عنوان لوگو
-            Box(modifier = Modifier.size(120.dp).scale(scale.value).alpha(alpha.value)) {
-                PlagueDoctorAvatar(sizeDp = 120)
-            }
-            
+            // لوگوی اپدونی (تصویر ۱۵۰ در ۱۵۰) به‌جای ربات
+            Image(
+                painter = painterResource(id = R.drawable.appdony_logo),
+                contentDescription = "لوگوی اپدونی",
+                modifier = Modifier.size(150.dp).scale(scale.value).alpha(alpha.value)
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             Text(
                 text = "اپدونی",
                 color = MaterialTheme.colorScheme.onPrimary,
