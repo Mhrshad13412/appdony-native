@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,7 +54,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
+import com.appdony.app.data.model.gameCardName
+import com.appdony.app.ui.components.ShimmerBox
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
 import com.appdony.app.ui.components.DownloadCardSkeleton
@@ -81,6 +86,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 private val StatusGreen = Color(0xFF34C77B)
 private val StatusYellow = Color(0xFFFFC53D)
 
+// ⚠️ مهم — لود اولویت‌دار صفحه‌ی دانلودها؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
+// ۱) اسکلت کارت‌ها تا لیست از حافظه‌ی گوشی برسه (بدون هیچ تأخیر ساختگی)
+// ۲) قاب و اسم تمیز و وضعیت هر دانلود همون لحظه (اسم با فیلتر gameCardName؛ همون فیلتر کارت‌ها)
+// ۳) آیکون آخر از همه و کم‌کیفیت (size 160 + RGB565) با لودینگ خودش
 @Composable
 fun DownloadsScreen() {
     val context = LocalContext.current
@@ -215,12 +224,21 @@ private fun IconWithRing(item: DownloadItem, done: Boolean, failed: Boolean) {
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             if (!item.iconUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = item.iconUrl,
+                val context = LocalContext.current
+                val request = remember(item.iconUrl) {
+                    ImageRequest.Builder(context).data(item.iconUrl).size(160).allowRgb565(true).crossfade(200).build()
+                }
+                SubcomposeAsyncImage(
+                    model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
+                    error = { },
+                    success = { SubcomposeAsyncImageContent() }
                 )
+            } else {
+                ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0)
             }
         }
     }
@@ -256,8 +274,10 @@ private fun DownloadCard(
             IconWithRing(item, done, failed)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                // اسم تمیز: «دانلود روبیکا نسخه 4.1.1 برای اندروید» → «روبیکا»
+                val shownTitle = remember(item.title) { item.title.gameCardName() }
                 Text(
-                    text = item.title,
+                    text = shownTitle,
                     color = AppdonyTextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
