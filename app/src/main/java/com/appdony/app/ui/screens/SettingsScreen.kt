@@ -158,15 +158,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
                     Spacer(Modifier.height(14.dp))
+                    // هر رنگ یه خونه‌ی مساوی می‌گیره تا هیچ دایره‌ای له یا بریده نشه (حتی با ۸ رنگ)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         ThemeManager.themeColors.forEachIndexed { index, colorValue ->
-                            ColorDot(
-                                color = Color(colorValue),
-                                selected = themeState.colorIndex == index
-                            ) { scope.launch { themeManager.setColorIndex(index) } }
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                ColorDot(
+                                    color = Color(colorValue),
+                                    selected = themeState.colorIndex == index
+                                ) { scope.launch { themeManager.setColorIndex(index) } }
+                            }
                         }
                     }
                 }
@@ -391,7 +397,7 @@ private fun ModeTile(title: String, icon: ImageVector, selected: Boolean, modifi
 private fun ColorDot(color: Color, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(38.dp)
+            .size(32.dp)
             .clip(CircleShape)
             .background(color)
             .border(
@@ -403,7 +409,7 @@ private fun ColorDot(color: Color, selected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         if (selected) {
-            Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
         }
     }
 }
