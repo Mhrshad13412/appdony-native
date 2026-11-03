@@ -1,6 +1,7 @@
 package com.appdony.app.ui.components
 
 import android.os.SystemClock
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -9,11 +10,16 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -32,6 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -56,12 +64,14 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -99,16 +109,16 @@ private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// ── شیشه‌ای (مثل تلگرام): کاشی دور آیکن و اسم، آیکن و اسم از بالا ۱۰dp شروع می‌شن ──
+// ── شیشه‌ای (مثل تلگرام ادز): کاشی مستطیل گرد دور آیکن و اسم، آیکن و اسم از بالا ۱۰dp شروع می‌شن ──
 private val GlassContentTop = 10.dp
 private val GlassTileInset = 2.dp
-private val GlassTileShape = RoundedCornerShape(22.dp)
+private val GlassTileShape = RoundedCornerShape(20.dp)
 
 // دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر که تو یه «برش گرد» از خودِ نوار می‌شینه
 private val AiButtonSize = 54.dp
 
 /** خونه‌ی وسط (دکمه‌ی هوش مصنوعی) از بقیه‌ی خونه‌ها پهن‌تره تا «هوش مصنوعی» کامل جا بشه */
-private const val AiSlotWeight = 1.3f
+private const val AiSlotWeight = 1.5f
 
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
 private val AiBump = 24.dp
@@ -165,11 +175,29 @@ fun AppBottomNav(
     onSupportClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
     // جمله‌های «اپدونی پلاس» فقط وقتی بتا (تنظیمات ← آزمایشی) روشنه گفته می‌شن
     LaunchedEffect(Unit) {
-        SettingsManager(context).beta.collect { AssistantPhrases.plusEnabled = it }
+        settings.beta.collect { AssistantPhrases.plusEnabled = it }
     }
+    // حالت «ثابت گوشه»: دکمه‌ی هوش مصنوعی بالای منو، گوشه‌ی صفحه می‌شینه (جای خالی دورش لمس رو نمی‌گیره)
+    val cornerAi by settings.aiCorner.collectAsState(initial = false)
 
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (cornerAi && !fixedAi) CornerAiButton(onClick = onAiClick)
+        NavBar(currentRoute, hazeState, onTabSelected, fixedAi, onAiClick, onSupportClick)
+    }
+}
+
+@Composable
+private fun NavBar(
+    currentRoute: String?,
+    hazeState: HazeState,
+    onTabSelected: (String) -> Unit,
+    fixedAi: Boolean,
+    onAiClick: () -> Unit,
+    onSupportClick: () -> Unit
+) {
     val selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val surface = MaterialTheme.colorScheme.surface
     val background = MaterialTheme.colorScheme.background
@@ -183,36 +211,36 @@ fun AppBottomNav(
         return
     }
 
-    // نوار کپسولی (نصف ارتفاعِ نوار = گردی کامل)
-    val barShape = remember(notch) { NotchedBarShape(corner = 36.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
+    // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
+    val barShape = remember(notch) { NotchedBarShape(corner = 28.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
     // لبه‌ی شیشه: بالا روشن‌تر، وسط محو، پایین یه کم پررنگ‌تر
     val edgeBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.18f))
+        if (dark) listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.14f))
         else listOf(outline.copy(alpha = 0.60f), outline.copy(alpha = 0.25f), outline.copy(alpha = 0.40f))
     )
     // برقِ نرمِ بالای شیشه
     val sheenBrush = Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.09f else 0.30f), Color.Transparent)
+        listOf(Color.White.copy(alpha = if (dark) 0.05f else 0.30f), Color.Transparent)
     )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 14.dp, end = 14.dp, top = 8.dp + bump, bottom = 10.dp)
+                .padding(start = 18.dp, end = 18.dp, top = 8.dp + bump, bottom = 14.dp)
         ) {
-            // شیشه‌ی بلوری: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه؛ برش دکمه هم جزو همین شکله
+            // شیشه‌ی مات: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه؛ برش دکمه هم جزو همین شکله
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
-                        blurRadius = 28.dp
+                        blurRadius = 24.dp
                         backgroundColor = background
-                        tints = listOf(HazeTint(surface.copy(alpha = 0.50f)))
+                        tints = listOf(HazeTint(surface.copy(alpha = 0.82f)))
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
-                        fallbackTint = HazeTint(surface.copy(alpha = 0.92f))
+                        fallbackTint = HazeTint(surface.copy(alpha = 0.94f))
                     }
                     .background(sheenBrush)
                     .border(1.dp, edgeBrush, barShape)
@@ -346,14 +374,14 @@ private fun NavTabsArea(
                     // کاشی انتخاب‌شده‌ی شیشه‌ای بی‌رنگه: شیشه‌ی سفید، نه رنگ تم
                     .background(
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.10f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.08f))
                             else listOf(Color.White.copy(alpha = 0.90f), Color.White.copy(alpha = 0.60f))
                         )
                     )
                     .border(
                         1.dp,
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0.18f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.10f))
                             else listOf(
                                 MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
                                 MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
@@ -408,6 +436,68 @@ private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier =
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.wrapContentWidth(unbounded = true)
         )
+    }
+}
+
+// ───────────────────────── دکمه‌ی ثابت گوشه ─────────────────────────
+
+/** فقط یک بار در هر اجرای برنامه اول با نوشته باز می‌شه، بعد به دایره جمع می‌شه */
+private var cornerIntroShown = false
+
+/**
+ * هوش مصنوعیِ ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): دایره‌ی شیشه‌ای گوشه‌ی راست، بالای منو.
+ * اول به شکل قرص با نوشته‌ی «هوش مصنوعی» میاد و بعد از چند ثانیه به دایره جمع می‌شه.
+ */
+@Composable
+private fun CornerAiButton(onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    var expanded by remember { mutableStateOf(!cornerIntroShown) }
+    LaunchedEffect(Unit) {
+        if (expanded) {
+            cornerIntroShown = true
+            delay(4_000)
+            expanded = false
+        }
+    }
+    val shape = RoundedCornerShape(32.dp)
+    val fill = scheme.primary.copy(alpha = 0.20f).compositeOver(scheme.surface)
+
+    // چپ‌به‌راست ثابت می‌شه تا دکمه همیشه گوشه‌ی راست بمونه و قرص به سمت چپ باز بشه
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 18.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Row(
+                modifier = Modifier
+                    .height(60.dp)
+                    .clip(shape)
+                    .background(fill)
+                    .border(1.5.dp, scheme.primary.copy(alpha = 0.55f), shape)
+                    .clickable(onClick = onClick)
+                    .semantics { contentDescription = "هوش مصنوعی" },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandHorizontally() + fadeIn(),
+                    exit = shrinkHorizontally() + fadeOut()
+                ) {
+                    Text(
+                        text = "هوش مصنوعی",
+                        color = scheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(start = 24.dp, end = 2.dp)
+                    )
+                }
+                Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+                    BuddyCanvas(modifier = Modifier.size(44.dp), plate = fill, ink = scheme.primary)
+                }
+            }
+        }
     }
 }
 
