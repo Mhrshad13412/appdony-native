@@ -214,14 +214,14 @@ private fun NavBar(
     // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
     val barShape = remember(notch) { NotchedBarShape(corner = 28.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
-    // لبه‌ی شیشه: بالا روشن‌تر، وسط محو، پایین یه کم پررنگ‌تر
+    // لبه‌ی شیشه (مثل هونر/تلگرام ادز): فقط بالا یه خط خیلی کم‌رنگ، پایین تقریباً هیچی
     val edgeBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.14f))
-        else listOf(outline.copy(alpha = 0.60f), outline.copy(alpha = 0.25f), outline.copy(alpha = 0.40f))
+        if (dark) listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.015f))
+        else listOf(Color.White.copy(alpha = 0.70f), outline.copy(alpha = 0.10f), outline.copy(alpha = 0.04f))
     )
     // برقِ نرمِ بالای شیشه
     val sheenBrush = Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.05f else 0.30f), Color.Transparent)
+        listOf(Color.White.copy(alpha = if (dark) 0.04f else 0.18f), Color.Transparent)
     )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -236,14 +236,15 @@ private fun NavBar(
                     .fillMaxWidth()
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
-                        blurRadius = 24.dp
+                        blurRadius = 30.dp
                         backgroundColor = background
-                        tints = listOf(HazeTint(surface.copy(alpha = 0.82f)))
+                        // شیشه‌ی نیمه‌شفاف مثل هونر: محتوای پشتش محو دیده می‌شه، نه یه سطح مات
+                        tints = listOf(HazeTint(surface.copy(alpha = if (dark) 0.42f else 0.55f)))
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
-                        fallbackTint = HazeTint(surface.copy(alpha = 0.94f))
+                        fallbackTint = HazeTint(surface.copy(alpha = 0.88f))
                     }
                     .background(sheenBrush)
-                    .border(1.dp, edgeBrush, barShape)
+                    .border(0.75.dp, edgeBrush, barShape)
             ) {
                 Box(modifier = Modifier.padding(NavInnerPadding)) {
                     NavTabsArea(
@@ -374,17 +375,17 @@ private fun NavTabsArea(
                     // کاشی انتخاب‌شده‌ی شیشه‌ای بی‌رنگه: شیشه‌ی سفید، نه رنگ تم
                     .background(
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.08f))
-                            else listOf(Color.White.copy(alpha = 0.90f), Color.White.copy(alpha = 0.60f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.05f))
+                            else listOf(Color.White.copy(alpha = 0.70f), Color.White.copy(alpha = 0.40f))
                         )
                     )
                     .border(
-                        1.dp,
+                        0.75.dp,
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.10f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.02f))
                             else listOf(
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.06f)
                             )
                         ),
                         GlassTileShape
