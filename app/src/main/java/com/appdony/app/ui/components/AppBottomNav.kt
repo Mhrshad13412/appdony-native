@@ -308,7 +308,7 @@ private fun ClassicBottomNav(
  * ردیف تب‌ها. وقتی [fixedAi] روشنه، خونه‌ی وسط مال دکمه‌ی هوش مصنوعیه
  * (کمی پهن‌تر از بقیه) و دو تب یه طرفش، دو تب طرف دیگه‌ش.
  * هایلایت از تبی به تب دیگه با یه فنر نرم سُر می‌خوره:
- *  - شیشه‌ای: کاشی گرد دور آیکن و اسم (مثل تلگرام)
+ *  - شیشه‌ای: کاشی گرد بی‌رنگ (شیشه‌ی سفید) دور آیکن و اسم (مثل تلگرام)
  *  - کلاسیک: قرص پهن پشت آیکن (مثل گوگل پلی)
  */
 @Composable
@@ -323,8 +323,9 @@ private fun NavTabsArea(
     val half = bottomNavItems.size / 2
     val aiW = if (fixedAi) AiSlotWeight else 0f
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().guideTarget("nav")) {
         val unit = maxWidth / (bottomNavItems.size + aiW)
         val before = selectedIndex + if (fixedAi && selectedIndex >= half) aiW else 0f
         val slotStart = unit * before
@@ -342,12 +343,22 @@ private fun NavTabsArea(
                     .offset(x = indicatorX)
                     .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
                     .clip(GlassTileShape)
+                    // کاشی انتخاب‌شده‌ی شیشه‌ای بی‌رنگه: شیشه‌ی سفید، نه رنگ تم
                     .background(
-                        Brush.verticalGradient(listOf(primary.copy(alpha = 0.28f), primary.copy(alpha = 0.12f)))
+                        Brush.verticalGradient(
+                            if (dark) listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.10f))
+                            else listOf(Color.White.copy(alpha = 0.90f), Color.White.copy(alpha = 0.60f))
+                        )
                     )
                     .border(
                         1.dp,
-                        Brush.verticalGradient(listOf(primary.copy(alpha = 0.75f), primary.copy(alpha = 0.28f))),
+                        Brush.verticalGradient(
+                            if (dark) listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0.18f))
+                            else listOf(
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            )
+                        ),
                         GlassTileShape
                     )
             )
@@ -445,6 +456,7 @@ private object BubbleAbove : PopupPositionProvider {
  * هیچ حلقه یا رنگ اضافه‌ای دورش نیست؛ جای خالی دورش همون برشیه که از خودِ نوار بریده شده.
  * تو دایره ربات هوش مصنوعیه که زندگی خودش رو داره: هر چند ثانیه حرف می‌زنه (حباب میاد)،
  * می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
+ * تا وقتی راهنمای اولین ورود بازه، ربات ساکته و حرف تصادفی نمی‌زنه.
  * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
@@ -494,6 +506,14 @@ private fun AiNavButton(
         if (say === s) say = null
     }
 
+    // وقتی راهنما باز می‌شه ربات ساکت می‌شه و حرف نیمه‌کاره‌ش جمع می‌شه
+    LaunchedEffect(GuideState.active) {
+        if (GuideState.active) {
+            say = null
+            talking = false
+        }
+    }
+
     // کارهای تصادفی ربات؛ وقتی پشتیبان اومده ساکت می‌شه
     LaunchedEffect(supportOn) {
         if (supportOn) {
@@ -513,7 +533,7 @@ private fun AiNavButton(
             delay(3_500)
         }
         while (true) {
-            if (say == null) {
+            if (say == null && !GuideState.active) {
                 // خوردن تصادفی به دیوار عمداً حذف شده؛ ربات تو حالت ثابت خودش رو نمی‌کوبه (فقط موقع کشیدن توسط کاربر)
                 when ((0..99).random()) {
                     in 0..44 -> speak(nextBuddySay(routeNow))
@@ -535,6 +555,7 @@ private fun AiNavButton(
     LaunchedEffect(supportOn) {
         if (supportOn) return@LaunchedEffect
         AssistantBus.events.collect { s ->
+            if (GuideState.active) return@collect
             if (s.kind == SayKind.DONE) launch { buddy.jump() }
             speak(s, extraMs = 6_000L)
         }
@@ -543,6 +564,7 @@ private fun AiNavButton(
     Box(
         modifier = modifier
             .size(AiButtonSize)
+            .guideTarget("ai")
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
@@ -580,7 +602,7 @@ private fun AiNavButton(
 
         // حباب حرف‌های ربات؛ پنجره‌ی جدا که از لبه‌ی دکمه بیرون بزنه و بریده نشه
         val shown = say
-        if (shown != null && !supportOn) {
+        if (shown != null && !supportOn && !GuideState.active) {
             key(shown) {
                 Popup(
                     popupPositionProvider = BubbleAbove,
@@ -633,11 +655,19 @@ private fun NavTab(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    // شیشه‌ای: متن و آیکنِ انتخاب‌شده سفیده (توی تم روشن، سفید روی شیشه‌ی روشن دیده نمی‌شه؛ پس تیره)
+    val selectedColor = when {
+        !glass -> primary
+        dark -> Color.White
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val tint by animateColorAsState(if (selected) selectedColor else muted, tween(250), label = "nav_tint")
 
     Column(
         modifier = modifier
             .height(NavItemHeight)
+            .guideTarget("tab_${item.route}")
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
