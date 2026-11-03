@@ -1,8 +1,11 @@
 package com.appdony.app.data.model
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -28,6 +31,14 @@ object PopularityRemote {
     @Volatile private var file: File? = null
     @Volatile private var lastTry = 0L
 
+    // دانلود تو صف جدا و قابل‌انتظار با زمان‌سنج؛ قبلاً یه درخواست بلاک‌کننده بود که تایم‌اوت نمی‌شد و ردیف‌ها رو معطل می‌کرد
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var inFlight: Deferred<Unit>? = null
+
+    private fun startDownload(f: File): Deferred<Unit> = synchronized(this) {
+        inFlight?.takeIf { it.isActive } ?: scope.async { download(f) }.also { inFlight = it }
+    }
+
     private val client by lazy {
         OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
@@ -44,22 +55,35 @@ object PopularityRemote {
         } catch (e: Exception) {
             // فایل خراب: نادیده بگیر
         }
+        // همون اول کار پشت صحنه تازه می‌شه تا موقع لود ردیف‌ها آماده باشه
+        val stale = scores.isEmpty() || System.currentTimeMillis() - f.lastModified() >= MAX_AGE_MS
+        if (stale) {
+            lastTry = System.currentTimeMillis()
+            startDownload(f)
+        }
     }
 
     fun score(postId: Int): Int? = scores[postId]
 
-    /** اگه هنوز دیتایی نداریم صبر می‌کنه (حداکثر ۴ ثانیه)؛ اگه دیتای قدیمی داریم پشت صحنه تازه می‌کنه */
+    /** اگه هنوز دیتایی نداریم حداکثر ۱.۵ ثانیه صبر می‌کنه (و دانلود ادامه پیدا می‌کنه)؛ اگه دیتای قدیمی داریم پشت صحنه تازه می‌کنه */
     suspend fun ensureFresh() {
         val f = file ?: return
         val age = System.currentTimeMillis() - f.lastModified()
         if (scores.isNotEmpty() && age < MAX_AGE_MS) return
+        if (scores.isEmpty()) {
+            val running = inFlight?.takeIf { it.isActive }
+            if (running != null) {
+                withTimeoutOrNull(1500) { running.await() }
+                return
+            }
+        }
         val now = System.currentTimeMillis()
         if (now - lastTry < RETRY_GAP_MS) return
         lastTry = now
         if (scores.isEmpty()) {
-            withTimeoutOrNull(4000) { withContext(Dispatchers.IO) { download(f) } }
+            withTimeoutOrNull(1500) { startDownload(f).await() }
         } else {
-            Thread { download(f) }.start()
+            startDownload(f)
         }
     }
 
