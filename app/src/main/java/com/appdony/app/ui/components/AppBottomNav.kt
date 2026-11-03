@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -81,15 +83,16 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
-private val NavItemHeight = 56.dp
+private val NavItemHeight = 58.dp
+private val NavIconSize = 26.dp
 
 // دکمه‌ی هوش مصنوعی وسط منو (مثل بام): حلقه‌ی بیرونی، دایره‌ی داخلی و جای خالی بین تب‌ها
-private val AiSlotWidth = 78.dp
-private val AiRingSize = 72.dp
-private val AiButtonSize = 62.dp
+private val AiSlotWidth = 84.dp
+private val AiRingSize = 76.dp
+private val AiButtonSize = 66.dp
 
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
-private val AiBump = 24.dp
+private val AiBump = 26.dp
 
 /** ارتفاع کل منو وقتی دکمه‌ی هوش مصنوعی وسطشه (برای کسانی که جا رزرو می‌کنن) */
 val AiNavTotalHeight = 88.dp + AiBump
@@ -127,7 +130,7 @@ fun AppBottomNav(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 10.dp + bump, bottom = 10.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 8.dp + bump, bottom = 10.dp)
         ) {
             // شیشه‌ی بلوری: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه
             Box(
@@ -162,13 +165,13 @@ fun AppBottomNav(
                 route = currentRoute,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
             )
         }
     }
 }
 
-/** حالت کلاسیک: نوار مات، چسبیده به لبه‌های صفحه، بدون بلور و بدون بوردر */
+/** حالت کلاسیک (مثل بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا، بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -179,6 +182,7 @@ private fun ClassicBottomNav(
     onSupportClick: () -> Unit
 ) {
     val bump = if (fixedAi) AiBump else 0.dp
+    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -186,8 +190,11 @@ private fun ClassicBottomNav(
                 .fillMaxWidth()
                 .padding(top = bump)
                 .background(MaterialTheme.colorScheme.surface)
+                .drawBehind {
+                    drawRect(color = lineColor, size = Size(size.width, 1.dp.toPx()))
+                }
                 .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 12.dp)
+                .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
         ) {
             NavTabsArea(
                 selectedIndex = selectedIndex,
@@ -214,6 +221,7 @@ private fun ClassicBottomNav(
 /**
  * ردیف تب‌ها و اندیکاتور لغزنده. وقتی [fixedAi] روشنه، وسط ردیف یه جای خالی برای دکمه‌ی
  * هوش مصنوعی می‌ماند: دو تب یه طرف، دو تب طرف دیگه.
+ * اندیکاتور دقیقاً به اندازه‌ی کل تب (آیکن + اسم + فاصله‌ها) هایلایت می‌کنه.
  */
 @Composable
 private fun NavTabsArea(
@@ -246,7 +254,7 @@ private fun NavTabsArea(
                 .width(tabWidth)
                 .height(NavItemHeight)
                 .clip(indicatorShape)
-                .background(primary.copy(alpha = 0.14f))
+                .background(primary.copy(alpha = 0.16f))
                 .then(if (indicatorBorder) Modifier.border(1.5.dp, primary, indicatorShape) else Modifier)
         )
 
@@ -263,10 +271,11 @@ private fun NavTabsArea(
                     ) {
                         Text(
                             text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = primary,
                             maxLines = 1,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
                 }
@@ -530,14 +539,9 @@ private fun NavTab(
 
     val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.15f else 1f,
+        targetValue = if (selected) 1.1f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "nav_icon_scale"
-    )
-    val iconLift by animateDpAsState(
-        targetValue = if (selected) (-1).dp else 0.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "nav_icon_lift"
     )
 
     Column(
@@ -552,21 +556,24 @@ private fun NavTab(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = item.selectedIcon,
-            contentDescription = item.label,
-            tint = tint,
-            modifier = Modifier
-                .size(24.dp)
-                .offset(y = iconLift)
-                .scale(iconScale)
-        )
+        // انتخاب‌شده: آیکن تو‌پر؛ انتخاب‌نشده: آیکن خطی
+        Crossfade(targetState = selected, animationSpec = tween(200), label = "nav_icon_fill") { sel ->
+            Icon(
+                imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
+                contentDescription = item.label,
+                tint = tint,
+                modifier = Modifier
+                    .size(NavIconSize)
+                    .scale(iconScale)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         Text(
             text = item.label,
             fontSize = 11.sp,
             color = tint,
             maxLines = 1,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
     }
 }
