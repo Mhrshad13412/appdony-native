@@ -13,7 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 // ۴) بعد تصاویر، مشابه‌ها و کامنت‌ها، هر کدوم مستقل و به محض آماده شدن
 // هیچ تأخیر ساختگی‌ای نیست و اگه شبکه قطع بود، دکمه‌ی «تلاش دوباره» هست.
 // اسم برنامه/بازی با همون فیلتر کارت‌ها (gameCardName) تمیز می‌شه؛ عنوان مقاله‌های وبلاگ دست نمی‌خوره.
+// چیدمان بازی/برنامه: آیکون + اسم، ردیف نسخه/حجم/نیازمندی، ردیف دکمه‌ها (دانلود، نشانک، اشتراک)، بعد بقیه
 @Composable
 fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClick: (Int) -> Unit) {
     val vm: DetailViewModel = viewModel(
@@ -95,6 +96,7 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
     val favorites by favoritesManager.favoriteIds.collectAsStateWithLifecycle(initialValue = emptySet())
     var showLoginSheet by remember { mutableStateOf(false) }
     var userRating by remember { mutableIntStateOf(0) }
+    val isFavorite = favorites.contains(postId)
 
     if (showLoginSheet) {
         LoginSheet(onDismiss = { showLoginSheet = false }, onLoginSuccess = { user: UserData ->
@@ -115,6 +117,7 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
             context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری"))
         }
     }
+    val toggleFavorite: () -> Unit = { scope.launch { favoritesManager.toggle(postId) } }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (val s = state) {
@@ -135,6 +138,9 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
                 DetailContent(
                     post = s.post, info = s.info, similar = s.similar, contentBlocks = s.contentBlocks,
                     isLoggedIn = isLoggedIn, nonce = nonce, isBlog = isBlog, userRating = userRating,
+                    isFavorite = isFavorite,
+                    onToggleFavorite = toggleFavorite,
+                    onShare = { shareAction() },
                     onRatingChanged = { if (isLoggedIn) userRating = it else showLoginSheet = true },
                     onSimilarClick = onSimilarClick,
                     onDownload = { link ->
@@ -152,21 +158,23 @@ fun DetailScreen(postId: Int, isBlog: Boolean, onBack: () -> Unit, onSimilarClic
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color.White)
         }
-        Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() },
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.Share, "اشتراک‌گذاری", tint = Color.White) }
-            Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000))
-                    .clickable { scope.launch { favoritesManager.toggle(postId) } },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (favorites.contains(postId)) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    "علاقه‌مندی",
-                    tint = if (favorites.contains(postId)) Color(0xFFFF5252) else Color.White
-                )
+        // برای وبلاگ، اشتراک و نشانک همچنان روی عکسِ بالا میمونن؛ برای بازی/برنامه توی ردیف دکمه‌ها هستن
+        if (isBlog) {
+            Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { shareAction() },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Share, "اشتراک‌گذاری", tint = Color.White) }
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xCC000000)).clickable { toggleFavorite() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (isFavorite) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        "نشانک",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else Color.White
+                    )
+                }
             }
         }
     }
@@ -267,26 +275,125 @@ private fun InfoTable(rows: List<Pair<String, String>>) {
     }
 }
 
+/** بالای صفحه: آیکون گرد (سمت راست) + اسم و دسته */
+@Composable
+private fun AppHeader(imageUrl: String?, title: String, category: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 60.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = imageUrl, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.size(100.dp).clip(RoundedCornerShape(22.dp)).background(AppdonyCardBg)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = AppdonyTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 30.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(category, color = AppdonyTextMuted, fontSize = 14.sp)
+        }
+    }
+}
+
+/** ردیف مشخصات کوتاه: هر آیتم (مقدار، عنوان) */
+@Composable
+private fun StatsRow(items: List<Pair<String, String>>) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(20.dp)).background(AppdonyCardBg).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEachIndexed { index, (value, label) ->
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Text(label, color = AppdonyTextMuted, fontSize = 12.sp)
+            }
+            if (index != items.lastIndex) {
+                Box(Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CircleIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, tint: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(52.dp).clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, desc, tint = tint) }
+}
+
+/** ردیف دکمه‌ها: دانلود (اصلی) + نشانک + اشتراک */
+@Composable
+private fun ActionRow(
+    info: AppInfo, isFavorite: Boolean,
+    onDownload: (DownloadLink) -> Unit, onToggleFavorite: () -> Unit, onShare: () -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val first = info.downloadLinks.firstOrNull()
+    val loading = first == null && !info.linksChecked
+    val enabled = first != null && first.url.isNotBlank()
+    val label = when {
+        loading -> "در حال بررسی لینک..."
+        first == null -> "لینک نصب موجود نیست"
+        first.url.isBlank() -> first.title
+        first.size != null -> "${first.title} (${first.size})"
+        else -> first.title
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = { first?.let { onDownload(it) } },
+            enabled = enabled,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = primary,
+                disabledContainerColor = AppdonyCardBg
+            )
+        ) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = AppdonyTextMuted)
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = label,
+                color = if (enabled) Color.White else AppdonyTextMuted,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        CircleIconButton(
+            icon = if (isFavorite) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            desc = "نشانک",
+            tint = if (isFavorite) primary else AppdonyTextPrimary,
+            onClick = onToggleFavorite
+        )
+        CircleIconButton(Icons.Default.Share, "اشتراک‌گذاری", AppdonyTextPrimary, onShare)
+    }
+}
+
+/** بقیه‌ی لینک‌ها (از دومی به بعد) و حالت خطا؛ لینک اول توی ردیف دکمه‌هاست */
 @Composable
 private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
-    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val primary = MaterialTheme.colorScheme.primary
+    val extra = info.downloadLinks.drop(1)
+    val showError = info.downloadLinks.isEmpty() && info.linksChecked
+    if (extra.isEmpty() && !showError) return
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (info.downloadLinks.isEmpty() && !info.linksChecked) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(10.dp))
-                Text("در حال بررسی لینک نصب...", color = AppdonyTextMuted, fontSize = 13.sp)
-            }
-        } else if (info.downloadLinks.isEmpty()) {
+        if (showError) {
             val failed = info.linkError != null
             Column(
                 modifier = Modifier
@@ -317,35 +424,26 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
                 }) { Text("کپی اطلاعات فنی", fontSize = 12.sp) }
             }
         } else {
-            info.downloadLinks.forEachIndexed { index, link ->
+            extra.forEach { link ->
                 val locked = link.url.isBlank()
-                val isPrimary = index == 0 && !locked
                 Button(
                     onClick = { onDownload(link) },
                     enabled = !locked,
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPrimary) primary else AppdonyCardBg,
+                        containerColor = AppdonyCardBg,
                         disabledContainerColor = AppdonyCardBg.copy(alpha = 0.6f)
                     )
                 ) {
                     Icon(
                         if (locked) Icons.Default.Lock else Icons.Default.Download, null,
-                        tint = when {
-                            locked -> AppdonyTextMuted
-                            isPrimary -> Color.White
-                            else -> AppdonyTextPrimary
-                        }
+                        tint = if (locked) AppdonyTextMuted else AppdonyTextPrimary
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = link.title,
-                        color = when {
-                            locked -> AppdonyTextMuted
-                            isPrimary -> Color.White
-                            else -> AppdonyTextPrimary
-                        },
+                        color = if (locked) AppdonyTextMuted else AppdonyTextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -354,7 +452,7 @@ private fun DownloadSection(info: AppInfo, onDownload: (DownloadLink) -> Unit) {
                     )
                     if (link.size != null && !locked) {
                         Spacer(Modifier.width(8.dp))
-                        Text(link.size, color = if (isPrimary) Color.White.copy(alpha = 0.8f) else AppdonyTextMuted, fontSize = 12.sp)
+                        Text(link.size, color = AppdonyTextMuted, fontSize = 12.sp)
                     }
                 }
             }
@@ -368,45 +466,23 @@ private fun DetailPreview(post: Post) {
     val featured = remember(post.id) { post.featuredImageUrl() }
     val title = remember(post.id) { post.cleanTitle().gameCardName() }
     val category = remember(post.id) { post.primaryCategoryName() }
-    val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(280.dp)
-                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+        AppHeader(imageUrl = featured, title = title, category = category)
+        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(70.dp), cornerRadius = 20)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(model = featured, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            Box(
-                modifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))
-                )
-            )
+            ShimmerBox(modifier = Modifier.weight(1f).height(52.dp), cornerRadius = 26)
+            ShimmerBox(modifier = Modifier.size(52.dp), cornerRadius = 26)
+            ShimmerBox(modifier = Modifier.size(52.dp), cornerRadius = 26)
         }
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = featured, contentDescription = null,
-                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, color = AppdonyTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(4.dp))
-                    Text(category, color = primaryColor, fontSize = 13.sp)
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-            ShimmerBox(modifier = Modifier.width(90.dp).height(18.dp), cornerRadius = 6)
-            Spacer(Modifier.height(10.dp))
-            ShimmerBox(modifier = Modifier.fillMaxWidth().height(110.dp), cornerRadius = 20)
-            Spacer(Modifier.height(20.dp))
-            ShimmerBox(modifier = Modifier.width(70.dp).height(18.dp), cornerRadius = 6)
-            Spacer(Modifier.height(10.dp))
-            ShimmerBox(modifier = Modifier.fillMaxWidth().height(54.dp), cornerRadius = 16)
-        }
+        Spacer(Modifier.height(16.dp))
+        ShimmerBox(modifier = Modifier.padding(horizontal = 16.dp).width(70.dp).height(18.dp), cornerRadius = 6)
+        Spacer(Modifier.height(10.dp))
+        ShimmerBox(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(160.dp), cornerRadius = 20)
     }
 }
 
@@ -414,6 +490,7 @@ private fun DetailPreview(post: Post) {
 private fun DetailContent(
     post: Post, info: AppInfo, similar: List<Post>, contentBlocks: List<ContentBlock>,
     isLoggedIn: Boolean, nonce: String, isBlog: Boolean, userRating: Int,
+    isFavorite: Boolean, onToggleFavorite: () -> Unit, onShare: () -> Unit,
     onRatingChanged: (Int) -> Unit, onSimilarClick: (Int) -> Unit,
     onDownload: (DownloadLink) -> Unit, onNeedLogin: () -> Unit
 ) {
@@ -432,11 +509,16 @@ private fun DetailContent(
         val featuredName = featured?.let { baseName(it) }
         info.screenshots.filter { baseName(it) != featuredName }
     }
+    // ردیف سه‌تایی بالا (مثل نمونه): نسخه | حجم | نیازمندی
+    val statItems = remember(info) {
+        buildList {
+            info.version?.let { add(it to "نسخه") }
+            info.size?.let { add(it to "حجم") }
+            info.androidReq?.let { add(it to "نیازمندی") }
+        }
+    }
     val tableRows = remember(info, post) {
         buildList {
-            info.version?.let { add("نسخه" to it) }
-            info.size?.let { add("حجم" to it) }
-            info.androidReq?.let { add("اندروید مورد نیاز" to it) }
             info.developer?.let { add("سازنده" to it) }
             add("دسته‌بندی" to post.primaryCategoryName())
             post.date?.let { add("تاریخ انتشار" to it.substringBefore('T')) }
@@ -444,55 +526,53 @@ private fun DetailContent(
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(if (isBlog) 220.dp else 280.dp)
-                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-            ) {
-                AsyncImage(model = featured, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (isBlog) {
+            item {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
+                        .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                ) {
+                    AsyncImage(model = featured, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f)))
+                        )
                     )
-                )
+                }
             }
-        }
-
-        item {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-                if (isBlog) {
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                     Text(post.primaryCategoryName(), color = primaryColor, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(Modifier.height(8.dp))
                     Text(post.cleanTitle(), color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, lineHeight = 32.sp)
                     Spacer(Modifier.height(16.dp))
-                } else {
-                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AppdonyCardBg).padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = featured, contentDescription = null,
-                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop
-                            )
-                            Spacer(Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(appTitle, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Spacer(Modifier.height(4.dp))
-                                Text(post.primaryCategoryName(), color = primaryColor, fontSize = 13.sp)
-                            }
-                        }
-                        // امتیاز دادن فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
-                        if (isLoggedIn) {
-                            Spacer(Modifier.height(16.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            Spacer(Modifier.height(12.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
-                                Spacer(Modifier.width(8.dp))
-                                RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
-                            }
-                        }
+                }
+            }
+        } else {
+            item { AppHeader(imageUrl = featured, title = appTitle, category = post.primaryCategoryName()) }
+            if (statItems.isNotEmpty()) item { StatsRow(statItems) }
+            item {
+                ActionRow(
+                    info = info, isFavorite = isFavorite,
+                    onDownload = onDownload, onToggleFavorite = onToggleFavorite, onShare = onShare
+                )
+            }
+            // امتیاز دادن فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
+            if (isLoggedIn) {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
+                        Spacer(Modifier.width(8.dp))
+                        RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
                     }
                 }
             }
+            // بقیه‌ی لینک‌ها یا پیام خطا (لینک اول توی ردیف دکمه‌هاست)
+            item { DownloadSection(info = info, onDownload = onDownload) }
         }
 
         if (isBlog && tocItems.isNotEmpty()) {
@@ -521,14 +601,6 @@ private fun DetailContent(
         }
 
         if (!isBlog) {
-            // جدول مشخصات
-            item { SectionTitle("مشخصات") }
-            item { InfoTable(tableRows) }
-
-            // دانلود
-            item { SectionTitle("دانلود") }
-            item { DownloadSection(info = info, onDownload = onDownload) }
-
             // تصاویر
             if (shots.isNotEmpty()) {
                 item { SectionTitle("تصاویر") }
@@ -548,6 +620,10 @@ private fun DetailContent(
                     }
                 }
             }
+
+            // جدول مشخصات (بقیه‌ی موارد؛ نسخه/حجم/نیازمندی بالا نشون داده شدن)
+            item { SectionTitle("مشخصات") }
+            item { InfoTable(tableRows) }
 
             if (description.isNotEmpty()) item { SectionTitle("توضیحات") }
         }
