@@ -48,7 +48,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
-            delay(450L)
+            // بدون هیچ تأخیر اولیه: لیست همون لحظه از حافظه‌ی گوشی خونده می‌شه
             while (isActive) {
                 withContext(Dispatchers.IO) { refreshOnce() }
                 _loaded.value = true
