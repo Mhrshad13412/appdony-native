@@ -6,6 +6,8 @@ import com.appdony.app.data.model.Post
 import com.appdony.app.data.repository.HomeRepository
 import com.appdony.app.data.repository.HomeSection
 import com.appdony.app.util.LatestOnly
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,17 +95,29 @@ class HomeViewModel(
     }
 
     // هر ردیف فقط وقتی به صفحه نزدیک شد صدا زده می‌شه
+    // اگه شبکه ضعیف بود و ردیف نیومد، خودش چند بار با فاصله‌ی کم دوباره تلاش می‌کنه تا کاربر روی اسکلت گیر نکنه
     fun loadSection(id: Int) {
         if (!requested.add(id)) return
         val section = base.firstOrNull { it.id == id } ?: return
 
         viewModelScope.launch {
-            try {
-                val posts = repository.loadSection(section, rootId)
-                raw[id] = posts
-                rebuild()
-            } catch (e: Exception) {
-                requested.remove(id) // دفعه‌ی بعد که ردیف دوباره دیده شد، دوباره تلاش می‌کنه
+            var attempt = 0
+            while (true) {
+                try {
+                    val posts = repository.loadSection(section, rootId)
+                    raw[id] = posts
+                    rebuild()
+                    return@launch
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    attempt++
+                    if (attempt >= 4) {
+                        requested.remove(id) // دفعه‌ی بعد که ردیف دوباره دیده شد، دوباره تلاش می‌کنه
+                        return@launch
+                    }
+                    delay(1_200L * attempt)
+                }
             }
         }
     }
