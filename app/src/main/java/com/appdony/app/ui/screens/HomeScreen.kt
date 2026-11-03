@@ -59,7 +59,6 @@ import com.appdony.app.ui.components.ShimmerBox
 import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.produceState
@@ -97,6 +96,10 @@ fun HomeScreen(
         return
     }
 
+    // ⚠️ مهم — لود اولویت‌دار صفحه‌ی اصلی؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
+    // ۱) اسکلت ردیف‌ها ۲) عنوان ردیف‌ها (همیشه فوری) ۳) هر ردیف فقط وقتی نزدیک صفحه شد لود می‌شه (HomeViewModel.loadSection)
+    // ۴) هر کارت با قاب و متن فوری میاد و اندروید/نسخه و عکسش لودینگ جدا دارن (AppCard.kt)
+    // هیچ تأخیر ساختگی‌ای نیست؛ همه‌چیز به محض آماده شدن داده نشون داده می‌شه.
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         // پایین لیست جا می‌ذاریم تا آخرین ردیف زیر منوی شیشه‌ای نمونه
@@ -249,28 +252,24 @@ private fun CategorySection(
 
 // ───────────── کمکی‌ها ─────────────
 
-// ظاهر شدن تدریجی کارت‌ها (یکی‌یکی)
+// ظاهر شدن نرم کارت‌ها؛ بدون هیچ تأخیر ساختگی: هر کارت همون لحظه‌ای که داده‌ش رسید شروع به محو شدن می‌کنه
+// (پارامتر index فقط برای سازگاری با جاهای صدا زدن مونده)
 @Composable
-private fun FadeIn(key: Any, index: Int, content: @Composable () -> Unit) {
+private fun FadeIn(key: Any, @Suppress("UNUSED_PARAMETER") index: Int, content: @Composable () -> Unit) {
     var visible by rememberSaveable(key) { mutableStateOf(false) }
 
-    LaunchedEffect(key) {
-        if (!visible) {
-            delay(index.coerceAtMost(6) * 70L)
-            visible = true
-        }
-    }
+    LaunchedEffect(key) { visible = true }
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(350),
+        animationSpec = tween(180),
         label = "fade_in"
     )
 
     Box(
         modifier = Modifier.graphicsLayer {
             this.alpha = alpha
-            translationY = (1f - alpha) * 30f
+            translationY = (1f - alpha) * 16f
         }
     ) {
         content()
