@@ -339,6 +339,13 @@ fun MainContent(
     val currentRoute = navBackStackEntry?.destination?.route ?: "games"
     val isMainRoute = currentRoute in listOf("games", "apps", "blog", "downloads")
     val isSearchRoute = currentRoute == "search"
+    // صفحه‌ی جزئیات هم مثل صفحه‌های اصلی نوار بالا (لوگو، جستجو، ورود) و منوی پایین رو داره
+    val isDetailRoute = currentRoute.startsWith("detail/")
+    val showBottomNav = isMainRoute || isDetailRoute
+    // توی جزئیات، تبی که ازش اومدیم توی منو روشن می‌مونه
+    var lastMainRoute by remember { mutableStateOf("games") }
+    LaunchedEffect(currentRoute) { if (isMainRoute) lastMainRoute = currentRoute }
+    val navHighlightRoute = if (isDetailRoute) lastMainRoute else currentRoute
 
     // نوار بالا خودش فیلد جستجوئه؛ پس متن جستجو اینجا هم لازمه
     val searchViewModel = rememberSearchViewModel()
@@ -355,12 +362,12 @@ fun MainContent(
     val layoutDirection = LocalLayoutDirection.current
     val systemNavInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // ارتفاع منو (۸۸ دپ) + نوار سیستم؛ لیست‌ها این‌قدر ته صفحه جا می‌ذارن
-    val bottomClearance = if (isMainRoute) 88.dp + systemNavInset else 0.dp
+    val bottomClearance = if (showBottomNav) 88.dp + systemNavInset else 0.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                if (isMainRoute || isSearchRoute) {
+                if (isMainRoute || isSearchRoute || isDetailRoute) {
                     AppTopBar(
                         isLoggedIn = isLoggedIn,
                         userInitial = if (displayName.isNotBlank()) displayName else username,
@@ -376,7 +383,7 @@ fun MainContent(
             }
         ) { padding ->
             // صفحه‌های اصلی: محتوا تا ته صفحه ادامه داره و از زیر منوی شیشه‌ای رد می‌شه
-            val contentPadding = if (isMainRoute) {
+            val contentPadding = if (showBottomNav) {
                 PaddingValues(
                     start = padding.calculateStartPadding(layoutDirection),
                     top = padding.calculateTopPadding(),
@@ -399,13 +406,13 @@ fun MainContent(
 
         // منوی پایین: شناور روی محتوا، موقع رفتن به جستجو آروم می‌ره پایین و موقع برگشتن میاد بالا
         AnimatedVisibility(
-            visible = isMainRoute,
+            visible = showBottomNav,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(380)),
             exit = slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
         ) {
             AppBottomNav(
-                currentRoute = currentRoute,
+                currentRoute = navHighlightRoute,
                 hazeState = hazeState,
                 onTabSelected = { route -> navController.navigateToTab(route) },
                 // هوش مصنوعی ثابت: دکمه‌ی گرد وسط منو (شیشه‌ای و کلاسیک) چت هوش مصنوعی رو باز می‌کنه
@@ -429,7 +436,7 @@ fun MainContent(
                     currentRoute = currentRoute,
                     // وقتی پشتیبان جای آیکن نشسته، آیکن قایمه
                     visible = assistantVisible && SupportPresence.phase == SupportPhase.OFF,
-                    bottomBarHeight = if (isMainRoute) 88.dp else 0.dp,
+                    bottomBarHeight = if (showBottomNav) 88.dp else 0.dp,
                     onSearchClick = openSearch,
                     onDownloadsClick = { navController.navigateToTab("downloads") },
                     onHelpClick = { navController.navigateToTab("blog") },
