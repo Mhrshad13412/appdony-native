@@ -4,13 +4,9 @@ import android.os.SystemClock
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -18,17 +14,17 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -78,20 +74,20 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
-private val NavItemHeight = 60.dp
+private val NavItemHeight = 58.dp
 
-// مثل پلی‌استور: آیکن ۲۴ و یه قرص پهن پشتش؛ اسم زیر قرص می‌شینه
+// مثل پلی‌استور: آیکن ۲۴، یه قرص گرد پشتش و اسم زیر قرص
 private val NavIconSize = 24.dp
 private val NavPillWidth = 56.dp
-private val NavPillHeight = 30.dp
+private val NavPillHeight = 32.dp
+private val NavPillTop = 4.dp
 
-// دکمه‌ی هوش مصنوعی وسط منو (مثل بام): دایره‌ی توپر، حلقه‌ی بریدگی دورش و جای خالی بین تب‌ها
-private val AiSlotWidth = 76.dp
-private val AiRingSize = 68.dp
-private val AiButtonSize = 56.dp
+// دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر + حلقه‌ی نازک هم‌رنگ نوار، وسط خونه‌ی پنجم
+private val AiRingSize = 58.dp
+private val AiButtonSize = 52.dp
 
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
-private val AiBump = 28.dp
+private val AiBump = 20.dp
 
 /** ارتفاع کل منو وقتی دکمه‌ی هوش مصنوعی وسطشه (برای کسانی که جا رزرو می‌کنن) */
 val AiNavTotalHeight = 88.dp + AiBump
@@ -159,7 +155,7 @@ fun AppBottomNav(
         if (fixedAi) {
             AiNavButton(
                 route = currentRoute,
-                ringColor = background,
+                ringColor = surface,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
@@ -192,7 +188,7 @@ private fun ClassicBottomNav(
                     drawRect(color = lineColor, size = Size(size.width, 1.dp.toPx()))
                 }
                 .navigationBarsPadding()
-                .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
+                .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
         ) {
             NavTabsArea(
                 selectedIndex = selectedIndex,
@@ -215,9 +211,9 @@ private fun ClassicBottomNav(
 }
 
 /**
- * ردیف تب‌ها. وقتی [fixedAi] روشنه، وسط ردیف یه جای خالی برای دکمه‌ی
- * هوش مصنوعی می‌ماند: دو تب یه طرف، دو تب طرف دیگه.
- * هایلایت انتخاب مثل پلی‌استور یه قرصِ پهن پشت آیکنه (تو خود NavTab).
+ * ردیف تب‌ها مثل بام: همه‌ی خونه‌ها مساوین. وقتی [fixedAi] روشنه، خونه‌ی وسط (پنجم)
+ * مال دکمه‌ی هوش مصنوعیه و دو تب یه طرفش، دو تب طرف دیگه‌ش.
+ * قرص هایلایت پشت آیکنِ تب انتخاب‌شده با یه فنر نرم از تبی به تب دیگه سُر می‌خوره.
  */
 @Composable
 private fun NavTabsArea(
@@ -228,36 +224,58 @@ private fun NavTabsArea(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val half = bottomNavItems.size / 2
+    val slots = bottomNavItems.size + if (fixedAi) 1 else 0
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        bottomNavItems.forEachIndexed { index, item ->
-            if (fixedAi && index == half) {
-                // جای دکمه‌ی وسط؛ فقط اسمش پایین می‌شینه (هم‌تراز اسم بقیه‌ی تب‌ها)
-                Box(
-                    modifier = Modifier.width(AiSlotWidth).height(NavItemHeight),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Text(
-                        text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
-                        fontSize = 11.sp,
-                        color = primary,
-                        maxLines = 1,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val slotWidth = maxWidth / slots
+        val slotIndex = selectedIndex + if (fixedAi && selectedIndex >= half) 1 else 0
+
+        // قرص سُر‌خور (آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیتم‌ها)
+        val pillX by animateDpAsState(
+            targetValue = slotWidth * slotIndex + (slotWidth - NavPillWidth) / 2,
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+            label = "nav_pill_x"
+        )
+        Box(
+            modifier = Modifier
+                .offset(x = pillX, y = NavPillTop)
+                .size(width = NavPillWidth, height = NavPillHeight)
+                .clip(CircleShape)
+                .background(primary.copy(alpha = 0.22f))
+        )
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            bottomNavItems.forEachIndexed { index, item ->
+                if (fixedAi && index == half) {
+                    AiSlotLabel(supportOn = supportOn, modifier = Modifier.weight(1f))
                 }
+                NavTab(
+                    item = item,
+                    selected = index == selectedIndex,
+                    onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
+                    modifier = Modifier.weight(1f)
+                )
             }
-            NavTab(
-                item = item,
-                selected = index == selectedIndex,
-                onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
-                modifier = Modifier.weight(1f)
-            )
         }
+    }
+}
+
+/** خونه‌ی وسط: خود دکمه از بالا میاد؛ اینجا فقط اسمش هم‌تراز اسم بقیه‌ی تب‌ها می‌شینه */
+@Composable
+private fun AiSlotLabel(supportOn: Boolean, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.height(NavItemHeight),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(NavPillTop + NavPillHeight + 3.dp))
+        Text(
+            text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -302,9 +320,10 @@ private object BubbleAbove : PopupPositionProvider {
 }
 
 /**
- * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه؛ حلقه‌ی دورش هم‌رنگ نواره و مثل بریدگی دیده می‌شه.
- * تو دایره‌ی توپرِ وسطش (به رنگ تم برنامه) ربات هوش مصنوعیه که زندگی خودش رو داره:
- * هر چند ثانیه حرف می‌زنه (حباب میاد)، می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
+ * دکمه‌ی گرد وسط منو مثل بام: دایره‌ی توپر به رنگ تم، کمی از لبه‌ی بالای نوار بیرون زده
+ * و فقط یه حلقه‌ی نازک هم‌رنگ نوار دورشه (همین حس «بریدگی» می‌ده)؛ هاله و پدینگ اضافه نداره.
+ * تو دایره ربات هوش مصنوعیه که زندگی خودش رو داره: هر چند ثانیه حرف می‌زنه (حباب میاد)،
+ * می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
  * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
@@ -319,16 +338,9 @@ private fun AiNavButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.9f else 1f,
+        targetValue = if (pressed) 0.92f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "ai_press"
-    )
-    // موج نرمی که از دکمه پخش می‌شه و محو می‌شه
-    val pulse = rememberInfiniteTransition(label = "ai_pulse").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearOutSlowInEasing), RepeatMode.Restart),
-        label = "ai_pulse_value"
     )
 
     // پشتیبان توی حالت ثابت جای آیکن هوش مصنوعی می‌شینه؛ ENTER و ON هر دو یعنی فعال
@@ -408,8 +420,6 @@ private fun AiNavButton(
         }
     }
 
-    val pulseColor = scheme.primary
-
     Box(
         modifier = modifier
             .size(AiRingSize)
@@ -418,17 +428,9 @@ private fun AiNavButton(
                 scaleY = pressScale
                 translationY = -buddy.hop.value * 10.dp.toPx()
             }
-            .drawBehind {
-                val t = pulse.value
-                drawCircle(
-                    color = pulseColor.copy(alpha = 0.22f * (1f - t)),
-                    radius = size.minDimension / 2f + 8.dp.toPx() * t
-                )
-            }
             .clip(CircleShape)
-            // حلقه‌ی هم‌رنگ نوار؛ همین باعث می‌شه دکمه توی نوار «بریده» به نظر بیاد
+            // حلقه‌ی نازک هم‌رنگ نوار؛ همین باعث می‌شه دکمه توی نوار «بریده» به نظر بیاد
             .background(ringColor)
-            .glassBorder(1.dp, scheme.outline.copy(alpha = 0.35f), CircleShape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -507,43 +509,27 @@ private fun NavTab(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-
     val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
-    // قرص هایلایت از وسط آیکن به دو طرف باز می‌شه (مثل پلی‌استور)
-    val pill by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium),
-        label = "nav_pill"
-    )
 
+    // آیکن همیشه ۴dp از بالا شروع می‌شه تا دقیقاً وسط قرصِ سُرخور بشینه
     Column(
         modifier = modifier
             .height(NavItemHeight)
-            .clip(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(width = NavPillWidth, height = NavPillHeight),
+            modifier = Modifier
+                .padding(top = NavPillTop)
+                .size(width = NavPillWidth, height = NavPillHeight),
             contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .graphicsLayer {
-                        scaleX = pill
-                        alpha = pill
-                    }
-                    .clip(CircleShape)
-                    .background(primary.copy(alpha = 0.22f))
-            )
             // انتخاب‌شده: آیکن تو‌پر؛ انتخاب‌نشده: آیکن خطی
-            Crossfade(targetState = selected, animationSpec = tween(200), label = "nav_icon_fill") { sel ->
+            Crossfade(targetState = selected, animationSpec = tween(180), label = "nav_icon_fill") { sel ->
                 Icon(
                     imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
                     contentDescription = item.label,
@@ -552,7 +538,7 @@ private fun NavTab(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(3.dp))
         Text(
             text = item.label,
             fontSize = 11.sp,
