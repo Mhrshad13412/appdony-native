@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -57,9 +60,12 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -71,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.ui.navigation.BottomNavItem
 import com.appdony.app.ui.navigation.bottomNavItems
 import com.appdony.app.util.AssistantBus
@@ -84,22 +91,30 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
-private val NavItemHeight = 58.dp
-
-// مثل پلی‌استور: آیکن ۲۴، یه قرص گرد پشتش و اسم زیر قرص
+private val NavItemHeight = 60.dp
 private val NavIconSize = 24.dp
-private val NavPillWidth = 56.dp
+
+// ── کلاسیک (مثل گوگل پلی): قرص پهن پشت آیکن، اسم زیر قرص ──
+private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
+
+// ── شیشه‌ای (مثل تلگرام): کاشی دور آیکن و اسم، آیکن و اسم از بالا ۱۰dp شروع می‌شن ──
+private val GlassContentTop = 10.dp
+private val GlassTileInset = 2.dp
+private val GlassTileShape = RoundedCornerShape(22.dp)
 
 // دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر که تو یه «برش گرد» از خودِ نوار می‌شینه
 private val AiButtonSize = 54.dp
 
+/** خونه‌ی وسط (دکمه‌ی هوش مصنوعی) از بقیه‌ی خونه‌ها پهن‌تره تا «هوش مصنوعی» کامل جا بشه */
+private const val AiSlotWeight = 1.3f
+
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
-private val AiBump = 22.dp
+private val AiBump = 24.dp
 
 /** فاصله‌ی برش تا لبه‌ی دکمه */
-private val AiNotchGap = 5.dp
+private val AiNotchGap = 8.dp
 private val AiNotchRadius = AiButtonSize / 2 + AiNotchGap
 
 /** مرکز برش نسبت به لبه‌ی بالای نوار (همون مرکز دکمه) */
@@ -149,6 +164,12 @@ fun AppBottomNav(
     onAiClick: () -> Unit = {},
     onSupportClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    // جمله‌های «اپدونی پلاس» فقط وقتی بتا (تنظیمات ← آزمایشی) روشنه گفته می‌شن
+    LaunchedEffect(Unit) {
+        SettingsManager(context).beta.collect { AssistantPhrases.plusEnabled = it }
+    }
+
     val selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val surface = MaterialTheme.colorScheme.surface
     val background = MaterialTheme.colorScheme.background
@@ -162,7 +183,18 @@ fun AppBottomNav(
         return
     }
 
-    val barShape = remember(notch) { NotchedBarShape(corner = 32.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
+    // نوار کپسولی (نصف ارتفاعِ نوار = گردی کامل)
+    val barShape = remember(notch) { NotchedBarShape(corner = 36.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
+    val dark = background.luminance() < 0.5f
+    // لبه‌ی شیشه: بالا روشن‌تر، وسط محو، پایین یه کم پررنگ‌تر
+    val edgeBrush = Brush.verticalGradient(
+        if (dark) listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.18f))
+        else listOf(outline.copy(alpha = 0.60f), outline.copy(alpha = 0.25f), outline.copy(alpha = 0.40f))
+    )
+    // برقِ نرمِ بالای شیشه
+    val sheenBrush = Brush.verticalGradient(
+        listOf(Color.White.copy(alpha = if (dark) 0.09f else 0.30f), Color.Transparent)
+    )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -176,20 +208,22 @@ fun AppBottomNav(
                     .fillMaxWidth()
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
-                        blurRadius = 24.dp
+                        blurRadius = 28.dp
                         backgroundColor = background
-                        tints = listOf(HazeTint(surface.copy(alpha = 0.55f)))
+                        tints = listOf(HazeTint(surface.copy(alpha = 0.50f)))
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
                         fallbackTint = HazeTint(surface.copy(alpha = 0.92f))
                     }
-                    .border(1.dp, outline.copy(alpha = 0.35f), barShape)
+                    .background(sheenBrush)
+                    .border(1.dp, edgeBrush, barShape)
             ) {
                 Box(modifier = Modifier.padding(NavInnerPadding)) {
                     NavTabsArea(
                         selectedIndex = selectedIndex,
                         currentRoute = currentRoute,
                         onTabSelected = onTabSelected,
-                        fixedAi = fixedAi
+                        fixedAi = fixedAi,
+                        glass = true
                     )
                 }
             }
@@ -206,7 +240,7 @@ fun AppBottomNav(
     }
 }
 
-/** حالت کلاسیک (مثل بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
+/** حالت کلاسیک (مثل گوگل پلی/بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -254,7 +288,8 @@ private fun ClassicBottomNav(
                 selectedIndex = selectedIndex,
                 currentRoute = currentRoute,
                 onTabSelected = onTabSelected,
-                fixedAi = fixedAi
+                fixedAi = fixedAi,
+                glass = false
             )
         }
 
@@ -270,48 +305,71 @@ private fun ClassicBottomNav(
 }
 
 /**
- * ردیف تب‌ها مثل بام: همه‌ی خونه‌ها مساوین. وقتی [fixedAi] روشنه، خونه‌ی وسط (پنجم)
- * مال دکمه‌ی هوش مصنوعیه و دو تب یه طرفش، دو تب طرف دیگه‌ش.
- * قرص هایلایت پشت آیکنِ تب انتخاب‌شده با یه فنر نرم از تبی به تب دیگه سُر می‌خوره.
+ * ردیف تب‌ها. وقتی [fixedAi] روشنه، خونه‌ی وسط مال دکمه‌ی هوش مصنوعیه
+ * (کمی پهن‌تر از بقیه) و دو تب یه طرفش، دو تب طرف دیگه‌ش.
+ * هایلایت از تبی به تب دیگه با یه فنر نرم سُر می‌خوره:
+ *  - شیشه‌ای: کاشی گرد دور آیکن و اسم (مثل تلگرام)
+ *  - کلاسیک: قرص پهن پشت آیکن (مثل گوگل پلی)
  */
 @Composable
 private fun NavTabsArea(
     selectedIndex: Int,
     currentRoute: String?,
     onTabSelected: (String) -> Unit,
-    fixedAi: Boolean
+    fixedAi: Boolean,
+    glass: Boolean
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val half = bottomNavItems.size / 2
-    val slots = bottomNavItems.size + if (fixedAi) 1 else 0
+    val aiW = if (fixedAi) AiSlotWeight else 0f
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val slotWidth = maxWidth / slots
-        val slotIndex = selectedIndex + if (fixedAi && selectedIndex >= half) 1 else 0
+        val unit = maxWidth / (bottomNavItems.size + aiW)
+        val before = selectedIndex + if (fixedAi && selectedIndex >= half) aiW else 0f
+        val slotStart = unit * before
 
-        // قرص سُر‌خور (آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیتم‌ها)
-        val pillX by animateDpAsState(
-            targetValue = slotWidth * slotIndex + (slotWidth - NavPillWidth) / 2,
+        // آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیتم‌ها
+        val indicatorX by animateDpAsState(
+            targetValue = if (glass) slotStart + GlassTileInset else slotStart + (unit - NavPillWidth) / 2,
             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
-            label = "nav_pill_x"
+            label = "nav_indicator_x"
         )
-        Box(
-            modifier = Modifier
-                .offset(x = pillX, y = NavPillTop)
-                .size(width = NavPillWidth, height = NavPillHeight)
-                .clip(CircleShape)
-                .background(primary.copy(alpha = 0.22f))
-        )
+
+        if (glass) {
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorX)
+                    .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
+                    .clip(GlassTileShape)
+                    .background(
+                        Brush.verticalGradient(listOf(primary.copy(alpha = 0.28f), primary.copy(alpha = 0.12f)))
+                    )
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(listOf(primary.copy(alpha = 0.75f), primary.copy(alpha = 0.28f))),
+                        GlassTileShape
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorX, y = NavPillTop)
+                    .size(width = NavPillWidth, height = NavPillHeight)
+                    .clip(CircleShape)
+                    .background(primary.copy(alpha = 0.24f))
+            )
+        }
 
         Row(modifier = Modifier.fillMaxWidth()) {
             bottomNavItems.forEachIndexed { index, item ->
                 if (fixedAi && index == half) {
-                    AiSlotLabel(supportOn = supportOn, modifier = Modifier.weight(1f))
+                    AiSlotLabel(supportOn = supportOn, glass = glass, modifier = Modifier.weight(aiW))
                 }
                 NavTab(
                     item = item,
                     selected = index == selectedIndex,
+                    glass = glass,
                     onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
                     modifier = Modifier.weight(1f)
                 )
@@ -320,20 +378,24 @@ private fun NavTabsArea(
     }
 }
 
-/** خونه‌ی وسط: خود دکمه از بالا میاد؛ اینجا فقط اسمش هم‌تراز اسم بقیه‌ی تب‌ها می‌شینه */
+/** خونه‌ی وسط: خود دکمه از بالا میاد؛ اینجا فقط اسمش (کامل، بدون بریدگی) هم‌تراز اسم بقیه‌ی تب‌ها می‌شینه */
 @Composable
-private fun AiSlotLabel(supportOn: Boolean, modifier: Modifier = Modifier) {
+private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier = Modifier) {
+    val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
     Column(
         modifier = modifier.height(NavItemHeight),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(NavPillTop + NavPillHeight + 3.dp))
+        Spacer(Modifier.height(labelTop))
         Text(
             text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
-            fontWeight = FontWeight.SemiBold
+            softWrap = false,
+            overflow = TextOverflow.Visible,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.wrapContentWidth(unbounded = true)
         )
     }
 }
@@ -548,10 +610,24 @@ private fun AiNavButton(
     }
 }
 
+/** آیکن تب: انتخاب‌شده تو‌پر، انتخاب‌نشده خطی؛ با کراس‌فید نرم */
+@Composable
+private fun TabIcon(item: BottomNavItem, selected: Boolean, tint: Color) {
+    Crossfade(targetState = selected, animationSpec = tween(180), label = "nav_icon_fill") { sel ->
+        Icon(
+            imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
+            contentDescription = item.label,
+            tint = tint,
+            modifier = Modifier.size(NavIconSize)
+        )
+    }
+}
+
 @Composable
 private fun NavTab(
     item: BottomNavItem,
     selected: Boolean,
+    glass: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -559,7 +635,6 @@ private fun NavTab(
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
 
-    // آیکن همیشه ۴dp از بالا شروع می‌شه تا دقیقاً وسط قرصِ سُرخور بشینه
     Column(
         modifier = modifier
             .height(NavItemHeight)
@@ -570,20 +645,21 @@ private fun NavTab(
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .padding(top = NavPillTop)
-                .size(width = NavPillWidth, height = NavPillHeight),
-            contentAlignment = Alignment.Center
-        ) {
-            // انتخاب‌شده: آیکن تو‌پر؛ انتخاب‌نشده: آیکن خطی
-            Crossfade(targetState = selected, animationSpec = tween(180), label = "nav_icon_fill") { sel ->
-                Icon(
-                    imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
-                    contentDescription = item.label,
-                    tint = tint,
-                    modifier = Modifier.size(NavIconSize)
-                )
+        if (glass) {
+            // شیشه‌ای: آیکن و اسم هر دو تو کاشی‌ان؛ آیکن از بالا ۱۰dp شروع می‌شه
+            Spacer(Modifier.height(GlassContentTop))
+            Box(modifier = Modifier.size(NavIconSize), contentAlignment = Alignment.Center) {
+                TabIcon(item, selected, tint)
+            }
+        } else {
+            // کلاسیک: آیکن وسط قرصِ پهن می‌شینه (مثل گوگل پلی)
+            Box(
+                modifier = Modifier
+                    .padding(top = NavPillTop)
+                    .size(width = NavPillWidth, height = NavPillHeight),
+                contentAlignment = Alignment.Center
+            ) {
+                TabIcon(item, selected, tint)
             }
         }
         Spacer(Modifier.height(3.dp))
