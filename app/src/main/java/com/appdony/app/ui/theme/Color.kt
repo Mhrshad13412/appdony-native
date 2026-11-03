@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.lerp
 
 object AppdonyPalette {
     var isDark by mutableStateOf(true)
-    var primary by mutableStateOf(Color(0xFF0D7377))
+    var primary by mutableStateOf(Color(0xFF4BA98F))
 }
 
 private fun tint(base: Color, amount: Float): Color = lerp(base, AppdonyPalette.primary, amount)
