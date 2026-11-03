@@ -44,13 +44,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -82,12 +94,18 @@ private val NavPillWidth = 56.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر + حلقه‌ی نازک هم‌رنگ نوار، وسط خونه‌ی پنجم
-private val AiRingSize = 58.dp
-private val AiButtonSize = 52.dp
+// دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر که تو یه «برش گرد» از خودِ نوار می‌شینه
+private val AiButtonSize = 54.dp
 
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
-private val AiBump = 20.dp
+private val AiBump = 22.dp
+
+/** فاصله‌ی برش تا لبه‌ی دکمه */
+private val AiNotchGap = 5.dp
+private val AiNotchRadius = AiButtonSize / 2 + AiNotchGap
+
+/** مرکز برش نسبت به لبه‌ی بالای نوار (همون مرکز دکمه) */
+private val AiNotchCenterY = AiButtonSize / 2 - AiBump
 
 /** ارتفاع کل منو وقتی دکمه‌ی هوش مصنوعی وسطشه (برای کسانی که جا رزرو می‌کنن) */
 val AiNavTotalHeight = 88.dp + AiBump
@@ -97,6 +115,32 @@ val AiNavTotalHeight = 88.dp + AiBump
  * منوی پایین روی محتوا می‌شینه، پس جای خودش رو از صفحه رزرو نمی‌کنه.
  */
 val LocalBottomBarClearance = compositionLocalOf<Dp> { 0.dp }
+
+/**
+ * بدنه‌ی نوار با یه برش گرد وسطِ لبه‌ی بالا (مثل بام).
+ * برش از خودِ نوار بریده می‌شه، پس رنگ و حلقه‌ی جدا نداره؛
+ * هر چی پشت نواره (محتوای صفحه) از همون برش دیده می‌شه.
+ * [notchRadius] صفر باشه برش نداره (وقتی هوش مصنوعی ثابت خاموشه).
+ */
+private class NotchedBarShape(
+    private val corner: Dp,
+    private val notchRadius: Dp,
+    private val notchCenterY: Dp
+) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val c = with(density) { corner.toPx() }
+        val r = with(density) { notchRadius.toPx() }
+        val cy = with(density) { notchCenterY.toPx() }
+        val bar = Path().apply {
+            addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(c, c)))
+        }
+        if (r <= 0f) return Outline.Generic(bar)
+        val hole = Path().apply {
+            addOval(Rect(center = Offset(size.width / 2f, cy), radius = r))
+        }
+        return Outline.Generic(Path.combine(PathOperation.Difference, bar, hole))
+    }
+}
 
 @Composable
 fun AppBottomNav(
@@ -113,13 +157,14 @@ fun AppBottomNav(
     val outline = MaterialTheme.colorScheme.outline
     val glass = LocalGlassMode.current
     val bump = if (fixedAi) AiBump else 0.dp
+    val notch = if (fixedAi) AiNotchRadius else 0.dp
 
     if (!glass) {
         ClassicBottomNav(selectedIndex, currentRoute, onTabSelected, fixedAi, onAiClick, onSupportClick)
         return
     }
 
-    val barShape = RoundedCornerShape(32.dp)
+    val barShape = remember(notch) { NotchedBarShape(corner = 32.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -127,7 +172,7 @@ fun AppBottomNav(
                 .fillMaxWidth()
                 .padding(start = 14.dp, end = 14.dp, top = 8.dp + bump, bottom = 10.dp)
         ) {
-            // شیشه‌ی بلوری: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه
+            // شیشه‌ی بلوری: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه؛ برش دکمه هم جزو همین شکله
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -155,7 +200,6 @@ fun AppBottomNav(
         if (fixedAi) {
             AiNavButton(
                 route = currentRoute,
-                ringColor = surface,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
@@ -164,7 +208,7 @@ fun AppBottomNav(
     }
 }
 
-/** حالت کلاسیک (مثل بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا، بدون بلور */
+/** حالت کلاسیک (مثل بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -175,17 +219,29 @@ private fun ClassicBottomNav(
     onSupportClick: () -> Unit
 ) {
     val bump = if (fixedAi) AiBump else 0.dp
+    val notch = if (fixedAi) AiNotchRadius else 0.dp
     val surface = MaterialTheme.colorScheme.surface
     val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    val barShape = remember(notch) { NotchedBarShape(corner = 0.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = bump)
+                .clip(barShape)
                 .background(surface)
                 .drawBehind {
-                    drawRect(color = lineColor, size = Size(size.width, 1.dp.toPx()))
+                    // فقط خط لبه‌ی بالا و دور برش؛ کناره‌ها و پایین بی‌خط می‌مونن
+                    val edge = barShape.createOutline(size, layoutDirection, this)
+                    clipRect(
+                        left = 2.dp.toPx(),
+                        top = 0f,
+                        right = size.width - 2.dp.toPx(),
+                        bottom = 48.dp.toPx()
+                    ) {
+                        drawOutline(edge, color = lineColor, style = Stroke(width = 2.dp.toPx()))
+                    }
                 }
                 .navigationBarsPadding()
                 .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
@@ -201,7 +257,6 @@ private fun ClassicBottomNav(
         if (fixedAi) {
             AiNavButton(
                 route = currentRoute,
-                ringColor = surface,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter)
@@ -320,8 +375,8 @@ private object BubbleAbove : PopupPositionProvider {
 }
 
 /**
- * دکمه‌ی گرد وسط منو مثل بام: دایره‌ی توپر به رنگ تم، کمی از لبه‌ی بالای نوار بیرون زده
- * و فقط یه حلقه‌ی نازک هم‌رنگ نوار دورشه (همین حس «بریدگی» می‌ده)؛ هاله و پدینگ اضافه نداره.
+ * دکمه‌ی گرد وسط منو مثل بام: فقط یه دایره‌ی توپر به رنگ تم که کمی از لبه‌ی بالای نوار بیرون زده.
+ * هیچ حلقه یا رنگ اضافه‌ای دورش نیست؛ جای خالی دورش همون برشیه که از خودِ نوار بریده شده.
  * تو دایره ربات هوش مصنوعیه که زندگی خودش رو داره: هر چند ثانیه حرف می‌زنه (حباب میاد)،
  * می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
  * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
@@ -329,7 +384,6 @@ private object BubbleAbove : PopupPositionProvider {
 @Composable
 private fun AiNavButton(
     route: String?,
-    ringColor: Color,
     onClick: () -> Unit,
     onSupportClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -422,15 +476,14 @@ private fun AiNavButton(
 
     Box(
         modifier = modifier
-            .size(AiRingSize)
+            .size(AiButtonSize)
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
                 translationY = -buddy.hop.value * 10.dp.toPx()
             }
             .clip(CircleShape)
-            // حلقه‌ی نازک هم‌رنگ نوار؛ همین باعث می‌شه دکمه توی نوار «بریده» به نظر بیاد
-            .background(ringColor)
+            .background(scheme.primary)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -446,25 +499,16 @@ private fun AiNavButton(
             if (support) {
                 val ring = ((SupportPresence.endAt - nowMs.longValue).toFloat() / SupportPresence.HOLD_MS)
                     .coerceIn(0f, 1f)
-                Box(modifier = Modifier.size(AiButtonSize).clip(CircleShape)) {
-                    SupportAvatar(sizeDp = AiButtonSize.value.toInt(), ring = ring)
-                }
+                SupportAvatar(sizeDp = AiButtonSize.value.toInt(), ring = ring)
             } else {
-                // دایره‌ی توپر به رنگ تم، ربات سفید داخلش
-                Box(
-                    modifier = Modifier
-                        .size(AiButtonSize)
-                        .clip(CircleShape)
-                        .background(scheme.primary)
-                ) {
-                    BuddyCanvas(
-                        modifier = Modifier.size(AiButtonSize),
-                        talking = talking,
-                        plate = scheme.primary,
-                        ink = Color.White,
-                        state = buddy
-                    )
-                }
+                // ربات سفید روی دایره‌ی توپرِ رنگ تم
+                BuddyCanvas(
+                    modifier = Modifier.size(AiButtonSize),
+                    talking = talking,
+                    plate = scheme.primary,
+                    ink = Color.White,
+                    state = buddy
+                )
             }
         }
 
