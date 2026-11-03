@@ -64,6 +64,10 @@ import kotlinx.coroutines.withContext
 
 private val CardWidth = 122.dp
 
+// جای ثابت ردیف دسته و ردیف اندروید/نسخه؛ حتی وقتی خالین رزرو می‌شن تا همه‌ی کارت‌ها هم‌قد باشن
+private val CardCategoryHeight = 14.dp
+private val CardMetaHeight = 24.dp
+
 // ════════════════════════════════════════════════════════════════════════════
 // ⚠️ مهم — لود اولویت‌دار کارت‌ها (از ساده به سخت)؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
 // این مراحل «گذر زمان» نیستن؛ هیچ تأخیر ساختگی‌ای نیست و هر بخش همون لحظه‌ای که داده‌ش آماده شد میاد:
@@ -164,35 +168,50 @@ fun AppCard(
             minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
         )
-        // اسم دسته درست زیر اسم بازی/برنامه
-        if (!category.isNullOrBlank()) {
-            Text(
-                text = category, color = primary, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+        // اسم دسته درست زیر اسم بازی/برنامه؛ جاش همیشه رزروئه تا ارتفاع کارت‌ها یکی باشه
+        Box(
+            modifier = Modifier.fillMaxWidth().height(CardCategoryHeight),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!category.isNullOrBlank()) {
+                Text(
+                    text = category, color = primary, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        if (metaLoading) {
-            // لودینگ اندروید و نسخه تا حسابشون تموم بشه
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
-                ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
-            }
-        } else if (androidReq != null || version != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (androidReq != null) MetaItem(Icons.Filled.Android, androidReq, primary)
-                if (version != null) MetaItem(Icons.Filled.Bolt, version, primary)
+        // ردیف اندروید/نسخه؛ جاش همیشه رزروئه (چه لودینگ، چه آماده، چه خالی) تا کارت‌ها هم‌قد بمونن
+        Box(
+            modifier = Modifier.fillMaxWidth().height(CardMetaHeight),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            if (metaLoading) {
+                // لودینگ اندروید و نسخه تا حسابشون تموم بشه
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                        ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
+                        ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
+                    }
+                }
+            } else if (androidReq != null || version != null) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (androidReq != null) MetaItem(Icons.Filled.Android, androidReq, primary)
+                        if (version != null) MetaItem(Icons.Filled.Bolt, version, primary)
+                    }
+                }
             }
         }
     }
