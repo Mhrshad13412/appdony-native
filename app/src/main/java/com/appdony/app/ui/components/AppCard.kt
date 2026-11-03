@@ -1,5 +1,7 @@
 package com.appdony.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,11 +28,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -59,9 +65,21 @@ import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private val CardWidth = 122.dp
+
+// ════════════════════════════════════════════════════════════════════════════
+// ⚠️ مهم — لود مرحله‌ای کارت‌ها؛ تحت هیچ عنوان حذف یا ساده نشه ⚠️
+// ترتیب نمایش برای کاربر (تا حوصله‌ش سر نره و کم‌کم چیزی ببینه):
+//   ۱) اسکلت ردیف (SectionRowSkeleton/CardSkeleton تو HomeScreen، تا رسیدن داده)
+//   ۲) قاب پیش‌فرض خود کارت (همین‌جا، مرحله‌ی ۱) با لودینگ تو هر بخش
+//   ۳) متن‌ها: اسم و دسته (مرحله‌ی ۲)، و اندروید/نسخه با لودینگ جدا تا حسابشون تموم شه
+//   ۴) عکس (مرحله‌ی ۳) آخر از همه و کم‌کیفیت (size 240 + RGB565) تا سبک و سریع بیاد
+// ردیف‌ها هم خودشون یکی‌یکی ظاهر می‌شن (FadeIn تو HomeScreen) و عنوان ردیف همیشه اول میاد.
+// ════════════════════════════════════════════════════════════════════════════
+private val revealedCards = java.util.Collections.synchronizedSet(HashSet<String>())
 
 /** اندروید مورد نیاز و نسخه‌ی پست؛ اگه قبلاً حساب شده باشه فوراً میاد، وگرنه پشت صحنه حساب می‌شه */
 @Composable
@@ -75,7 +93,10 @@ fun rememberPostMeta(post: Post): PostMeta {
 /** کارت بازی/برنامه از روی خود پست: عکس، «جدید»، اسم، اندروید و نسخه */
 @Composable
 fun PostCard(post: Post, onClick: () -> Unit, modifier: Modifier = Modifier, fillWidth: Boolean = false) {
-    val meta = rememberPostMeta(post)
+    // اندروید/نسخه پشت صحنه حساب می‌شن؛ تا آماده نشدن، کارت جاش یه لودینگ نشون می‌ده (null = هنوز آماده نیست)
+    val meta by produceState<PostMeta?>(initialValue = post.cachedMeta(), key1 = post.id) {
+        value = withContext(Dispatchers.Default) { post.meta() }
+    }
     val title = remember(post.id) { post.cleanTitle() }
     val image = remember(post.id) { try { post.featuredImageUrl() } catch (e: Exception) { null } }
     val category = remember(post.id) { post.cardCategory() }
@@ -88,8 +109,9 @@ fun PostCard(post: Post, onClick: () -> Unit, modifier: Modifier = Modifier, fil
         onClick = onClick,
         modifier = modifier,
         category = category,
-        androidReq = meta.androidReq,
-        version = meta.version,
+        androidReq = meta?.androidReq,
+        version = meta?.version,
+        metaLoading = meta == null,
         isNew = isNew,
         isUpdated = isUpdated,
         fillWidth = fillWidth
@@ -105,6 +127,7 @@ fun AppCard(
     category: String? = null,
     androidReq: String? = null,
     version: String? = null,
+    metaLoading: Boolean = false,
     isNew: Boolean = false,
     isUpdated: Boolean = false,
     fillWidth: Boolean = false
@@ -112,7 +135,24 @@ fun AppCard(
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
     val shownTitle = remember(title) { title.gameCardName() }
-    val imageRequest = remember(imageUrl) { ImageRequest.Builder(context).data(imageUrl).size(320).crossfade(150).build() }
+    // عکس کم‌کیفیت و سبک: سایز کوچیک + RGB565 (فقط برای عکس‌های بدون شفافیت) + کراس‌فید نرم
+    val imageRequest = remember(imageUrl) {
+        ImageRequest.Builder(context).data(imageUrl).size(240).allowRgb565(true).crossfade(200).build()
+    }
+
+    // مرحله‌ی ۱ قاب، ۲ متن، ۳ عکس؛ کارتی که قبلاً کامل دیده شده دوباره مرحله‌ها رو تکرار نمی‌کنه
+    val cardKey = remember(title, imageUrl) { "$title|$imageUrl" }
+    var stage by remember(cardKey) { mutableStateOf(if (cardKey in revealedCards) 3 else 1) }
+    LaunchedEffect(cardKey) {
+        if (stage < 3) {
+            delay(90)
+            stage = 2
+            delay(140)
+            stage = 3
+            revealedCards.add(cardKey)
+        }
+    }
+    val textAlpha by animateFloatAsState(if (stage >= 2) 1f else 0f, tween(260), label = "card_text")
     val sizing = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(CardWidth)
 
     Column(
@@ -120,41 +160,68 @@ fun AppCard(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1.12f).clip(RoundedCornerShape(16.dp))) {
-            SubcomposeAsyncImage(
-                model = imageRequest, contentDescription = shownTitle, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
-                loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
-                error = {
-                    Box(modifier = Modifier.fillMaxSize().background(AppdonyCardBg), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Warning, "خطا", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
-                    }
-                },
-                success = { SubcomposeAsyncImageContent() }
-            )
+            if (stage >= 3) {
+                SubcomposeAsyncImage(
+                    model = imageRequest, contentDescription = shownTitle, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                    loading = { ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0) },
+                    error = {
+                        Box(modifier = Modifier.fillMaxSize().background(AppdonyCardBg), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Warning, "خطا", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
+                        }
+                    },
+                    success = { SubcomposeAsyncImageContent() }
+                )
+            } else {
+                // هنوز نوبت عکس نشده: قاب با لودینگ
+                ShimmerBox(modifier = Modifier.fillMaxSize(), cornerRadius = 0)
+            }
             if (isNew) NewBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
             else if (isUpdated) UpdatedBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = shownTitle, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-            minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            lineHeight = 15.sp, modifier = Modifier.fillMaxWidth()
-        )
-        // اسم دسته درست زیر اسم بازی/برنامه
-        if (!category.isNullOrBlank()) {
+        if (stage < 2) {
+            // لودینگ متن‌ها (اسم و دسته)
+            Column(modifier = Modifier.fillMaxWidth().height(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                ShimmerBox(modifier = Modifier.fillMaxWidth(0.85f).height(11.dp), cornerRadius = 4)
+                Spacer(modifier = Modifier.height(4.dp))
+                ShimmerBox(modifier = Modifier.fillMaxWidth(0.55f).height(11.dp), cornerRadius = 4)
+            }
+            if (!category.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                ShimmerBox(modifier = Modifier.fillMaxWidth(0.45f).height(10.dp), cornerRadius = 4)
+            }
+        } else {
             Text(
-                text = category, color = primary, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                text = shownTitle, color = AppdonyTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                lineHeight = 15.sp, modifier = Modifier.fillMaxWidth().alpha(textAlpha)
             )
+            // اسم دسته درست زیر اسم بازی/برنامه
+            if (!category.isNullOrBlank()) {
+                Text(
+                    text = category, color = primary, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().alpha(textAlpha)
+                )
+            }
         }
 
-        if (androidReq != null || version != null) {
+        if (stage >= 2 && metaLoading) {
+            // لودینگ اندروید و نسخه تا حسابشون تموم بشه
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
+                ShimmerBox(modifier = Modifier.width(34.dp).height(10.dp), cornerRadius = 4)
+            }
+        } else if (stage >= 2 && (androidReq != null || version != null)) {
             Spacer(modifier = Modifier.height(4.dp))
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)))
             Spacer(modifier = Modifier.height(4.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().alpha(textAlpha),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
