@@ -92,19 +92,23 @@ class HomeRepository {
         return LatestOnly.latestPerApp(api.getPostsByCategory(categoryId = id, perPage = 20)).take(10)
     }
 
+    // ⚠️ مهم — لود سبک و مرحله‌ای؛ تحت هیچ عنوان حذف نشه ⚠️
+    // هر ردیف فقط وقتی به صفحه نزدیک شد (HomeViewModel.loadSection) و فقط با تعداد پست کم (۲۴ تا ۳۰) گرفته می‌شه
+    // تا اول عنوان و اسکلت بیاد و بعد کارت‌ها یکی‌یکی (جزئیات مراحل: AppCard.kt)
     suspend fun loadSection(section: HomeSection, rootId: Int?): List<Post> {
-        PopularityRemote.ensureFresh()
+        // آمار محبوبیت فقط برای ردیف‌های مرتب‌شده بر اساس شهرت لازمه؛ «جدیدترین/به‌روزترین» منتظرش نمی‌مونن
+        if (section.id != SEC_NEWEST && section.id != SEC_UPDATED) PopularityRemote.ensureFresh()
         val root = rootId
         if (section.id < 0) return loadSpecial(section.id, root)
         return if (section.filterByRoot && root != null) {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 50)
+                api.getPostsByCategory(categoryId = section.id, perPage = 30)
                     .filter { root in it.categories }
                     .filterNot(::isPlusPost)
             ).sortedByFame().take(12)
         } else {
             LatestOnly.latestPerApp(
-                api.getPostsByCategory(categoryId = section.id, perPage = 40)
+                api.getPostsByCategory(categoryId = section.id, perPage = 24)
                     .filterNot(::isPlusPost)
             ).sortedByFame().take(12)
         }
@@ -119,14 +123,14 @@ class HomeRepository {
                 LatestOnly.latestPerApp(list.filterNot(::isPlusPost)).sortedByFame()
             }
             SEC_NEWEST -> {
-                val list = if (root != null) api.getPostsByCategory(categoryId = root, perPage = 40) else api.getPosts(perPage = 40)
+                val list = if (root != null) api.getPostsByCategory(categoryId = root, perPage = 24) else api.getPosts(perPage = 24)
                 LatestOnly.latestPerApp(list.filterNot(::isPlusPost))
             }
             else -> {
                 if (root == null) return emptyList()
                 // مرتب‌شده بر اساس آخرین ویرایش (orderby=modified)، بعد از هر اپ فقط یک کارت
                 LatestOnly.latestPerAppByEdit(
-                    api.getPostsByCategory(categoryId = root, perPage = 60, orderBy = "modified")
+                    api.getPostsByCategory(categoryId = root, perPage = 30, orderBy = "modified")
                         .filterNot(::isPlusPost)
                 )
             }
