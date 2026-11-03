@@ -31,28 +31,12 @@ class ThemeManager(private val context: Context) {
         private val KEY_COLOR_INDEX = intPreferencesKey("theme_color_index")
         private val KEY_FONT_SIZE = stringPreferencesKey("font_size")
 
-        // پالت رنگ‌ها (رنگ جدید آخر لیست اضافه شده تا رنگ ذخیره‌شده‌ی کاربرها بهم نریزه)
+        // رنگ ثابت اپدونی (انتخاب رنگ حذف شده؛ همه‌جا همین رنگ سایته)
         val themeColors = listOf(
-            0xFF0D7377, // سبز اپدونی (پیش‌فرض)
-            0xFF1976D2, // آبی
-            0xFF7B1FA2, // بنفش
-            0xFFC2185B, // صورتی
-            0xFFD32F2F, // قرمز
-            0xFF5D4037, // قهوه‌ای
-            0xFF455A64, // خاکستری
-            0xFF7CB342  // سبز روشن
+            0xFF4BA98F // سبز اپدونی
         )
 
-        val colorNames = listOf(
-            "سبز اپدونی",
-            "آبی",
-            "بنفش",
-            "صورتی",
-            "قرمز",
-            "قهوه‌ای",
-            "خاکستری",
-            "سبز روشن"
-        )
+        val colorNames = listOf("سبز اپدونی")
     }
 
     val state: Flow<ThemeState> = context.themeDataStore.data.map { prefs ->
