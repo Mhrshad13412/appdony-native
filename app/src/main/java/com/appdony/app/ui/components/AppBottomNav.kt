@@ -182,9 +182,10 @@ fun AppBottomNav(
     }
     // حالت «ثابت گوشه»: دکمه‌ی هوش مصنوعی بالای منو، گوشه‌ی صفحه می‌شینه (جای خالی دورش لمس رو نمی‌گیره)
     val cornerAi by settings.aiCorner.collectAsState(initial = false)
+    val glassMode = LocalGlassMode.current
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (cornerAi && !fixedAi) CornerAiButton(onClick = onAiClick)
+        if (cornerAi && !fixedAi) CornerAiButton(onClick = onAiClick, hazeState = hazeState, glass = glassMode)
         NavBar(currentRoute, hazeState, onTabSelected, fixedAi, onAiClick, onSupportClick)
     }
 }
@@ -238,8 +239,14 @@ private fun NavBar(
                     .hazeEffect(state = hazeState) {
                         blurRadius = 30.dp
                         backgroundColor = background
-                        // شیشه‌ی نیمه‌شفاف مثل هونر: محتوای پشتش محو دیده می‌شه، نه یه سطح مات
-                        tints = listOf(HazeTint(surface.copy(alpha = if (dark) 0.42f else 0.55f)))
+                        // شیشه‌ی روشن‌کننده مثل تلگرام ادز: یه پایه‌ی کم‌رنگ + یه لایه‌ی سفید نازک،
+                        // پس رنگ‌های پشتش تیره نمی‌شن و مثل نور از زیر شیشه می‌درخشن
+                        tints = listOf(
+                            HazeTint(surface.copy(alpha = if (dark) 0.30f else 0.45f)),
+                            HazeTint(Color.White.copy(alpha = if (dark) 0.06f else 0.20f))
+                        )
+                        // دونه‌ی خیلی ریزِ شیشه‌ی مات‌شده
+                        noiseFactor = 0.035f
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
                         fallbackTint = HazeTint(surface.copy(alpha = 0.88f))
                     }
@@ -337,7 +344,7 @@ private fun ClassicBottomNav(
  * ردیف تب‌ها. وقتی [fixedAi] روشنه، خونه‌ی وسط مال دکمه‌ی هوش مصنوعیه
  * (کمی پهن‌تر از بقیه) و دو تب یه طرفش، دو تب طرف دیگه‌ش.
  * هایلایت از تبی به تب دیگه با یه فنر نرم سُر می‌خوره:
- *  - شیشه‌ای: کاشی گرد بی‌رنگ (شیشه‌ی سفید) دور آیکن و اسم (مثل تلگرام)
+ *  - شیشه‌ای: کاشی گرد شیشه‌ای با ته‌رنگ تم دور آیکن و اسم (مثل تلگرام)
  *  - کلاسیک: قرص پهن پشت آیکن (مثل گوگل پلی)
  */
 @Composable
@@ -372,21 +379,18 @@ private fun NavTabsArea(
                     .offset(x = indicatorX)
                     .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
                     .clip(GlassTileShape)
-                    // کاشی انتخاب‌شده‌ی شیشه‌ای بی‌رنگه: شیشه‌ی سفید، نه رنگ تم
+                    // کاشی انتخاب‌شده مثل تلگرام ادز: شیشه‌ی روشن که پایینش یه ته‌رنگ از رنگ تم داره
                     .background(
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.05f))
-                            else listOf(Color.White.copy(alpha = 0.70f), Color.White.copy(alpha = 0.40f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.14f), primary.copy(alpha = 0.10f))
+                            else listOf(Color.White.copy(alpha = 0.75f), primary.copy(alpha = 0.12f))
                         )
                     )
                     .border(
                         0.75.dp,
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.02f))
-                            else listOf(
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.06f)
-                            )
+                            if (dark) listOf(Color.White.copy(alpha = 0.16f), primary.copy(alpha = 0.22f))
+                            else listOf(Color.White.copy(alpha = 0.90f), primary.copy(alpha = 0.25f))
                         ),
                         GlassTileShape
                     )
@@ -448,9 +452,10 @@ private var cornerIntroShown = false
 /**
  * هوش مصنوعیِ ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): دایره‌ی شیشه‌ای گوشه‌ی راست، بالای منو.
  * اول به شکل قرص با نوشته‌ی «هوش مصنوعی» میاد و بعد از چند ثانیه به دایره جمع می‌شه.
+ * تو حالت شیشه‌ای خودش شیشه‌ی رنگیه (بلور + ته‌رنگ تم)؛ تو کلاسیک سطح توپره.
  */
 @Composable
-private fun CornerAiButton(onClick: () -> Unit) {
+private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boolean) {
     val scheme = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(!cornerIntroShown) }
     LaunchedEffect(Unit) {
@@ -473,8 +478,23 @@ private fun CornerAiButton(onClick: () -> Unit) {
                 modifier = Modifier
                     .height(60.dp)
                     .clip(shape)
-                    .background(fill)
-                    .border(1.5.dp, scheme.primary.copy(alpha = 0.55f), shape)
+                    .then(
+                        if (glass) {
+                            // شیشه‌ی رنگی مثل دکمه‌ی «تماس با پشتیبانی» تلگرام ادز
+                            Modifier.hazeEffect(state = hazeState) {
+                                blurRadius = 30.dp
+                                backgroundColor = scheme.background
+                                tints = listOf(HazeTint(scheme.primary.copy(alpha = 0.26f)))
+                                noiseFactor = 0.035f
+                                fallbackTint = HazeTint(fill)
+                            }
+                        } else Modifier.background(fill)
+                    )
+                    .border(
+                        if (glass) 1.dp else 1.5.dp,
+                        scheme.primary.copy(alpha = if (glass) 0.45f else 0.55f),
+                        shape
+                    )
                     .clickable(onClick = onClick)
                     .semantics { contentDescription = "هوش مصنوعی" },
                 verticalAlignment = Alignment.CenterVertically
@@ -746,50 +766,10 @@ private fun NavTab(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    // شیشه‌ای: متن و آیکنِ انتخاب‌شده سفیده (توی تم روشن، سفید روی شیشه‌ی روشن دیده نمی‌شه؛ پس تیره)
-    val selectedColor = when {
-        !glass -> primary
-        dark -> Color.White
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    val tint by animateColorAsState(if (selected) selectedColor else muted, tween(250), label = "nav_tint")
+    // آیکن و اسم تب انتخاب‌شده به رنگ تمه (کلاسیک و شیشه‌ای، مثل تلگرام ادز)
+    val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
 
     Column(
         modifier = modifier
             .height(NavItemHeight)
-            .guideTarget("tab_${item.route}")
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (glass) {
-            // شیشه‌ای: آیکن و اسم هر دو تو کاشی‌ان؛ آیکن از بالا ۱۰dp شروع می‌شه
-            Spacer(Modifier.height(GlassContentTop))
-            Box(modifier = Modifier.size(NavIconSize), contentAlignment = Alignment.Center) {
-                TabIcon(item, selected, tint)
-            }
-        } else {
-            // کلاسیک: آیکن وسط قرصِ پهن می‌شینه (مثل گوگل پلی)
-            Box(
-                modifier = Modifier
-                    .padding(top = NavPillTop)
-                    .size(width = NavPillWidth, height = NavPillHeight),
-                contentAlignment = Alignment.Center
-            ) {
-                TabIcon(item, selected, tint)
-            }
-        }
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = item.label,
-            fontSize = 11.sp,
-            color = tint,
-            maxLines = 1,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-        )
-    }
-}
+            .guideTarget("tab_${i
