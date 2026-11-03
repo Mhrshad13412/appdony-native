@@ -3,6 +3,7 @@ package com.appdony.app.ui.components
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appdony.app.R
 import kotlinx.coroutines.delay
 
 /**
@@ -100,6 +103,24 @@ fun AppTopBar(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // لوگوی اپدونی (سمت راست)؛ تو حالت جستجو آروم جمع می‌شه
+        Box(
+            modifier = Modifier
+                .width((40f * (1f - progress)).dp)
+                .height(44.dp)
+                .clipToBounds(),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.appdony_logo),
+                contentDescription = "اپدونی",
+                modifier = Modifier
+                    .requiredSize(40.dp)
+                    .graphicsLayer { alpha = 1f - progress }
+            )
+        }
+        Spacer(modifier = Modifier.width((10f * (1f - progress)).dp))
+
         // دکمه‌ی برگشت: فقط تو حالت جستجو آروم باز می‌شه
         Box(
             modifier = Modifier
