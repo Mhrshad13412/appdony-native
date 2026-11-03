@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** حالت ظاهر برنامه: true = شیشه‌ای (بلور و بوردر)، false = کلاسیک (مات و بدون بوردر) */
-val LocalGlassMode = compositionLocalOf { true }
+val LocalGlassMode = compositionLocalOf { false }
 
 /** گوشه‌ی گرد مشترک همه‌ی کارت‌ها؛ هم‌خانواده با منوی پایین (که ۳۲dp گرده) */
 val AppdonyCardShape = RoundedCornerShape(24.dp)
