@@ -12,6 +12,13 @@ internal fun String.stripEmoji(): String =
     replace(Regex("[\\p{So}\\uFE0F\\u200D]"), "").replace(Regex("\\s+"), " ").trim()
 
 internal object AssistantPhrases {
+    /**
+     * جمله‌های «اپدونی پلاس» فقط وقتی گفته می‌شن که بتا (تنظیمات ← آزمایشی) روشن باشه.
+     * پیش‌فرض خاموشه؛ AppBottomNav مقدارش رو از تنظیمات همگام می‌کنه.
+     */
+    @Volatile
+    var plusEnabled: Boolean = false
+
     private val general = listOf(
         "سلام! اگه بازی خاصی تو ذهنته، از دکمه‌ی جستجو اسمش رو بزن 🔍",
         "خسته نشدی؟ یه نفس عمیق بکش، بعد برگرد سراغ دانلود 😄",
@@ -99,8 +106,8 @@ internal object AssistantPhrases {
     private val recent = ArrayDeque<String>()
 
     fun next(route: String?): AssistantSay {
-        // گاهی (حدود ۱۴٪) تبلیغ ملایم اپدونی پلاس
-        val pool = if (Random.nextFloat() < 0.14f) {
+        // گاهی (حدود ۱۴٪) تبلیغ ملایم اپدونی پلاس؛ فقط وقتی بتا روشنه
+        val pool = if (plusEnabled && Random.nextFloat() < 0.14f) {
             plus
         } else {
             val r = route.orEmpty()
