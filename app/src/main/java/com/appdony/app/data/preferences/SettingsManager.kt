@@ -8,7 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
+val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 class SettingsManager(private val context: Context) {
 
@@ -32,8 +32,8 @@ class SettingsManager(private val context: Context) {
     val startPage: Flow<String> = context.settingsDataStore.data.map { it[KEY_START_PAGE] ?: "games" }
     val showAiAssistant: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_SHOW_AI] ?: true } // 👈 جدید
 
-    // فعلاً پیش‌فرض شیشه‌ای؛ وقتی کلاسیک کامل شد پیش‌فرض می‌شه کلاسیک
-    val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[KEY_UI_STYLE] ?: STYLE_GLASS }
+    // پیش‌فرض کلاسیکه؛ شیشه‌ای فقط وقتی کاربر خودش از تنظیمات انتخاب کنه
+    val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[KEY_UI_STYLE] ?: STYLE_CLASSIC }
 
     // بتا: پیش‌فرض خاموش؛ وقتی روشن باشه بلوک‌های اپدونی پلاس نشون داده می‌شن
     val beta: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_BETA] ?: false }
@@ -48,28 +48,3 @@ class SettingsManager(private val context: Context) {
     suspend fun setBeta(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_BETA] = enabled }
     }
-
-    suspend fun setUiStyle(style: String) {
-        context.settingsDataStore.edit { it[KEY_UI_STYLE] = style }
-    }
-
-    suspend fun setWifiOnly(enabled: Boolean) {
-        context.settingsDataStore.edit { it[KEY_WIFI_ONLY] = enabled }
-    }
-
-    suspend fun setNotifyBlog(enabled: Boolean) {
-        context.settingsDataStore.edit { it[KEY_NOTIFY_BLOG] = enabled }
-    }
-
-    suspend fun setNotifyUpdates(enabled: Boolean) {
-        context.settingsDataStore.edit { it[KEY_NOTIFY_UPDATES] = enabled }
-    }
-
-    suspend fun setStartPage(page: String) {
-        context.settingsDataStore.edit { it[KEY_START_PAGE] = page }
-    }
-
-    suspend fun setShowAiAssistant(enabled: Boolean) {
-        context.settingsDataStore.edit { it[KEY_SHOW_AI] = enabled }
-    }
-}
