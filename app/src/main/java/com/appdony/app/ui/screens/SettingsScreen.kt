@@ -168,39 +168,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
                 RowDivider()
 
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Palette, null, tint = primary, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("رنگ برنامه", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            ThemeManager.colorNames.getOrElse(themeState.colorIndex) { "" },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    // هر رنگ یه خونه‌ی مساوی می‌گیره تا هیچ دایره‌ای له یا بریده نشه (حتی با ۸ رنگ)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ThemeManager.themeColors.forEachIndexed { index, colorValue ->
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                ColorDot(
-                                    color = Color(colorValue),
-                                    selected = themeState.colorIndex == index
-                                ) { scope.launch { themeManager.setColorIndex(index) } }
-                            }
-                        }
-                    }
-                }
-                RowDivider()
-
                 val fontSizes = FontSize.values()
                 PillSelector(
                     options = listOf(
