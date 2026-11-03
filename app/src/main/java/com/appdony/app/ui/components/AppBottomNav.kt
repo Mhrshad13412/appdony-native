@@ -7,7 +7,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -21,14 +20,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,12 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -83,16 +78,20 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
-private val NavItemHeight = 58.dp
-private val NavIconSize = 26.dp
+private val NavItemHeight = 60.dp
 
-// دکمه‌ی هوش مصنوعی وسط منو (مثل بام): حلقه‌ی بیرونی، دایره‌ی داخلی و جای خالی بین تب‌ها
-private val AiSlotWidth = 84.dp
-private val AiRingSize = 76.dp
-private val AiButtonSize = 66.dp
+// مثل پلی‌استور: آیکن ۲۴ و یه قرص پهن پشتش؛ اسم زیر قرص می‌شینه
+private val NavIconSize = 24.dp
+private val NavPillWidth = 56.dp
+private val NavPillHeight = 30.dp
+
+// دکمه‌ی هوش مصنوعی وسط منو (مثل بام): دایره‌ی توپر، حلقه‌ی بریدگی دورش و جای خالی بین تب‌ها
+private val AiSlotWidth = 76.dp
+private val AiRingSize = 68.dp
+private val AiButtonSize = 56.dp
 
 /** چقدر دکمه‌ی وسط از لبه‌ی بالای منو بیرون می‌زنه */
-private val AiBump = 26.dp
+private val AiBump = 28.dp
 
 /** ارتفاع کل منو وقتی دکمه‌ی هوش مصنوعی وسطشه (برای کسانی که جا رزرو می‌کنن) */
 val AiNavTotalHeight = 88.dp + AiBump
@@ -151,10 +150,7 @@ fun AppBottomNav(
                         selectedIndex = selectedIndex,
                         currentRoute = currentRoute,
                         onTabSelected = onTabSelected,
-                        fixedAi = fixedAi,
-                        indicatorShape = RoundedCornerShape(26.dp),
-                        indicatorBorder = true,
-                        indicatorLabel = "nav_indicator_x"
+                        fixedAi = fixedAi
                     )
                 }
             }
@@ -163,6 +159,7 @@ fun AppBottomNav(
         if (fixedAi) {
             AiNavButton(
                 route = currentRoute,
+                ringColor = background,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
@@ -182,6 +179,7 @@ private fun ClassicBottomNav(
     onSupportClick: () -> Unit
 ) {
     val bump = if (fixedAi) AiBump else 0.dp
+    val surface = MaterialTheme.colorScheme.surface
     val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -189,7 +187,7 @@ private fun ClassicBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = bump)
-                .background(MaterialTheme.colorScheme.surface)
+                .background(surface)
                 .drawBehind {
                     drawRect(color = lineColor, size = Size(size.width, 1.dp.toPx()))
                 }
@@ -200,16 +198,14 @@ private fun ClassicBottomNav(
                 selectedIndex = selectedIndex,
                 currentRoute = currentRoute,
                 onTabSelected = onTabSelected,
-                fixedAi = fixedAi,
-                indicatorShape = RoundedCornerShape(22.dp),
-                indicatorBorder = false,
-                indicatorLabel = "classic_nav_indicator_x"
+                fixedAi = fixedAi
             )
         }
 
         if (fixedAi) {
             AiNavButton(
                 route = currentRoute,
+                ringColor = surface,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
                 modifier = Modifier.align(Alignment.TopCenter)
@@ -219,73 +215,48 @@ private fun ClassicBottomNav(
 }
 
 /**
- * ردیف تب‌ها و اندیکاتور لغزنده. وقتی [fixedAi] روشنه، وسط ردیف یه جای خالی برای دکمه‌ی
+ * ردیف تب‌ها. وقتی [fixedAi] روشنه، وسط ردیف یه جای خالی برای دکمه‌ی
  * هوش مصنوعی می‌ماند: دو تب یه طرف، دو تب طرف دیگه.
- * اندیکاتور دقیقاً به اندازه‌ی کل تب (آیکن + اسم + فاصله‌ها) هایلایت می‌کنه.
+ * هایلایت انتخاب مثل پلی‌استور یه قرصِ پهن پشت آیکنه (تو خود NavTab).
  */
 @Composable
 private fun NavTabsArea(
     selectedIndex: Int,
     currentRoute: String?,
     onTabSelected: (String) -> Unit,
-    fixedAi: Boolean,
-    indicatorShape: Shape,
-    indicatorBorder: Boolean,
-    indicatorLabel: String
+    fixedAi: Boolean
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val half = bottomNavItems.size / 2
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
 
-    BoxWithConstraints {
-        val aiWidth = if (fixedAi) AiSlotWidth else 0.dp
-        val tabWidth = (maxWidth - aiWidth) / bottomNavItems.size
-
-        // اندیکاتور لغزنده: با فنر از یک تب به تب بعدی «سُر می‌خورد»
-        // (آفست در RTL از راست حساب می‌شود، یعنی هم‌جهت با ترتیب آیتم‌ها)
-        val indicatorX by animateDpAsState(
-            targetValue = tabWidth * selectedIndex + (if (fixedAi && selectedIndex >= half) aiWidth else 0.dp),
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
-            label = indicatorLabel
-        )
-        Box(
-            modifier = Modifier
-                .offset(x = indicatorX)
-                .width(tabWidth)
-                .height(NavItemHeight)
-                .clip(indicatorShape)
-                .background(primary.copy(alpha = 0.16f))
-                .then(if (indicatorBorder) Modifier.border(1.5.dp, primary, indicatorShape) else Modifier)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            bottomNavItems.forEachIndexed { index, item ->
-                if (fixedAi && index == half) {
-                    // جای دکمه‌ی وسط؛ فقط اسمش پایین می‌شینه
-                    Box(
-                        modifier = Modifier.width(AiSlotWidth).height(NavItemHeight),
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Text(
-                            text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
-                            fontSize = 11.sp,
-                            color = primary,
-                            maxLines = 1,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        bottomNavItems.forEachIndexed { index, item ->
+            if (fixedAi && index == half) {
+                // جای دکمه‌ی وسط؛ فقط اسمش پایین می‌شینه (هم‌تراز اسم بقیه‌ی تب‌ها)
+                Box(
+                    modifier = Modifier.width(AiSlotWidth).height(NavItemHeight),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Text(
+                        text = if (supportOn) "پشتیبانی" else "هوش مصنوعی",
+                        fontSize = 11.sp,
+                        color = primary,
+                        maxLines = 1,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
                 }
-                NavTab(
-                    item = item,
-                    selected = index == selectedIndex,
-                    onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
-                    modifier = Modifier.width(tabWidth)
-                )
             }
+            NavTab(
+                item = item,
+                selected = index == selectedIndex,
+                onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -331,14 +302,15 @@ private object BubbleAbove : PopupPositionProvider {
 }
 
 /**
- * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه و حلقه‌ی دورش مثل بریدگی منو دیده می‌شه.
- * تو دایره‌ی وسطش ربات هوش مصنوعیه که به رنگ تم برنامه‌ست و زندگی خودش رو داره:
+ * دکمه‌ی گرد وسط منو مثل بام: از لبه‌ی بالای منو بیرون می‌زنه؛ حلقه‌ی دورش هم‌رنگ نواره و مثل بریدگی دیده می‌شه.
+ * تو دایره‌ی توپرِ وسطش (به رنگ تم برنامه) ربات هوش مصنوعیه که زندگی خودش رو داره:
  * هر چند ثانیه حرف می‌زنه (حباب میاد)، می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
  * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
 private fun AiNavButton(
     route: String?,
+    ringColor: Color,
     onClick: () -> Unit,
     onSupportClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -436,8 +408,6 @@ private fun AiNavButton(
         }
     }
 
-    // رنگ‌های دکمه از تم برنامه می‌آن
-    val fill = lerp(scheme.background, scheme.primary, 0.16f)
     val pulseColor = scheme.primary
 
     Box(
@@ -452,11 +422,12 @@ private fun AiNavButton(
                 val t = pulse.value
                 drawCircle(
                     color = pulseColor.copy(alpha = 0.22f * (1f - t)),
-                    radius = size.minDimension / 2f + 10.dp.toPx() * t
+                    radius = size.minDimension / 2f + 8.dp.toPx() * t
                 )
             }
             .clip(CircleShape)
-            .background(scheme.background)
+            // حلقه‌ی هم‌رنگ نوار؛ همین باعث می‌شه دکمه توی نوار «بریده» به نظر بیاد
+            .background(ringColor)
             .glassBorder(1.dp, scheme.outline.copy(alpha = 0.35f), CircleShape)
             .clickable(
                 interactionSource = interaction,
@@ -477,18 +448,18 @@ private fun AiNavButton(
                     SupportAvatar(sizeDp = AiButtonSize.value.toInt(), ring = ring)
                 }
             } else {
+                // دایره‌ی توپر به رنگ تم، ربات سفید داخلش
                 Box(
                     modifier = Modifier
                         .size(AiButtonSize)
                         .clip(CircleShape)
-                        .background(fill)
-                        .border(1.5.dp, scheme.primary.copy(alpha = 0.55f), CircleShape)
+                        .background(scheme.primary)
                 ) {
                     BuddyCanvas(
                         modifier = Modifier.size(AiButtonSize),
                         talking = talking,
-                        plate = fill,
-                        ink = scheme.primary,
+                        plate = scheme.primary,
+                        ink = Color.White,
                         state = buddy
                     )
                 }
@@ -538,16 +509,17 @@ private fun NavTab(
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     val tint by animateColorAsState(if (selected) primary else muted, tween(250), label = "nav_tint")
-    val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.1f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "nav_icon_scale"
+    // قرص هایلایت از وسط آیکن به دو طرف باز می‌شه (مثل پلی‌استور)
+    val pill by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium),
+        label = "nav_pill"
     )
 
     Column(
         modifier = modifier
             .height(NavItemHeight)
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -556,16 +528,29 @@ private fun NavTab(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // انتخاب‌شده: آیکن تو‌پر؛ انتخاب‌نشده: آیکن خطی
-        Crossfade(targetState = selected, animationSpec = tween(200), label = "nav_icon_fill") { sel ->
-            Icon(
-                imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
-                contentDescription = item.label,
-                tint = tint,
+        Box(
+            modifier = Modifier.size(width = NavPillWidth, height = NavPillHeight),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
                 modifier = Modifier
-                    .size(NavIconSize)
-                    .scale(iconScale)
+                    .matchParentSize()
+                    .graphicsLayer {
+                        scaleX = pill
+                        alpha = pill
+                    }
+                    .clip(CircleShape)
+                    .background(primary.copy(alpha = 0.22f))
             )
+            // انتخاب‌شده: آیکن تو‌پر؛ انتخاب‌نشده: آیکن خطی
+            Crossfade(targetState = selected, animationSpec = tween(200), label = "nav_icon_fill") { sel ->
+                Icon(
+                    imageVector = if (sel) item.selectedIcon else item.unselectedIcon,
+                    contentDescription = item.label,
+                    tint = tint,
+                    modifier = Modifier.size(NavIconSize)
+                )
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(
