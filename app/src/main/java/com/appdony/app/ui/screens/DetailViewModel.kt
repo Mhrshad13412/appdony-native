@@ -3,6 +3,7 @@ package com.appdony.app.ui.screens
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.appdony.app.data.model.Post
+import com.appdony.app.data.model.PostMemory
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.util.AppInfo
 import com.appdony.app.util.ContentBlock
@@ -17,7 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 sealed class DetailUiState {
-    object Loading : DetailUiState()
+    // پیش‌نمایش: اگه پست قبلاً تو لیستی دیده شده باشه، عکس و اسمش همون لحظه نشون داده می‌شه
+    data class Loading(val preview: Post? = null) : DetailUiState()
     data class Success(
         val post: Post,
         val info: AppInfo,
@@ -33,7 +35,7 @@ class DetailViewModel(
 ) : ViewModel() {
 
     private val repo = AppRepository()
-    private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
+    private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading(PostMemory.get(postId)))
     val state: StateFlow<DetailUiState> = _state.asStateFlow()
 
     init {
@@ -42,7 +44,7 @@ class DetailViewModel(
 
     fun load() {
         viewModelScope.launch {
-            _state.value = DetailUiState.Loading
+            _state.value = DetailUiState.Loading(PostMemory.get(postId))
 
             val postResult = if (isBlog) repo.getBlogPost(postId) else repo.getPost(postId)
 
