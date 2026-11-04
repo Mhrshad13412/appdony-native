@@ -421,12 +421,22 @@ fun MainContent(
 }
 
 fun NavController.navigateToTab(route: String) {
-    // اگه الان توی جزئیات (بازی/برنامه/مقاله) هستیم، رفتن به یه بخش دیگه یعنی خارج شدن از اون جزئیات:
-    // حالتش ذخیره نمی‌شه تا وقتی برگشتیم به اون بخش، دوباره وسط همون بازی نیفتیم
-    val leavingDetail = currentDestination?.route?.startsWith("detail/") == true
+    // منطق ساده و بدون ذخیره/بازیابی state: پشته همیشه «بازی‌ها» + حداکثر یک تب دیگه‌ست.
+    // قبلاً saveState/restoreState بعد از خروج از جزئیات باعث می‌شد تب بازی‌ها قفل بشه و برنگرده.
+    val start = graph.findStartDestination()
+    if (route == start.route) {
+        // برگشت به بازی‌ها: همه‌ی چیزای بالاش (تب دیگه، جزئیات) پاک می‌شن
+        if (!popBackStack(route, inclusive = false)) {
+            navigate(route) {
+                popUpTo(start.id) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+        return
+    }
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = !leavingDetail }
+        popUpTo(start.id) { saveState = false }
         launchSingleTop = true
-        restoreState = true
+        restoreState = false
     }
 }
