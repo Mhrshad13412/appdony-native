@@ -215,14 +215,14 @@ private fun NavBar(
     // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
     val barShape = remember(notch) { NotchedBarShape(corner = 28.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
-    // لبه‌ی شیشه (مثل هونر/تلگرام ادز): فقط بالا یه خط خیلی کم‌رنگ، پایین تقریباً هیچی
-    val edgeBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.015f))
-        else listOf(Color.White.copy(alpha = 0.70f), outline.copy(alpha = 0.10f), outline.copy(alpha = 0.04f))
+    // لبه‌ی «شیشه‌ی مایع»: از گوشه‌ی بالا-چپ برق می‌زنه، وسط تقریباً نامرئیه و پایین-راست دوباره یه برق کم‌رنگ داره
+    val rimBrush = Brush.linearGradient(
+        if (dark) listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.22f))
+        else listOf(Color.White.copy(alpha = 0.95f), outline.copy(alpha = 0.10f), outline.copy(alpha = 0.04f), Color.White.copy(alpha = 0.70f))
     )
     // برقِ نرمِ بالای شیشه
     val sheenBrush = Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.04f else 0.18f), Color.Transparent)
+        listOf(Color.White.copy(alpha = if (dark) 0.10f else 0.30f), Color.Transparent)
     )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -237,21 +237,32 @@ private fun NavBar(
                     .fillMaxWidth()
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
-                        blurRadius = 30.dp
+                        // تارتر از قبل (۳۰ ← ۴۴) تا شیشه‌ی مایع باشه ولی متن‌ها خوانا بمونن
+                        blurRadius = 44.dp
                         backgroundColor = background
-                        // شیشه‌ی روشن‌کننده مثل تلگرام ادز: یه پایه‌ی کم‌رنگ + یه لایه‌ی سفید نازک،
-                        // پس رنگ‌های پشتش تیره نمی‌شن و مثل نور از زیر شیشه می‌درخشن
+                        // شفاف‌تر از قبل: رنگ‌های پشتش مثل نور از زیر شیشه می‌درخشن
                         tints = listOf(
-                            HazeTint(surface.copy(alpha = if (dark) 0.30f else 0.45f)),
-                            HazeTint(Color.White.copy(alpha = if (dark) 0.06f else 0.20f))
+                            HazeTint(surface.copy(alpha = if (dark) 0.26f else 0.38f)),
+                            HazeTint(Color.White.copy(alpha = if (dark) 0.07f else 0.22f))
                         )
                         // دونه‌ی خیلی ریزِ شیشه‌ی مات‌شده
-                        noiseFactor = 0.035f
+                        noiseFactor = 0.03f
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
                         fallbackTint = HazeTint(surface.copy(alpha = 0.88f))
                     }
                     .background(sheenBrush)
-                    .border(0.75.dp, edgeBrush, barShape)
+                    // خط برقِ باریکِ زیر لبه‌ی بالا، مثل بازتاب نور روی شیشه
+                    .drawBehind {
+                        val h = 1.2.dp.toPx()
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = if (dark) 0.35f else 0.80f), Color.Transparent)
+                            ),
+                            topLeft = Offset(size.width * 0.14f, h),
+                            size = Size(size.width * 0.72f, h)
+                        )
+                    }
+                    .border(1.dp, rimBrush, barShape)
             ) {
                 Box(modifier = Modifier.padding(NavInnerPadding)) {
                     NavTabsArea(
@@ -374,23 +385,23 @@ private fun NavTabsArea(
         )
 
         if (glass) {
+            // کاشی انتخاب‌شده: حباب شیشه‌ای مایع؛ قطری روشن، وسطش یه ته‌رنگ از تم و لبه‌ی برق‌دار
             Box(
                 modifier = Modifier
                     .offset(x = indicatorX)
                     .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
                     .clip(GlassTileShape)
-                    // کاشی انتخاب‌شده مثل تلگرام ادز: شیشه‌ی روشن که پایینش یه ته‌رنگ از رنگ تم داره
                     .background(
-                        Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.14f), primary.copy(alpha = 0.10f))
-                            else listOf(Color.White.copy(alpha = 0.75f), primary.copy(alpha = 0.12f))
+                        Brush.linearGradient(
+                            if (dark) listOf(Color.White.copy(alpha = 0.24f), primary.copy(alpha = 0.12f), Color.White.copy(alpha = 0.07f))
+                            else listOf(Color.White.copy(alpha = 0.90f), primary.copy(alpha = 0.12f), Color.White.copy(alpha = 0.50f))
                         )
                     )
                     .border(
-                        0.75.dp,
-                        Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.16f), primary.copy(alpha = 0.22f))
-                            else listOf(Color.White.copy(alpha = 0.90f), primary.copy(alpha = 0.25f))
+                        1.dp,
+                        Brush.linearGradient(
+                            if (dark) listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.24f))
+                            else listOf(Color.White, primary.copy(alpha = 0.18f), Color.White.copy(alpha = 0.85f))
                         ),
                         GlassTileShape
                     )
@@ -794,7 +805,15 @@ private fun NavTab(
         val iconTop = if (glass) GlassContentTop else NavPillTop + (NavPillHeight - NavIconSize) / 2
         val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
         Spacer(Modifier.height(iconTop))
-        TabIcon(item = item, selected = selected, tint = tint)
+        // آیکن انتخاب‌شده با یه فنر نرم کمی بزرگ می‌شه
+        val iconScale by animateFloatAsState(
+            targetValue = if (selected) 1.12f else 1f,
+            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+            label = "nav_icon_scale"
+        )
+        Box(modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }) {
+            TabIcon(item = item, selected = selected, tint = tint)
+        }
         Spacer(Modifier.height(labelTop - iconTop - NavIconSize))
         Text(
             text = item.label,
