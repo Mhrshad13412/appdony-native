@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +30,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdony.app.data.model.Post
@@ -55,7 +58,10 @@ fun HomeScreen(
     isGamesTab: Boolean,
     onPostClick: (Int) -> Unit,
     onCategoryClick: (Int, String) -> Unit = { _, _ -> },
-    viewModel: HomeViewModel = viewModel()
+    // ⚠️ مهم — ViewModel هر تب به اکتیویتی وصله (نه به ورودی ناوبری)؛ پشته‌ی ناوبری فقط «بازی‌ها» + یک تب دیگه رو نگه می‌داره
+    // و اگه ViewModel به ورودی ناوبری وصل باشه، هر بار که از تب دیگه‌ای میای «برنامه‌ها»، همه‌چیز از صفر لود می‌شه.
+    // با این روش، تب برنامه‌ها هم مثل بازی‌ها داده‌ش رو نگه می‌داره و اسکلت/لودینگ دوباره نمیاد.
+    viewModel: HomeViewModel = homeTabViewModel(isGamesTab)
 ) {
     val plus by viewModel.plus.collectAsStateWithLifecycle()
     // بتا خاموشه مگه کاربر از تنظیمات روشنش کنه؛ بلوک اپدونی پلاس فقط با بتا میاد
@@ -129,6 +135,19 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+/** ViewModel تب (بازی‌ها/برنامه‌ها) که با اکتیویتی زنده می‌مونه، نه با ورودی ناوبری */
+@Composable
+private fun homeTabViewModel(isGamesTab: Boolean): HomeViewModel {
+    var ctx: Context = LocalContext.current
+    while (ctx is ContextWrapper && ctx !is ComponentActivity) ctx = ctx.baseContext
+    val key = if (isGamesTab) "home_games" else "home_apps"
+    return if (ctx is ComponentActivity) {
+        viewModel(viewModelStoreOwner = ctx, key = key)
+    } else {
+        viewModel(key = key)
     }
 }
 
@@ -239,11 +258,17 @@ private fun CategorySection(
 
 // ظاهر شدن نرم کارت‌ها؛ بدون هیچ تأخیر ساختگی: هر کارت همون لحظه‌ای که داده‌ش رسید شروع به محو شدن می‌کنه
 // (پارامتر index فقط برای سازگاری با جاهای صدا زدن مونده)
+// کارتی که قبلاً یک بار ظاهر شده، موقع برگشتن به تب دوباره محو/ظاهر نمی‌شه (مثل تب بازی‌ها که همیشه می‌مونه)
+private val shownFades = HashSet<Any>()
+
 @Composable
 private fun FadeIn(key: Any, @Suppress("UNUSED_PARAMETER") index: Int, content: @Composable () -> Unit) {
-    var visible by rememberSaveable(key) { mutableStateOf(false) }
+    var visible by rememberSaveable(key) { mutableStateOf(key in shownFades) }
 
-    LaunchedEffect(key) { visible = true }
+    LaunchedEffect(key) {
+        visible = true
+        shownFades.add(key)
+    }
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
