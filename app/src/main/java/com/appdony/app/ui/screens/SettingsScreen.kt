@@ -39,6 +39,9 @@ import com.appdony.app.ui.components.AiMode
 import com.appdony.app.ui.components.AiModeSelector
 import com.appdony.app.ui.components.PillOption
 import com.appdony.app.ui.components.PillSelector
+import com.appdony.app.ui.components.appdonyCard
+import com.appdony.app.ui.components.glassTintOf
+import com.appdony.app.ui.components.isGlassDark
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -134,6 +137,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)
     ) {
         item {
+            val glassTop = com.appdony.app.ui.components.LocalGlassMode.current
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -141,8 +145,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        // شیشه‌ای: همون استایل منوی پایین؛ کلاسیک: مات مثل قبل
+                        .then(
+                            if (glassTop) Modifier.appdonyCard(CircleShape)
+                            else Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
                         .clickable { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -288,11 +295,10 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                // شیشه‌ای: کل بلاک شیشه‌ایه (ته‌رنگ و لبه‌ی منوی پایین)؛ کلاسیک: مات مثل قبل
                 .then(
-                    if (glass) Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)), RoundedCornerShape(20.dp))
-                    else Modifier
+                    if (glass) Modifier.appdonyCard(RoundedCornerShape(20.dp))
+                    else Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
                 ),
             content = content
         )
@@ -301,17 +307,23 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
 
 @Composable
 private fun RowDivider() {
+    val glass = com.appdony.app.ui.components.LocalGlassMode.current
+    val line = if (glass) {
+        if (isGlassDark()) Color.White.copy(alpha = 0.07f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    } else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp)
             .height(1.dp)
-            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            .background(line)
     )
 }
 
 @Composable
 private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val glass = com.appdony.app.ui.components.LocalGlassMode.current
+    val dark = isGlassDark()
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -326,8 +338,11 @@ private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean
                 checkedThumbColor = Color.White,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.background,
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                // شیشه‌ای: مسیر کلید با ته‌رنگ و لبه‌ی منو
+                uncheckedTrackColor = if (glass) glassTintOf(dark) else MaterialTheme.colorScheme.background,
+                uncheckedBorderColor = if (glass) {
+                    if (dark) Color.White.copy(alpha = 0.14f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                } else MaterialTheme.colorScheme.outline
             )
         )
     }
