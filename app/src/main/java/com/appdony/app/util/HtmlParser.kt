@@ -15,6 +15,8 @@ data class AppInfo(
     val version: String? = null,
     val size: String? = null,
     val androidReq: String? = null,
+    val rating: String? = null,
+    val ratingCount: String? = null,
     val developer: String? = null,
     val downloadLinks: List<DownloadLink> = emptyList(),
     val screenshots: List<String> = emptyList(),
@@ -192,6 +194,8 @@ object HtmlParser {
             version = extractVersion(text),
             size = extractSize(text),
             androidReq = extractAndroidReq(text),
+            rating = extractRating(text),
+            ratingCount = extractRatingCount(text),
             developer = extractDeveloper(lines),
             downloadLinks = extractDownloadLinks(doc),
             screenshots = extractScreenshots(doc),
@@ -205,28 +209,54 @@ object HtmlParser {
             Regex("نسخه\\s*[:：]?\\s*([0-9][0-9A-Za-z.\\-]*)"),
             Regex("[Vv]ersion\\s*[:：]?\\s*([0-9][0-9A-Za-z.\\-]*)")
         )
+        // اول نسخه‌ای که نقطه داره (مثل 1.45.3)؛ بعد هر چی پیدا شد
+        for (p in patterns) {
+            val all = p.findAll(text).map { it.groupValues[1].trim().trimEnd('.', '-') }.toList()
+            all.firstOrNull { it.contains('.') }?.let { return it }
+        }
         for (p in patterns) {
             val m = p.find(text)
-            if (m != null) return m.groupValues[1].trim()
+            if (m != null) return m.groupValues[1].trim().trimEnd('.', '-')
         }
         return null
     }
 
+    // «حجم: 252.91 MB» یا «حجم تقریبی 252.91 Mb»
     private fun extractSize(text: String): String? {
         val labeled = Regex(
-            "(?:حجم|Size)\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
+            "(?:حجم|Size)[^0-9]{0,15}([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
             RegexOption.IGNORE_CASE
         ).find(text)
         if (labeled != null) return "${labeled.groupValues[1]} ${labeled.groupValues[2]}"
         return null
     }
 
+    // فقط عددی که واقعاً می‌تونه نسخه‌ی اندروید باشه (۴ تا ۱۶)؛ «Shadow Fight 3» یا «نسخه 1.45» حساب نمی‌شن
     private fun extractAndroidReq(text: String): String? {
-        val m = Regex(
+        val regex = Regex(
             "(?:اندروید|Android)[^0-9]{0,25}([0-9]+(?:\\.[0-9]+)*\\+?)",
             RegexOption.IGNORE_CASE
-        ).find(text) ?: return null
-        return m.groupValues[1].trim()
+        )
+        for (m in regex.findAll(text)) {
+            val v = m.groupValues[1].trim()
+            val major = v.substringBefore('.').trimEnd('+').toIntOrNull() ?: continue
+            if (major in 4..16) return v
+        }
+        return null
+    }
+
+    // امتیاز (۱ تا ۵) اگه توی متن پست باشه
+    private fun extractRating(text: String): String? {
+        val m = Regex("(?:امتیاز|Rating|★|⭐)\\s*[:：]?\\s*([0-5](?:\\.[0-9])?)(?![0-9])", RegexOption.IGNORE_CASE).find(text) ?: return null
+        val v = m.groupValues[1]
+        val d = v.toDoubleOrNull() ?: return null
+        return if (d in 1.0..5.0) v else null
+    }
+
+    // تعداد نظر/رأی مثل «10.2K نظر»
+    private fun extractRatingCount(text: String): String? {
+        val m = Regex("([0-9]+(?:\\.[0-9]+)?\\s?[KkMm]?)\\s*(?:نظر|رأی|رای|دیدگاه|votes|ratings|reviews)", RegexOption.IGNORE_CASE).find(text) ?: return null
+        return m.groupValues[1].trim().ifBlank { null }
     }
 
     private fun extractDeveloper(lines: String): String? {
