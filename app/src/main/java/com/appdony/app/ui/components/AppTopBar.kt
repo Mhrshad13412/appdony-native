@@ -152,7 +152,6 @@ fun AppTopBar(
             modifier = Modifier
                 .weight(1f)
                 .height(44.dp)
-                .guideTarget("search")
                 .clip(RoundedCornerShape(22.dp))
                 .background(scheme.surfaceVariant)
                 .then(if (searchMode) Modifier else Modifier.clickable { onSearchClick() })
@@ -217,7 +216,6 @@ fun AppTopBar(
             Box(
                 modifier = Modifier
                     .requiredSize(44.dp)
-                    .guideTarget("account")
                     .graphicsLayer { alpha = 1f - progress }
                     .clip(CircleShape)
                     .background(if (isLoggedIn) scheme.primary else scheme.surfaceVariant)
