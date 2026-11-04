@@ -40,8 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.appdony.app.data.model.Post
-import com.appdony.app.data.model.cleanTitle
-import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.repository.AppRepository
 import com.appdony.app.ui.components.PostCard
