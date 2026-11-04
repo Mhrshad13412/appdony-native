@@ -107,14 +107,23 @@ fun FloatingDialog(
                     scaleIn(initialScale = 0.88f, animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) +
                     slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 8 }
             ) {
+                // شیشه‌ای: همون ته‌رنگ و لبه‌ی منوی پایین روی بلورِ پشت پنجره (کمی غلیظ‌تر چون متن داره)؛
+                // اندروید ۱۱ و پایین‌تر بلور پشت پنجره نداره، پس ته‌رنگ مات‌تر میاد
+                val glass = LocalGlassMode.current
+                val dialogShape = RoundedCornerShape(28.dp)
+                val dialogColor = if (glass) {
+                    val blurBehind = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    glassTintOf(isGlassDark(), alpha = if (blurBehind) 0.74f else 0.95f)
+                } else MaterialTheme.colorScheme.surface
                 Surface(
                     modifier = Modifier
                         .padding(24.dp)
                         .fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 24.dp,
-                    border = glassStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+                    shape = dialogShape,
+                    color = dialogColor,
+                    // سایه‌ی المنت از زیر شیشه‌ی شفاف دیده می‌شه؛ تو شیشه‌ای فقط دیم و بلور پشت پنجره جداش می‌کنه
+                    shadowElevation = if (glass) 0.dp else 24.dp,
+                    border = if (glass) BorderStroke(1.dp, glassRimBrush()) else null
                 ) {
                     Column(
                         modifier = Modifier
