@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -50,6 +52,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -65,8 +69,31 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 
 /**
+ * آیا بلور پشت پنجره واقعاً روشنه؟
+ * فقط چک نسخه‌ی اندروید کافی نیست: روی بعضی گوشی‌ها (شیائومی، حالت باتری، کاهش انیمیشن) بلور خاموشه.
+ */
+@Composable
+private fun rememberBlurBehindSupported(): Boolean =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) rememberCrossWindowBlurEnabled() else false
+
+@SuppressLint("NewApi")
+@Composable
+private fun rememberCrossWindowBlurEnabled(): Boolean {
+    val context = LocalContext.current
+    val windowManager = remember { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    var enabled by remember { mutableStateOf(windowManager.isCrossWindowBlurEnabled) }
+    DisposableEffect(windowManager) {
+        val listener = java.util.function.Consumer<Boolean> { enabled = it }
+        windowManager.addCrossWindowBlurEnabledListener(listener)
+        onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
+    }
+    return enabled
+}
+
+/**
  * کارت شناور مشترک (لاگین / منوی اکانت / درباره):
  * از هر چهار طرف فاصله دارد، پس‌زمینه تیره + بلور، و با انیمیشن فنری وارد می‌شود.
+ * اگه بلور پنجره روی گوشی خاموش باشه، کارت تقریباً مات میاد تا محتوای پشتش دیده نشه.
  */
 @Composable
 fun FloatingDialog(
@@ -74,6 +101,8 @@ fun FloatingDialog(
     dismissible: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val blurSupported = rememberBlurBehindSupported()
+
     Dialog(
         onDismissRequest = { if (dismissible) onDismiss() },
         properties = DialogProperties(
@@ -87,12 +116,17 @@ fun FloatingDialog(
             val window = (view.parent as? DialogWindowProvider)?.window
             if (window != null) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window.setDimAmount(0.45f)
+                // بدون بلور، دیم قوی‌تر تا پشت کارت کمتر دیده بشه
+                window.setDimAmount(if (blurSupported) 0.45f else 0.6f)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                    val params = window.attributes
-                    params.blurBehindRadius = 28
-                    window.attributes = params
+                    if (blurSupported) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                        val params = window.attributes
+                        params.blurBehindRadius = 40
+                        window.attributes = params
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                    }
                 }
             }
         }
@@ -108,12 +142,11 @@ fun FloatingDialog(
                     slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 8 }
             ) {
                 // شیشه‌ای: همون ته‌رنگ و لبه‌ی منوی پایین روی بلورِ پشت پنجره (کمی غلیظ‌تر چون متن داره)؛
-                // اندروید ۱۱ و پایین‌تر بلور پشت پنجره نداره، پس ته‌رنگ مات‌تر میاد
+                // اگه بلور واقعی در دسترس نباشه (اندروید ۱۱ و پایین‌تر یا بلور خاموش)، ته‌رنگ تقریباً مات میاد
                 val glass = LocalGlassMode.current
                 val dialogShape = RoundedCornerShape(28.dp)
                 val dialogColor = if (glass) {
-                    val blurBehind = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                    glassTintOf(isGlassDark(), alpha = if (blurBehind) 0.74f else 0.95f)
+                    glassTintOf(isGlassDark(), alpha = if (blurSupported) 0.74f else 0.97f)
                 } else MaterialTheme.colorScheme.surface
                 Surface(
                     modifier = Modifier
