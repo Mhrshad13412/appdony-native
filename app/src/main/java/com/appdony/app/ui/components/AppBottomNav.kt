@@ -59,15 +59,19 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -109,11 +113,13 @@ private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// ── شیشه‌ای (مثل تلگرام ادز): کاشی مستطیل گرد دور آیکن و اسم، آیکن و اسم از بالا ۸dp شروع می‌شن ──
+// ── شیشه‌ای (مثل تلگرام ادز): کاشی مربعِ گرد دور آیکن و اسم، آیکن و اسم از بالا ۸dp شروع می‌شن ──
 private val GlassContentTop = 8.dp
 
 // ارتفاع هر تب توی حالت شیشه‌ای: به اندازه‌ی آیکن و اسم، نه بیشتر (کل منو با فاصله‌ی دورش می‌شه ≈ ۶۸dp)
 private val GlassItemHeight = 56.dp
+
+// کاشی شیشه‌ای همیشه مربعه: ضلعش ۵۶dp (هم‌قد تب)؛ فقط اگه خونه از این باریک‌تر بود (مثلاً وقتی هوش مصنوعی وسطه) به پهنای خونه کم می‌شه، ولی باز مربعه
 private val GlassTileInset = 2.dp
 private val GlassTileShape = RoundedCornerShape(20.dp)
 
@@ -168,6 +174,40 @@ private class NotchedBarShape(
     }
 }
 
+/**
+ * سایه‌ی نرمِ دور یه شکل، از چند لایه‌ی پشت‌هم ساخته می‌شه تا روی همه‌ی نسخه‌های اندروید یکسان دربیاد.
+ * داخل خودِ شکل کشیده نمی‌شه (شیشه‌ست و نباید تیره بشه)؛ فقط بیرونش.
+ * [offsetY] مثبت یعنی سایه بیشتر زیر شکل میفته و کمتر بالاش.
+ * باید قبل از clip گذاشته بشه تا بریده نشه.
+ */
+private fun Modifier.softShadow(
+    shape: Shape,
+    color: Color,
+    spread: Dp,
+    offsetY: Dp,
+    layers: Int = 12
+): Modifier = this.drawBehind {
+    val path = when (val o = shape.createOutline(size, layoutDirection, this)) {
+        is Outline.Generic -> o.path
+        is Outline.Rounded -> Path().apply { addRoundRect(o.roundRect) }
+        is Outline.Rectangle -> Path().apply { addRect(o.rect) }
+    }
+    val spreadPx = spread.toPx()
+    val perLayer = color.alpha / layers
+    clipPath(path, ClipOp.Difference) {
+        translate(top = offsetY.toPx()) {
+            for (i in 1..layers) {
+                val reach = spreadPx * i / layers
+                drawPath(
+                    path = path,
+                    color = color.copy(alpha = perLayer),
+                    style = Stroke(width = reach * 2f, join = StrokeJoin.Round)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun AppBottomNav(
     currentRoute: String?,
@@ -218,11 +258,13 @@ private fun NavBar(
     // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
     val barShape = remember(notch) { NotchedBarShape(corner = 24.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
-    // لبه‌ی باریکِ شیشه‌ای: سفیدِ کم‌رنگ، بالا کمی پررنگ‌تر و پایین کم‌رنگ‌تر (بدون رنگ تم، مثل منوی تلگرام ادز)
+    // لبه‌ی باریکِ شیشه‌ای: سفیدِ خیلی کم‌رنگ، بالا کمی پررنگ‌تر و پایین تقریباً بی‌خط (بدون رنگ تم، مثل منوی تلگرام ادز)
     val rimBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.09f))
-        else listOf(Color.White.copy(alpha = 0.95f), outline.copy(alpha = 0.16f), outline.copy(alpha = 0.10f))
+        if (dark) listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
+        else listOf(Color.White.copy(alpha = 0.85f), outline.copy(alpha = 0.12f), outline.copy(alpha = 0.06f))
     )
+    // سایه‌ی بدنه: بیشتر زیرش میفته و بالاش خیلی کم
+    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.14f)
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -234,14 +276,15 @@ private fun NavBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .softShadow(barShape, bodyShadow, spread = 17.dp, offsetY = 9.dp)
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
                         // بلور درشت تا رنگِ پشتش نرم پخش بشه
-                        blurRadius = 40.dp
+                        blurRadius = 52.dp
                         backgroundColor = background
-                        // مات مشکی و نیمه‌شفاف: اگه رنگی پشتش بیاد از زیرش دیده و پخش می‌شه
+                        // مات مشکیِ تیره‌تر و نیمه‌شفاف: اگه رنگی پشتش بیاد از زیرش دیده و پخش می‌شه
                         tints = listOf(
-                            HazeTint(if (dark) Color(0xFF08090B).copy(alpha = 0.48f) else Color.White.copy(alpha = 0.55f))
+                            HazeTint(if (dark) Color(0xFF08090B).copy(alpha = 0.55f) else Color.White.copy(alpha = 0.55f))
                         )
                         // دونه‌ی خیلی ریزِ شیشه‌ی مات‌شده
                         noiseFactor = 0.02f
@@ -341,7 +384,7 @@ private fun ClassicBottomNav(
  * ردیف تب‌ها. وقتی [fixedAi] روشنه، خونه‌ی وسط مال دکمه‌ی هوش مصنوعیه
  * (کمی پهن‌تر از بقیه) و دو تب یه طرفش، دو تب طرف دیگه‌ش.
  * هایلایت از تبی به تب دیگه با یه فنر نرم سُر می‌خوره:
- *  - شیشه‌ای: کاشی گرد شیشه‌ای با ته‌رنگ تم دور آیکن و اسم (مثل تلگرام)
+ *  - شیشه‌ای: کاشی مربعِ گرد شیشه‌ای با ته‌رنگ تم دور آیکن و اسم (مثل تلگرام)
  *  - کلاسیک: قرص پهن پشت آیکن (مثل گوگل پلی)
  */
 @Composable
@@ -361,12 +404,14 @@ private fun NavTabsArea(
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val unit = maxWidth / (bottomNavItems.size + aiW)
+        // ضلع کاشی شیشه‌ای: همیشه مربع (با هوش مصنوعیِ وسط و بدونش)
+        val tileSide = (unit - GlassTileInset * 2).coerceAtMost(GlassItemHeight)
         val before = selectedIndex + if (fixedAi && selectedIndex >= half) aiW else 0f
         val slotStart = unit * before
 
         // آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیتم‌ها
         val indicatorX by animateDpAsState(
-            targetValue = if (glass) slotStart + GlassTileInset else slotStart + (unit - NavPillWidth) / 2,
+            targetValue = if (glass) slotStart + (unit - tileSide) / 2 else slotStart + (unit - NavPillWidth) / 2,
             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
             label = "nav_indicator_x"
         )
@@ -378,7 +423,7 @@ private fun NavTabsArea(
                     .matchParentSize()
                     .drawBehind {
                         val pad = NavInnerPadding.toPx()
-                        val fromStart = indicatorX.toPx() + (unit - GlassTileInset * 2).toPx() / 2f
+                        val fromStart = indicatorX.toPx() + tileSide.toPx() / 2f
                         val cx = if (layoutDirection == LayoutDirection.Rtl) size.width - fromStart else fromStart
                         drawRect(
                             brush = Brush.radialGradient(
@@ -394,20 +439,28 @@ private fun NavTabsArea(
                         )
                     }
             )
-            // کاشی انتخاب‌شده: شیشه‌ای؛ فقط یه ته‌رنگ خیلی کم‌رنگ از تم و لبه‌ی شیشه‌ای (بالا روشن‌تر، پایین تقریباً بی‌خط).
+            // کاشی انتخاب‌شده: مربعِ شیشه‌ای با سایه‌ی خیلی ریز؛ فقط یه ته‌رنگ خیلی کم‌رنگ از تم و لبه‌ی بدون رنگ.
+            // لبه‌ی بالاش از لبه‌ی بالای بدنه کم‌رنگ‌تره و لبه‌ی پایینش رنگ دیگه‌ایه (کمی تیره) و خیلی ضعیف‌تر از بالا.
             // رنگ تم فقط برای آیکن و اسمشه (توی NavTab)
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorX)
-                    .size(width = unit - GlassTileInset * 2, height = GlassItemHeight)
+                    .offset(x = indicatorX, y = (GlassItemHeight - tileSide) / 2)
+                    .size(tileSide)
+                    .softShadow(
+                        shape = GlassTileShape,
+                        color = if (dark) Color.Black.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.10f),
+                        spread = 4.dp,
+                        offsetY = 1.5.dp,
+                        layers = 6
+                    )
                     .clip(GlassTileShape)
                     .background(if (dark) Color.White.copy(alpha = 0.02f) else Color.White.copy(alpha = 0.50f))
                     .background(primary.copy(alpha = if (dark) 0.10f else 0.08f))
                     .border(
                         1.dp,
                         Brush.verticalGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.02f))
-                            else listOf(Color.White, outline.copy(alpha = 0.14f), outline.copy(alpha = 0.04f))
+                            if (dark) listOf(Color.White.copy(alpha = 0.07f), Color.White.copy(alpha = 0.025f), Color.Black.copy(alpha = 0.10f))
+                            else listOf(Color.White.copy(alpha = 0.70f), outline.copy(alpha = 0.06f), outline.copy(alpha = 0.03f))
                         ),
                         GlassTileShape
                     )
