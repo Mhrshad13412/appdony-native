@@ -59,6 +59,7 @@ fun AiModeSelector(selected: AiMode, onSelect: (AiMode) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val modes = AiMode.values()
     val shape = RoundedCornerShape(18.dp)
+    val selectedTint = glassSelectedIconTint()
 
     Column(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Crossfade(targetState = selected, label = "ai_mode_text") { m ->
@@ -83,8 +84,7 @@ fun AiModeSelector(selected: AiMode, onSelect: (AiMode) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .clip(shape)
-                .background(scheme.background)
+                .glassTrack(shape)
         ) {
             val cell = maxWidth / modes.size
             // آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیکن‌ها
@@ -98,8 +98,7 @@ fun AiModeSelector(selected: AiMode, onSelect: (AiMode) -> Unit) {
                     .offset(x = x.value)
                     .size(width = cell, height = 56.dp)
                     .padding(4.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(scheme.primary)
+                    .glassKnob(RoundedCornerShape(14.dp))
             )
             Row(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
                 modes.forEach { m ->
@@ -116,7 +115,7 @@ fun AiModeSelector(selected: AiMode, onSelect: (AiMode) -> Unit) {
                         Icon(
                             imageVector = m.icon,
                             contentDescription = m.title,
-                            tint = if (m == selected) Color.White else scheme.onSurfaceVariant,
+                            tint = if (m == selected) selectedTint else scheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp)
                         )
                     }
