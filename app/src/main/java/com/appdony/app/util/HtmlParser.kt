@@ -45,22 +45,13 @@ object HtmlParser {
         "gamerant.com", "ign.com", "wikipedia.org", "reddit.com"
     )
     private val ALLOWED_HOSTS = setOf("drive.google.com", "docs.google.com")
-    private val DOWNLOAD_HEAD = Regex(
-        "نصب|دانلود|download|لینک|نسخه|مود|اصلی|مستقیم|سرور|mod|apk|obb|دیتا|داده",
-        RegexOption.IGNORE_CASE
-    )
     private val SOURCE_HEAD = Regex(
         "منبع|منابع|مرجع|source|reference|مطالب مرتبط|مطالب پیشنهادی|بیشتر بخوانید|مشابه|related|برچسب|tags|دیدگاه|نظرات|comment",
         RegexOption.IGNORE_CASE
     )
-    private val SHARE_PATH = Regex("/(o/public|public|file|files|f|d|s|dl)/[^/]+")
     private val FILE_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z", "obb")
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "webp", "gif")
-    private val DOWNLOAD_WORDS = listOf(
-        "دانلود", "download", "نصب", "لینک مستقیم", "دریافت", "نسخه مود", "mod apk", "مگابایت", "گیگابایت"
-    )
     private val JUNK_IMAGE = listOf("emoji", "avatar", "gravatar", "logo", "icon", "wp-includes", "/themes/", "sprite")
-    private val DL_PATH = Regex("(^|/)(dl|download|downloads|get|getfile|file|files)(/|$)")
     private val SIZE_REGEX = Regex(
         "([0-9]+(?:\\.[0-9]+)?)\\s*(MB|GB|KB|مگابایت|گیگابایت|کیلوبایت)",
         RegexOption.IGNORE_CASE
