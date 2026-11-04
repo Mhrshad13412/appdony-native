@@ -64,12 +64,6 @@ class SessionManager(private val context: Context) {
         }
     }
 
-    suspend fun updateNonce(newNonce: String) {
-        context.sessionDataStore.edit {
-            it[KEY_NONCE] = newNonce
-        }
-    }
-
     suspend fun clearSession() {
         // کوکی‌ها رو هم پاک کن
         ApiClient.clearCookies()
