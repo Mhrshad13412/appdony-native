@@ -232,24 +232,6 @@ private fun MetaItem(icon: ImageVector, text: String, tint: androidx.compose.ui.
     }
 }
 
-/** چیپ هم‌سبک اندیکاتور منوی پایین: زمینه‌ی کم‌رنگ primary + خط دور primary (خط فقط در شیشه‌ای) */
-@Composable
-internal fun NavChip(text: String, modifier: Modifier = Modifier, onImage: Boolean = false) {
-    val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(14.dp)
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .then(if (onImage) Modifier.background(scheme.surface.copy(alpha = 0.92f)) else Modifier)
-            .background(scheme.primary.copy(alpha = 0.14f))
-            .glassBorder(1.dp, scheme.primary, shape)
-            .padding(horizontal = 10.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = text, color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
 /** نشان «جدید» با همون استایل منوی پایین */
 @Composable
 internal fun NewBadge(modifier: Modifier = Modifier) {
