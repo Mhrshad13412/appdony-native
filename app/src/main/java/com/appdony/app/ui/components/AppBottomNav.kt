@@ -178,6 +178,7 @@ private class NotchedBarShape(
  * سایه‌ی نرمِ دور یه شکل، از چند لایه‌ی پشت‌هم ساخته می‌شه تا روی همه‌ی نسخه‌های اندروید یکسان دربیاد.
  * داخل خودِ شکل کشیده نمی‌شه (شیشه‌ست و نباید تیره بشه)؛ فقط بیرونش.
  * [offsetY] مثبت یعنی سایه بیشتر زیر شکل میفته و کمتر بالاش.
+ * وقتی offsetY == spread سایه دقیقاً فقط زیر شکل میفته و بالاش صفره.
  * باید قبل از clip گذاشته بشه تا بریده نشه.
  */
 private fun Modifier.softShadow(
@@ -263,8 +264,8 @@ private fun NavBar(
         if (dark) listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
         else listOf(Color.White.copy(alpha = 0.85f), outline.copy(alpha = 0.12f), outline.copy(alpha = 0.06f))
     )
-    // سایه‌ی بدنه: بیشتر زیرش میفته و بالاش خیلی کم
-    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.14f)
+    // سایه‌ی بدنه: فقط زیر بار؛ وقتی offsetY == spread سایه بالای شکل صفر می‌شه
+    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.08f)
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -276,7 +277,7 @@ private fun NavBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .softShadow(barShape, bodyShadow, spread = 17.dp, offsetY = 9.dp)
+                    .softShadow(barShape, bodyShadow, spread = 12.dp, offsetY = 12.dp)
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
                         // بلور درشت تا رنگِ پشتش نرم پخش بشه
@@ -293,7 +294,7 @@ private fun NavBar(
                     }
                     .border(1.dp, rimBrush, barShape)
             ) {
-                Box(modifier = Modifier.padding(NavInnerPadding)) {
+                Box(modifier = Modifier.padding(1.dp)) {
                     NavTabsArea(
                         selectedIndex = selectedIndex,
                         currentRoute = currentRoute,
@@ -422,7 +423,7 @@ private fun NavTabsArea(
                 modifier = Modifier
                     .matchParentSize()
                     .drawBehind {
-                        val pad = NavInnerPadding.toPx()
+                        val pad = 1.dp.toPx() // هم‌راستا با padding داخلی glass bar
                         val fromStart = indicatorX.toPx() + tileSide.toPx() / 2f
                         val cx = if (layoutDirection == LayoutDirection.Rtl) size.width - fromStart else fromStart
                         drawRect(
@@ -448,9 +449,9 @@ private fun NavTabsArea(
                     .size(tileSide)
                     .softShadow(
                         shape = GlassTileShape,
-                        color = if (dark) Color.Black.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.10f),
-                        spread = 4.dp,
-                        offsetY = 1.5.dp,
+                        color = if (dark) Color.Black.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
+                        spread = 3.dp,
+                        offsetY = 3.dp,
                         layers = 6
                     )
                     .clip(GlassTileShape)
