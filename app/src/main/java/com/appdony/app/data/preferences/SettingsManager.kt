@@ -16,7 +16,6 @@ class SettingsManager(private val context: Context) {
         private val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only")
         private val KEY_NOTIFY_BLOG = booleanPreferencesKey("notify_blog")
         private val KEY_NOTIFY_UPDATES = booleanPreferencesKey("notify_updates")
-        private val KEY_START_PAGE = stringPreferencesKey("start_page")
         private val KEY_SHOW_AI = booleanPreferencesKey("show_ai_assistant") // 👈 جدید
         private val KEY_UI_STYLE = stringPreferencesKey("ui_style") // "glass" | "classic"
         private val KEY_BETA = booleanPreferencesKey("beta_enabled")
@@ -30,7 +29,6 @@ class SettingsManager(private val context: Context) {
     val wifiOnly: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_WIFI_ONLY] ?: false }
     val notifyBlog: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_BLOG] ?: true }
     val notifyUpdates: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_UPDATES] ?: true }
-    val startPage: Flow<String> = context.settingsDataStore.data.map { it[KEY_START_PAGE] ?: "games" }
     val showAiAssistant: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_SHOW_AI] ?: true } // 👈 جدید
 
     // پیش‌فرض کلاسیکه؛ شیشه‌ای فقط وقتی کاربر خودش از تنظیمات انتخاب کنه
@@ -71,10 +69,6 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setNotifyUpdates(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_NOTIFY_UPDATES] = enabled }
-    }
-
-    suspend fun setStartPage(page: String) {
-        context.settingsDataStore.edit { it[KEY_START_PAGE] = page }
     }
 
     suspend fun setShowAiAssistant(enabled: Boolean) {
