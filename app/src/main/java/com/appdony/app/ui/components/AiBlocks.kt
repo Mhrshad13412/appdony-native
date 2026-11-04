@@ -1,9 +1,7 @@
 package com.appdony.app.ui.components
 
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +24,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,9 +55,6 @@ import coil.compose.AsyncImage
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.cleanTitle
 import com.appdony.app.data.model.featuredImageUrl
-import com.appdony.app.data.preferences.AiModel
-import com.appdony.app.data.preferences.AiQuota
-import com.appdony.app.data.preferences.formatRemaining
 import kotlinx.coroutines.delay
 
 // ───────────────────────── تجزیه‌ی پیام به متن و کد ─────────────────────────
@@ -226,105 +220,6 @@ fun AiCodeBlock(lang: String, code: String) {
                     .padding(12.dp)
             )
         }
-    }
-}
-
-// ───────────────────────── انتخاب مدل ─────────────────────────
-
-@Composable
-fun AiModelSelector(selected: AiModel, enabled: Boolean, onSelect: (AiModel) -> Unit) {
-    val primary = MaterialTheme.colorScheme.primary
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        AiModel.values().forEach { m ->
-            val isSelected = m == selected
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (isSelected) primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant)
-                    .border(
-                        BorderStroke(1.dp, if (isSelected) primary else Color.Transparent),
-                        RoundedCornerShape(14.dp)
-                    )
-                    .clickable(enabled = enabled && !isSelected) { onSelect(m) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    m.label,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    m.hint,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-// ───────────────────────── کارت سهم مصرف ─────────────────────────
-
-@Composable
-fun AiQuotaCard(quota: AiQuota?, now: Long) {
-    if (quota == null) return
-    val m = quota.model
-    val blocked = quota.blockReason(now) != null
-    val resetIn = quota.windowResetAt - now
-    val windowActive = resetIn > 0
-    val usedMsgs = if (windowActive) quota.usedMessages else 0
-    val usedTokens = if (windowActive) quota.usedTokens else 0
-    val color = if (blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "پیام این بازه: $usedMsgs از ${m.windowMessages}",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "امروز: ${quota.dailyUsed} از ${m.dailyMessages}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { (usedMsgs.toFloat() / m.windowMessages).coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = color,
-            trackColor = color.copy(alpha = 0.18f)
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = if (windowActive)
-                "توکن: $usedTokens از ${m.windowTokens} • ریست بازه: ${formatRemaining(resetIn)} دیگه"
-            else
-                "با اولین پیامت، بازه‌ی ۵ ساعته شروع می‌شه",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp
-        )
     }
 }
 
