@@ -32,7 +32,6 @@ import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.appdonyCard
-import com.appdony.app.ui.theme.AppdonyCardBg
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
