@@ -43,6 +43,7 @@ import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.data.model.gameCardName
 import com.appdony.app.data.model.primaryCategoryName
 import com.appdony.app.data.preferences.FavoritesManager
+import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AppCard
 import com.appdony.app.ui.components.BlogCardSkeleton
@@ -578,16 +579,22 @@ private fun DetailContent(
             info.androidReq?.let { add(it to "نیازمندی") }
         }
     }
+    // جدول مشخصات فقط همین دو مورده؛ نسخه/حجم/نیازمندی توی ردیف بالا نشون داده می‌شن
     val tableRows = remember(info, post) {
         buildList {
-            info.developer?.let { add("سازنده" to it) }
             add("دسته‌بندی" to post.primaryCategoryName())
             post.date?.let { add("تاریخ انتشار" to it.substringBefore('T')) }
         }
     }
 
+    // وقتی هوش مصنوعیِ «ثابت گوشه» روشنه، قرصش درست بالای منو می‌شینه؛ دکمه‌ی ثابت بالاترش میاد تا روش نیفته
+    val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
+    val cornerAi by settings.aiCorner.collectAsStateWithLifecycle(initialValue = false)
+    val fixedAiOn by settings.fixedAi.collectAsStateWithLifecycle(initialValue = true)
+    val aiPillExtra = if (cornerAi && !fixedAiOn) 70.dp else 0.dp
     // برای بازی/برنامه یه دکمه‌ی دانلود ثابت بالای منو هست؛ آخر لیست زیرش نره
-    val stickyExtra = if (isBlog) 0.dp else 68.dp
+    val stickyExtra = if (isBlog) 0.dp else 68.dp + aiPillExtra
     Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + stickyExtra + LocalBottomBarClearance.current)) {
         if (isBlog) {
@@ -685,7 +692,7 @@ private fun DetailContent(
                 }
             }
 
-            // جدول مشخصات (بقیه‌ی موارد؛ نسخه/حجم/نیازمندی بالا نشون داده شدن)
+            // جدول مشخصات (فقط دسته‌بندی و تاریخ انتشار؛ نسخه/حجم/نیازمندی بالا نشون داده شدن)
             item { SectionTitle("مشخصات") }
             item { InfoTable(tableRows) }
 
@@ -771,7 +778,7 @@ private fun DetailContent(
     if (!isBlog) {
         StickyDownload(
             info = info, onDownload = onDownload,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + aiPillExtra + 8.dp)
         )
     }
     }
