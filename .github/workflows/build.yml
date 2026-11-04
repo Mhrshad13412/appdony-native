@@ -28,8 +28,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      # ران‌نر Gradle 9.x داره که با AGP 8.13 سازگار نیست؛ پس خودمون 8.13 رو نصب می‌کنیم
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.2
+        with:
+          gradle-version: 8.13
 
       # AGP 8.13 به Gradle 8.13 نیاز داره
       - name: Generate Gradle Wrapper
