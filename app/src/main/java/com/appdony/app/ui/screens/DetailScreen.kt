@@ -314,7 +314,7 @@ private fun AppHeader(imageUrl: String?, title: String, category: String) {
     }
 }
 
-/** ردیف مشخصات کوتاه (مثل سایت): خط بالا و پایین، هر آیتم (مقدار، عنوان) با جداکننده‌ی عمودی */
+/** ردیف مشخصات کوتاه (مثل سایت): خط بالا و پایین، هر آیتم (مقدار، عنوان) با جداکننده‌ی عمودی؛ مقدارِ «★ 3.8» ستاره‌دار نشون داده می‌شه */
 @Composable
 private fun StatsRow(items: List<Pair<String, String>>) {
     val line = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -326,9 +326,20 @@ private fun StatsRow(items: List<Pair<String, String>>) {
         ) {
             items.forEachIndexed { index, (value, label) ->
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (value.startsWith("★ ")) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, null, tint = AppdonyTextPrimary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(value.removePrefix("★ "), color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                    } else {
+                        Text(
+                            value, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
-                    Text(label, color = AppdonyTextMuted, fontSize = 12.sp)
+                    Text(label, color = AppdonyTextMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
                 }
                 if (index != items.lastIndex) {
                     Box(Modifier.width(1.dp).height(32.dp).background(line))
@@ -337,6 +348,17 @@ private fun StatsRow(items: List<Pair<String, String>>) {
         }
         HorizontalDivider(color = line)
     }
+}
+
+/** ارقام فارسی/عربی → انگلیسی (برای خوندن نسخه از عنوان) */
+private fun digitsToEn(s: String): String = buildString(s.length) {
+    for (c in s) append(
+        when (c) {
+            in '\u06F0'..'\u06F9' -> '0' + (c - '\u06F0')
+            in '\u0660'..'\u0669' -> '0' + (c - '\u0660')
+            else -> c
+        }
+    )
 }
 
 @Composable
@@ -570,12 +592,19 @@ private fun DetailContent(
         val featuredName = featured?.let { baseName(it) }
         info.screenshots.filter { baseName(it) != featuredName }
     }
-    // ردیف سه‌تایی بالا (مثل نمونه): نسخه | حجم | نیازمندی
-    val statItems = remember(info) {
+    // ردیف چهارتایی بالا (مثل سایت): امتیاز | نسخه | حجم تقریبی | نیازمندی
+    val statItems = remember(info, post) {
+        // نسخه از عنوان پست (مثل سایت: «... نسخه 1.45.3 (مود + اصلی)»)؛ اگه نبود از متن
+        val titleVersion = Regex("(?:نسخه|[Vv]ersion)\\s*[:：]?\\s*([0-9][0-9A-Za-z.\\-]*)")
+            .find(digitsToEn(post.cleanTitle()))?.groupValues?.getOrNull(1)?.trim()?.trimEnd('.', '-')?.ifBlank { null }
+        val version = titleVersion ?: info.version
+        // حجم از متن؛ اگه نبود از اولین لینک دانلودی که حجم داره
+        val size = info.size ?: info.downloadLinks.firstNotNullOfOrNull { it.size }
         buildList {
-            info.version?.let { add(it to "نسخه") }
-            info.size?.let { add(it to "حجم") }
-            info.androidReq?.let { add(it to "نیازمندی") }
+            info.rating?.let { add("★ $it" to (info.ratingCount?.let { c -> "$c نظر" } ?: "امتیاز")) }
+            version?.let { add(it to "نسخه") }
+            size?.let { add(it to "حجم تقریبی") }
+            info.androidReq?.let { add("Android $it" to "نیازمندی") }
         }
     }
     // جدول مشخصات فقط همین دو مورده؛ نسخه/حجم/نیازمندی توی ردیف بالا نشون داده می‌شن
