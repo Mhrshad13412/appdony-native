@@ -53,10 +53,6 @@ fun Post.primaryCategoryName(): String {
     return embedded?.terms?.firstOrNull()?.firstOrNull()?.name ?: "دسته‌بندی"
 }
 
-fun Post.primaryCategoryId(): Int? {
-    return embedded?.terms?.firstOrNull()?.firstOrNull()?.id
-}
-
 // ───────────── اطلاعات کارت‌ها: «جدید»، اندروید، نسخه ─────────────
 
 /** تا این‌قدر بعد از انتشار یا آخرین ویرایش، پست «جدید» حساب می‌شه (۴ روز) */
