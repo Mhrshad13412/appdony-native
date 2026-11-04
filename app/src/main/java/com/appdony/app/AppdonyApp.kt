@@ -6,7 +6,6 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.appdony.app.data.api.ApiClient
-import com.appdony.app.data.local.AppDatabase
 import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.data.repository.HomeRepository
 import com.appdony.app.util.AppForeground
@@ -17,8 +16,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class AppdonyApp : Application(), ImageLoaderFactory {
-
-    val database: AppDatabase by lazy { AppDatabase.getDatabase(this) }
 
     override fun onCreate() {
         super.onCreate()
