@@ -77,6 +77,7 @@ internal fun BuddyCanvas(
     talking: Boolean = false,
     plate: Color = Color(0xFF0B0B0C),
     ink: Color = Color(0xFFF4F4F4),
+    screen: Color? = null,
     state: BuddyState? = null
 ) {
     val infinite = rememberInfiniteTransition(label = "buddy")
@@ -174,7 +175,8 @@ internal fun BuddyCanvas(
                     tilt = look.value * 0.3f + (state?.tilt?.value ?: 0f),
                     breath = breath.value,
                     plate = plate,
-                    ink = ink
+                    ink = ink,
+                    screen = screen
                 )
             )
         }
