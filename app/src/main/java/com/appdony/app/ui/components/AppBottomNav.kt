@@ -372,7 +372,7 @@ private fun NavTabsArea(
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().guideTarget("nav")) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val unit = maxWidth / (bottomNavItems.size + aiW)
         val before = selectedIndex + if (fixedAi && selectedIndex >= half) aiW else 0f
         val slotStart = unit * before
@@ -589,7 +589,6 @@ private object BubbleAbove : PopupPositionProvider {
  * هیچ حلقه یا رنگ اضافه‌ای دورش نیست؛ جای خالی دورش همون برشیه که از خودِ نوار بریده شده.
  * تو دایره ربات هوش مصنوعیه که زندگی خودش رو داره: هر چند ثانیه حرف می‌زنه (حباب میاد)،
  * می‌پره یا می‌ترسه (خوردن تصادفی به دیوار عمداً حذف شده).
- * تا وقتی راهنمای اولین ورود بازه، ربات ساکته و حرف تصادفی نمی‌زنه.
  * وقتی پشتیبان میاد، همین‌جا جای ربات رو می‌گیره و بوردرش تایمرشه؛ با زدنش چت پشتیبانی باز می‌شه.
  */
 @Composable
@@ -639,14 +638,6 @@ private fun AiNavButton(
         if (say === s) say = null
     }
 
-    // وقتی راهنما باز می‌شه ربات ساکت می‌شه و حرف نیمه‌کاره‌ش جمع می‌شه
-    LaunchedEffect(GuideState.active) {
-        if (GuideState.active) {
-            say = null
-            talking = false
-        }
-    }
-
     // کارهای تصادفی ربات؛ وقتی پشتیبان اومده ساکت می‌شه
     LaunchedEffect(supportOn) {
         if (supportOn) {
@@ -666,7 +657,7 @@ private fun AiNavButton(
             delay(3_500)
         }
         while (true) {
-            if (say == null && !GuideState.active) {
+            if (say == null) {
                 // خوردن تصادفی به دیوار عمداً حذف شده؛ ربات تو حالت ثابت خودش رو نمی‌کوبه (فقط موقع کشیدن توسط کاربر)
                 when ((0..99).random()) {
                     in 0..44 -> speak(nextBuddySay(routeNow))
@@ -688,7 +679,6 @@ private fun AiNavButton(
     LaunchedEffect(supportOn) {
         if (supportOn) return@LaunchedEffect
         AssistantBus.events.collect { s ->
-            if (GuideState.active) return@collect
             if (s.kind == SayKind.DONE) launch { buddy.jump() }
             speak(s, extraMs = 6_000L)
         }
@@ -697,7 +687,6 @@ private fun AiNavButton(
     Box(
         modifier = modifier
             .size(AiButtonSize)
-            .guideTarget("ai")
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
@@ -735,7 +724,7 @@ private fun AiNavButton(
 
         // حباب حرف‌های ربات؛ پنجره‌ی جدا که از لبه‌ی دکمه بیرون بزنه و بریده نشه
         val shown = say
-        if (shown != null && !supportOn && !GuideState.active) {
+        if (shown != null && !supportOn) {
             key(shown) {
                 Popup(
                     popupPositionProvider = BubbleAbove,
@@ -794,7 +783,6 @@ private fun NavTab(
     Column(
         modifier = modifier
             .height(NavItemHeight)
-            .guideTarget("tab_${item.route}")
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
