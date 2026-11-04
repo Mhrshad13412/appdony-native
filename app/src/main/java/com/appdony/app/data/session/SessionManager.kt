@@ -64,6 +64,13 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    /** فقط نانس رو به‌روز می‌کنه (بعد از تازه‌سازی نشست) */
+    suspend fun saveNonce(nonce: String) {
+        context.sessionDataStore.edit {
+            it[KEY_NONCE] = nonce
+        }
+    }
+
     suspend fun clearSession() {
         // کوکی‌ها رو هم پاک کن
         ApiClient.clearCookies()
