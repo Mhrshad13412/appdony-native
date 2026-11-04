@@ -454,6 +454,7 @@ private var cornerIntroShown = false
  * هوش مصنوعیِ ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): دایره‌ی شیشه‌ای گوشه‌ی راست، بالای منو.
  * اول به شکل قرص با نوشته‌ی «هوش مصنوعی» میاد و بعد از چند ثانیه به دایره جمع می‌شه.
  * تو حالت شیشه‌ای خودش شیشه‌ی رنگیه (بلور + ته‌رنگ تم)؛ تو کلاسیک سطح توپره.
+ * توی هر دو حالت، ربات سفیده روی یه دایره‌ی توپرِ رنگ تم (مثل دکمه‌ی وسط منو).
  */
 @Composable
 private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boolean) {
@@ -467,7 +468,8 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
         }
     }
     val shape = RoundedCornerShape(32.dp)
-    val fill = scheme.primary.copy(alpha = 0.20f).compositeOver(scheme.surface)
+    // کلاسیک: سطح توپرِ کمی رنگی؛ شیشه‌ای: شیشه‌ی بلورشده با ته‌رنگ تم (پشتش خوانا می‌مونه)
+    val fill = scheme.primary.copy(alpha = 0.14f).compositeOver(scheme.surface)
 
     // چپ‌به‌راست ثابت می‌شه تا دکمه همیشه گوشه‌ی راست بمونه و قرص به سمت چپ باز بشه
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -477,7 +479,6 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
         ) {
             Row(
                 modifier = Modifier
-                    .height(60.dp)
                     .clip(shape)
                     .then(
                         if (glass) {
@@ -485,7 +486,10 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
                             Modifier.hazeEffect(state = hazeState) {
                                 blurRadius = 30.dp
                                 backgroundColor = scheme.background
-                                tints = listOf(HazeTint(scheme.primary.copy(alpha = 0.26f)))
+                                tints = listOf(
+                                    HazeTint(scheme.surface.copy(alpha = 0.55f)),
+                                    HazeTint(scheme.primary.copy(alpha = 0.18f))
+                                )
                                 noiseFactor = 0.035f
                                 fallbackTint = HazeTint(fill)
                             }
@@ -493,11 +497,13 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
                     )
                     .border(
                         if (glass) 1.dp else 1.5.dp,
-                        scheme.primary.copy(alpha = if (glass) 0.45f else 0.55f),
+                        scheme.primary.copy(alpha = if (glass) 0.40f else 0.55f),
                         shape
                     )
                     .clickable(onClick = onClick)
-                    .semantics { contentDescription = "هوش مصنوعی" },
+                    .semantics { contentDescription = "هوش مصنوعی" }
+                    // فاصله‌ی یکسان دور دایره‌ی ربات تا پیلِ دور تا دور هم‌اندازه بمونه
+                    .padding(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AnimatedVisibility(
@@ -508,15 +514,19 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
                     Text(
                         text = "هوش مصنوعی",
                         color = scheme.onSurface,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         softWrap = false,
-                        modifier = Modifier.padding(start = 24.dp, end = 2.dp)
+                        modifier = Modifier.padding(start = 18.dp, end = 12.dp)
                     )
                 }
-                Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
-                    BuddyCanvas(modifier = Modifier.size(44.dp), plate = fill, ink = scheme.primary)
+                // مثل دکمه‌ی وسط منو: دایره‌ی توپرِ رنگ تم با ربات سفید (نه یه دیسک تیره توی قرص)
+                Box(
+                    modifier = Modifier.size(50.dp).clip(CircleShape).background(scheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BuddyCanvas(modifier = Modifier.size(50.dp), plate = scheme.primary, ink = Color.White)
                 }
             }
         }
