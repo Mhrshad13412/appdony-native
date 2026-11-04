@@ -1,6 +1,7 @@
 package com.appdony.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,8 +55,18 @@ fun AccountSheet(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
+            val glass = LocalGlassMode.current
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onDismiss() },
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (glass) Modifier
+                            .background(Color.White.copy(alpha = if (isGlassDark()) 0.05f else 0.35f))
+                            .border(1.dp, glassRimBrush(), CircleShape)
+                        else Modifier
+                    )
+                    .clickable { onDismiss() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Outlined.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onSurface)
@@ -64,11 +75,20 @@ fun AccountSheet(
         Spacer(Modifier.height(10.dp))
 
         if (isLoggedIn) {
+            val userCardShape = RoundedCornerShape(20.dp)
+            val glassUser = LocalGlassMode.current
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clip(userCardShape)
+                    // شیشه‌ای: کاشی روشنِ کم‌رنگ + لبه‌ی منو (مثل کاشی انتخاب‌شده‌ی منوی پایین)، نه یه مستطیل مات
+                    .then(
+                        if (glassUser) Modifier
+                            .background(Color.White.copy(alpha = if (isGlassDark()) 0.04f else 0.45f))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                            .border(1.dp, glassRimBrush(), userCardShape)
+                        else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -116,6 +136,8 @@ private fun AccountRow(
     tint: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
+    val iconShape = RoundedCornerShape(12.dp)
+    val glass = LocalGlassMode.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,9 +149,14 @@ private fun AccountRow(
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .glassBorder(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                .background(tint.copy(alpha = 0.08f)),
+                .clip(iconShape)
+                .then(
+                    // شیشه‌ای: کاشی کم‌رنگِ هم‌رنگ آیکن + همون لبه‌ی منو (به‌جای بوردرِ رنگی)
+                    if (glass) Modifier
+                        .background(tint.copy(alpha = 0.10f))
+                        .border(1.dp, glassRimBrush(), iconShape)
+                    else Modifier.background(tint.copy(alpha = 0.08f))
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
