@@ -22,9 +22,6 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
 
     const val BASE_URL = "https://appdony.ir/"
-    const val WP_LOGIN_URL = "https://appdony.ir/wp-login.php"
-    const val WP_ADMIN_URL = "https://appdony.ir/wp-admin/"
-
     private var cookieJar: PersistentCookieJar? = null
     private var httpCache: Cache? = null
 
