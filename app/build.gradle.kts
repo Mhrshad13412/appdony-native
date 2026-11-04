@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.appdony.app"
-    compileSdk = 35
+    // Haze 1.7.0 و Compose 1.9 به compileSdk 36 نیاز دارن (targetSdk همون ۳۵ می‌مونه)
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.appdony.app"
@@ -85,7 +86,8 @@ kotlin {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
+    // نسخه‌ی BOM با Compose 1.9.x که Haze 1.7.0 هم باهاش ساخته شده
+    val composeBom = platform("androidx.compose:compose-bom:2025.10.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -95,8 +97,8 @@ dependencies {
     // این کتابخانه رو نگه می‌داریم، ولی چون Minify روشنه، فقط آیکون‌هایی که استفاده کردیم توی اپ می‌مونن
     implementation("androidx.compose.material:material-icons-extended")
 
-    // بلور شیشه‌ای منوی پایین
-    implementation("dev.chrisbanes.haze:haze:1.2.0")
+    // بلور شیشه‌ای منوی پایین (۱.۷.۰ اولین نسخه‌ایه که expandLayerBounds داره)
+    implementation("dev.chrisbanes.haze:haze:1.7.0")
 
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.navigation:navigation-compose:2.8.3")
