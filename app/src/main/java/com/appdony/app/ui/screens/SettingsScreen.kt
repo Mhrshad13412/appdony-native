@@ -314,27 +314,6 @@ private fun RowDivider() {
 }
 
 @Composable
-private fun ColorDot(color: Color, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(color)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
-                shape = CircleShape
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (selected) {
-            Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
-@Composable
 private fun SettingsSwitchRow(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 14.dp, vertical = 12.dp),
