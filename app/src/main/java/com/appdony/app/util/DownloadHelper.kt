@@ -61,7 +61,6 @@ object DownloadHelper {
         "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
 
     private val FILE_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z", "obb")
-    private val BINARY_EXTS = setOf("apk", "xapk", "apks", "apkm", "zip", "rar", "7z")
     private val DOWNLOAD_WORDS = listOf("دانلود", "download", "لینک مستقیم", "دریافت")
 
     class Resolved(val url: String, val fileName: String?, val mime: String, val size: Long)
@@ -75,9 +74,6 @@ object DownloadHelper {
             .readTimeout(25, TimeUnit.SECONDS)
             .build()
     }
-
-    fun isBinaryName(fileName: String): Boolean =
-        fileName.substringAfterLast('.', "").lowercase() in BINARY_EXTS
 
     /**
      * اول لینک رو واقعاً چک می‌کنه (به فایل می‌رسه یا نه). اگه لینک خراب/قفل بود
