@@ -75,17 +75,6 @@ class HomeRepository {
         return HomeStructure(root?.id, sections.distinctBy { it.id })
     }
 
-    suspend fun loadFeatured(rootId: Int?): List<Post> {
-        PopularityRemote.ensureFresh()
-        val posts = if (rootId != null) {
-            api.getPostsByCategory(categoryId = rootId, perPage = 40)
-        } else {
-            api.getPosts(perPage = 40)
-        }
-        // از هر اپ فقط یک کارت (آخرین نسخه)
-        return LatestOnly.latestPerApp(posts.filterNot(::isPlusPost)).sortedByFame().take(8)
-    }
-
     /** بلاک «اپدونی پلاس»: فقط پست‌های دسته‌ی مخصوص همون تب */
     suspend fun loadPlus(isGames: Boolean): List<Post> {
         val id = if (isGames) PLUS_GAMES_ID else PLUS_APPS_ID
