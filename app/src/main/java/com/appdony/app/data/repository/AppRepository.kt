@@ -23,7 +23,6 @@ import okhttp3.Request
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Response
 import java.io.IOException
 import java.lang.reflect.Type
@@ -88,11 +87,6 @@ class AppRepository(private val context: Context? = null) {
             )
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) { Result.failure(e) }
-    }
-
-    suspend fun loadPlusPosts(page: Int, perPage: Int): Result<List<Post>> {
-        val plusCatId = getCategoryId("appdony-plus") ?: return Result.success(emptyList())
-        return getJson("${baseUrl}posts?categories=$plusCatId&page=$page&per_page=$perPage$light", postListType)
     }
 
     suspend fun getBlogPosts(page: Int, perPage: Int): Result<List<Post>> =
