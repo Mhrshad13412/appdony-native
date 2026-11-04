@@ -14,11 +14,6 @@ object AiLimits {
     /** طول هر بازه؛ از لحظه‌ی اولین پیام شروع می‌شه */
     const val WINDOW_MS = 5L * 60 * 60 * 1000
 
-    /** نرخ تقریبی دلار به تومان برای محاسبه‌ی هزینه */
-    const val USD_TO_TOMAN = 100_000.0
-
-    fun costToman(model: AiModel, promptTokens: Int, completionTokens: Int): Double =
-        (promptTokens * model.usdPerMInput + completionTokens * model.usdPerMOutput) / 1_000_000.0 * USD_TO_TOMAN
 }
 
 enum class AiModel(
