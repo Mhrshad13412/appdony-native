@@ -414,8 +414,16 @@ fun MainContent(
             AppBottomNav(
                 currentRoute = navHighlightRoute,
                 hazeState = hazeState,
-                // روی تبِ همین صفحه‌ی اصلی نیازی به رفتن نیست؛ ولی توی جزئیات، تبِ روشن برمی‌گردونه به لیست
-                onTabSelected = { route -> if (!(isMainRoute && route == currentRoute)) navController.navigateToTab(route) },
+                onTabSelected = { route ->
+                    when {
+                        // روی تبِ همین صفحه‌ی اصلی نیازی به رفتن نیست
+                        isMainRoute && route == currentRoute -> Unit
+                        // توی جزئیات، زدن تبِ روشن از جزئیات خارج می‌شه و برمی‌گرده به همون لیست (با همون جای اسکرول)
+                        isDetailRoute && route == lastMainRoute ->
+                            if (!navController.popBackStack(route, false)) navController.navigateToTab(route)
+                        else -> navController.navigateToTab(route)
+                    }
+                },
                 // هوش مصنوعی ثابت: دکمه‌ی گرد وسط منو (شیشه‌ای و کلاسیک) چت هوش مصنوعی رو باز می‌کنه
                 fixedAi = fixedAi,
                 onAiClick = { navController.navigate("ai_chat") { launchSingleTop = true } },
@@ -454,8 +462,11 @@ fun MainContent(
 }
 
 fun NavController.navigateToTab(route: String) {
+    // اگه الان توی جزئیات (بازی/برنامه/مقاله) هستیم، رفتن به یه بخش دیگه یعنی خارج شدن از اون جزئیات:
+    // حالتش ذخیره نمی‌شه تا وقتی برگشتیم به اون بخش، دوباره وسط همون بازی نیفتیم
+    val leavingDetail = currentDestination?.route?.startsWith("detail/") == true
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo(graph.findStartDestination().id) { saveState = !leavingDetail }
         launchSingleTop = true
         restoreState = true
     }
