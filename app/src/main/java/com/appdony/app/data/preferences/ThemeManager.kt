@@ -36,7 +36,6 @@ class ThemeManager(private val context: Context) {
             0xFF4BA98F // سبز اپدونی
         )
 
-        val colorNames = listOf("سبز اپدونی")
     }
 
     val state: Flow<ThemeState> = context.themeDataStore.data.map { prefs ->
@@ -58,10 +57,6 @@ class ThemeManager(private val context: Context) {
         context.themeDataStore.edit {
             it[KEY_MODE] = if (mode == ThemeMode.LIGHT) "light" else "dark"
         }
-    }
-
-    suspend fun setColorIndex(index: Int) {
-        context.themeDataStore.edit { it[KEY_COLOR_INDEX] = index }
     }
 
     suspend fun setFontSize(size: FontSize) {
