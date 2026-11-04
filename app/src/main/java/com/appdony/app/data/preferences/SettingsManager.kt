@@ -29,19 +29,20 @@ class SettingsManager(private val context: Context) {
     val wifiOnly: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_WIFI_ONLY] ?: false }
     val notifyBlog: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_BLOG] ?: true }
     val notifyUpdates: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_NOTIFY_UPDATES] ?: true }
-    val showAiAssistant: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_SHOW_AI] ?: true } // 👈 جدید
+    // پیش‌فرض خاموش؛ چون حالت پیش‌فرض دستیار «ثابت گوشه» ـه (دستیار شناور فقط وقتی کاربر خودش انتخاب کنه)
+    val showAiAssistant: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_SHOW_AI] ?: false }
 
-    // پیش‌فرض کلاسیکه؛ شیشه‌ای فقط وقتی کاربر خودش از تنظیمات انتخاب کنه
-    val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[KEY_UI_STYLE] ?: STYLE_CLASSIC }
+    // پیش‌فرض شیشه‌ایه؛ کلاسیک فقط وقتی کاربر خودش از تنظیمات انتخاب کنه
+    val uiStyle: Flow<String> = context.settingsDataStore.data.map { it[KEY_UI_STYLE] ?: STYLE_GLASS }
 
     // بتا: پیش‌فرض خاموش؛ وقتی روشن باشه بلوک‌های اپدونی پلاس نشون داده می‌شن
     val beta: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_BETA] ?: false }
 
-    // هوش مصنوعی ثابت: پیش‌فرض روشن؛ دکمه‌ی گرد هوش مصنوعی وسط منوی پایین (شیشه‌ای و کلاسیک)
-    val fixedAi: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_FIXED_AI] ?: true }
+    // هوش مصنوعی ثابت وسط منو: پیش‌فرض خاموش؛ دکمه‌ی گرد هوش مصنوعی وسط منوی پایین (شیشه‌ای و کلاسیک)
+    val fixedAi: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_FIXED_AI] ?: false }
 
-    // هوش مصنوعی ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): پیش‌فرض خاموش
-    val aiCorner: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AI_CORNER] ?: false }
+    // هوش مصنوعی ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): پیش‌فرض روشن؛ گوشه‌ی راست، بالای منو
+    val aiCorner: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AI_CORNER] ?: true }
 
     suspend fun setAiCorner(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AI_CORNER] = enabled }
