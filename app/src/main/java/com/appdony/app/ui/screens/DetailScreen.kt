@@ -44,7 +44,7 @@ import com.appdony.app.data.model.primaryCategoryName
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.session.SessionManager
-import com.appdony.app.ui.components.AppCard
+import com.appdony.app.ui.components.PostCard
 import com.appdony.app.ui.components.BlogCardSkeleton
 import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.DetailSkeleton
@@ -738,18 +738,17 @@ private fun DetailContent(
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(similar, key = { it.id }) { p ->
-                        AppCard(title = p.cleanTitle(), imageUrl = p.featuredImageUrl() ?: "", onClick = { onSimilarClick(p.id) })
+                        // همون کارت صفحه‌ی اصلی: دسته، اندروید و نسخه هم خودکار میاد
+                        PostCard(post = p, onClick = { onSimilarClick(p.id) })
                     }
                 }
             }
         }
 
-        // نظرها فقط زیر مطلب وبلاگ؛ بازی و برنامه نظر و امتیاز پایین صفحه ندارن
-        if (isBlog) {
-            item {
-                Spacer(Modifier.height(24.dp))
-                CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
-            }
+        // نظرات زیر همه‌ی صفحه‌ها (بازی، برنامه و وبلاگ)؛ از وردپرس خودکار خونده و با حساب کاربر ثبت می‌شه
+        item {
+            Spacer(Modifier.height(24.dp))
+            CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
         }
     }
     if (!isBlog) {
