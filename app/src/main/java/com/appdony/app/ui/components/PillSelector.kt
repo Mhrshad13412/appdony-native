@@ -51,6 +51,7 @@ data class PillOption(
 fun PillSelector(options: List<PillOption>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(18.dp)
+    val selectedTint = glassSelectedIconTint()
     val current = options[selectedIndex.coerceIn(0, options.lastIndex)]
 
     Column(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -76,8 +77,7 @@ fun PillSelector(options: List<PillOption>, selectedIndex: Int, onSelect: (Int) 
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .clip(shape)
-                .background(scheme.background)
+                .glassTrack(shape)
         ) {
             val cell = maxWidth / options.size
             // آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیکن‌ها
@@ -91,8 +91,7 @@ fun PillSelector(options: List<PillOption>, selectedIndex: Int, onSelect: (Int) 
                     .offset(x = x.value)
                     .size(width = cell, height = 56.dp)
                     .padding(4.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(scheme.primary)
+                    .glassKnob(RoundedCornerShape(14.dp))
             )
             Row(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
                 options.forEachIndexed { i, o ->
@@ -109,7 +108,7 @@ fun PillSelector(options: List<PillOption>, selectedIndex: Int, onSelect: (Int) 
                         Icon(
                             imageVector = o.icon,
                             contentDescription = o.title,
-                            tint = if (i == selectedIndex) Color.White else scheme.onSurfaceVariant,
+                            tint = if (i == selectedIndex) selectedTint else scheme.onSurfaceVariant,
                             modifier = Modifier.size(o.iconSize)
                         )
                     }
