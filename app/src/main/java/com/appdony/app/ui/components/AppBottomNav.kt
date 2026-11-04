@@ -314,6 +314,7 @@ private fun NavBar(
                 route = currentRoute,
                 onClick = onAiClick,
                 onSupportClick = onSupportClick,
+                hazeState = hazeState,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
             )
         }
@@ -530,8 +531,7 @@ private var cornerIntroShown = false
 /**
  * هوش مصنوعیِ ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): دایره‌ی شیشه‌ای گوشه‌ی راست، بالای منو.
  * اول به شکل قرص با نوشته‌ی «هوش مصنوعی» میاد و بعد از چند ثانیه به دایره جمع می‌شه.
- * تو حالت شیشه‌ای خودش شیشه‌ی رنگیه (بلور + ته‌رنگ تم)؛ تو کلاسیک سطح توپره.
- * توی هر دو حالت، ربات سفیده روی یه دایره‌ی توپرِ رنگ تم (مثل دکمه‌ی وسط منو).
+ * شیشه‌ای: شیشه‌ی هم‌تم با منوی پایین (بلور + ته‌رنگ و لبه‌ی منو) با ربات هم‌رنگ تم؛ کلاسیک: سطح توپر با ربات سفید روی دایره‌ی رنگ تم.
  */
 @Composable
 private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boolean) {
@@ -559,23 +559,9 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
                     .clip(shape)
                     .then(
                         if (glass) {
-                            // شیشه‌ی رنگی مثل دکمه‌ی «تماس با پشتیبانی» تلگرام ادز
-                            Modifier.hazeEffect(state = hazeState) {
-                                blurRadius = 30.dp
-                                backgroundColor = scheme.background
-                                tints = listOf(
-                                    HazeTint(scheme.surface.copy(alpha = 0.55f)),
-                                    HazeTint(scheme.primary.copy(alpha = 0.18f))
-                                )
-                                noiseFactor = 0.035f
-                                fallbackTint = HazeTint(fill)
-                            }
-                        } else Modifier.background(fill)
-                    )
-                    .border(
-                        if (glass) 1.dp else 1.5.dp,
-                        scheme.primary.copy(alpha = if (glass) 0.40f else 0.55f),
-                        shape
+                            // شیشه‌ی هم‌تم با منوی پایین: همون ته‌رنگ، همون لبه، یه ذره رنگ تم مثل کاشی انتخاب‌شده‌ی منو
+                            Modifier.glassPanel(shape, hazeState, blur = 40.dp, extraTint = scheme.primary.copy(alpha = 0.10f))
+                        } else Modifier.background(fill).border(1.5.dp, scheme.primary.copy(alpha = 0.55f), shape)
                     )
                     .clickable(onClick = onClick)
                     .semantics { contentDescription = "هوش مصنوعی" }
@@ -598,12 +584,31 @@ private fun CornerAiButton(onClick: () -> Unit, hazeState: HazeState, glass: Boo
                         modifier = Modifier.padding(start = 18.dp, end = 12.dp)
                     )
                 }
-                // مثل دکمه‌ی وسط منو: دایره‌ی توپرِ رنگ تم با ربات سفید (نه یه دیسک تیره توی قرص)
-                Box(
-                    modifier = Modifier.size(50.dp).clip(CircleShape).background(scheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    BuddyCanvas(modifier = Modifier.size(50.dp), plate = scheme.primary, ink = Color.White)
+                // کلاسیک: دایره‌ی توپرِ رنگ تم با ربات سفید (مثل دکمه‌ی وسط منو)
+                // شیشه‌ای: دایره‌ی شیشه‌ایِ کم‌رنگ با ربات هم‌رنگ تم (صفحه‌ی ربات تیره/سفیدِ منو)
+                if (glass) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(scheme.primary.copy(alpha = 0.16f))
+                            .border(1.dp, glassRimBrush(), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BuddyCanvas(
+                            modifier = Modifier.size(50.dp),
+                            plate = Color.Transparent,
+                            ink = scheme.primary,
+                            screen = glassRobotScreen()
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.size(50.dp).clip(CircleShape).background(scheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BuddyCanvas(modifier = Modifier.size(50.dp), plate = scheme.primary, ink = Color.White)
+                    }
                 }
             }
         }
@@ -662,9 +667,12 @@ private fun AiNavButton(
     route: String?,
     onClick: () -> Unit,
     onSupportClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // فقط توی حالت شیشه‌ای پاس داده می‌شه؛ null یعنی دکمه‌ی توپرِ کلاسیک
+    hazeState: HazeState? = null
 ) {
     val scheme = MaterialTheme.colorScheme
+    val glassBtn = LocalGlassMode.current && hazeState != null
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -758,8 +766,12 @@ private fun AiNavButton(
                 scaleY = pressScale
                 translationY = -buddy.hop.value * 10.dp.toPx()
             }
-            .clip(CircleShape)
-            .background(scheme.primary)
+            .then(
+                // شیشه‌ای: بلور + ته‌رنگ و لبه‌ی منو (یه ذره رنگ تم)؛ کلاسیک: دایره‌ی توپرِ رنگ تم
+                if (glassBtn && hazeState != null) Modifier.glassPanel(
+                    CircleShape, hazeState, blur = 40.dp, extraTint = scheme.primary.copy(alpha = 0.12f)
+                ) else Modifier.clip(CircleShape).background(scheme.primary)
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -777,14 +789,26 @@ private fun AiNavButton(
                     .coerceIn(0f, 1f)
                 SupportAvatar(sizeDp = AiButtonSize.value.toInt(), ring = ring)
             } else {
-                // ربات سفید روی دایره‌ی توپرِ رنگ تم
-                BuddyCanvas(
-                    modifier = Modifier.size(AiButtonSize),
-                    talking = talking,
-                    plate = scheme.primary,
-                    ink = Color.White,
-                    state = buddy
-                )
+                if (glassBtn) {
+                    // شیشه‌ای: ربات هم‌رنگ تم روی شیشه (صفحه‌ی ربات هم‌تم با کاشی منو)
+                    BuddyCanvas(
+                        modifier = Modifier.size(AiButtonSize),
+                        talking = talking,
+                        plate = Color.Transparent,
+                        ink = scheme.primary,
+                        screen = glassRobotScreen(),
+                        state = buddy
+                    )
+                } else {
+                    // کلاسیک: ربات سفید روی دایره‌ی توپرِ رنگ تم
+                    BuddyCanvas(
+                        modifier = Modifier.size(AiButtonSize),
+                        talking = talking,
+                        plate = scheme.primary,
+                        ink = Color.White,
+                        state = buddy
+                    )
+                }
             }
         }
 
