@@ -70,7 +70,6 @@ import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
 import com.appdony.app.ui.components.AboutDialog
 import com.appdony.app.ui.components.AccountSheet
-import com.appdony.app.ui.components.AiNavTotalHeight
 import com.appdony.app.ui.components.AppBottomNav
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
