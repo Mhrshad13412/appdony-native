@@ -101,7 +101,7 @@ fun HomeScreen(
                 Column {
                     SectionTitleSkeleton()
                     SectionRowSkeleton()
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
         }
@@ -207,21 +207,21 @@ private fun CategorySection(
 ) {
     val posts = state.posts
 
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         // عنوان همیشه فوراً نشون داده می‌شه
         SectionHeader(title = state.section.title, onMoreClick = onMoreClick)
 
         if (posts == null) {
             LazyRow(
                 userScrollEnabled = false,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(4) { CardSkeleton() }
             }
         } else {
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
@@ -231,7 +231,7 @@ private fun CategorySection(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 
