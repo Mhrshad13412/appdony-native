@@ -130,3 +130,39 @@ fun Modifier.appdonyCard(shape: Shape? = null): Modifier {
         .background(sheen)
         .border(1.dp, glassRimBrush(), s)
 }
+
+/**
+ * مسیر (ردیف) انتخاب‌گرها و کلیدها.
+ * کلاسیک: همون سطح مات قبلی. شیشه‌ای: ته‌رنگ و لبه‌ی منوی پایین.
+ */
+@Composable
+fun Modifier.glassTrack(shape: Shape): Modifier {
+    val scheme = MaterialTheme.colorScheme
+    if (!LocalGlassMode.current) return this.clip(shape).background(scheme.background)
+    return this
+        .clip(shape)
+        .background(scheme.background)
+        .background(glassTintOf(isGlassDark()))
+        .border(1.dp, glassRimBrush(), shape)
+}
+
+/**
+ * دسته‌ی لغزنده‌ی انتخاب‌گرها.
+ * کلاسیک: توپر با رنگ تم. شیشه‌ای: کاشی شیشه‌ای با ته‌رنگ تم و لبه‌ی منو (مثل کاشی انتخاب‌شده‌ی منوی پایین).
+ */
+@Composable
+fun Modifier.glassKnob(shape: Shape): Modifier {
+    val scheme = MaterialTheme.colorScheme
+    if (!LocalGlassMode.current) return this.clip(shape).background(scheme.primary)
+    val dark = isGlassDark()
+    return this
+        .clip(shape)
+        .background(if (dark) Color.White.copy(alpha = 0.03f) else Color.White.copy(alpha = 0.50f))
+        .background(scheme.primary.copy(alpha = if (dark) 0.22f else 0.16f))
+        .border(1.dp, glassRimBrush(), shape)
+}
+
+/** رنگ آیکن گزینه‌ی انتخاب‌شده: کلاسیک سفید روی دسته‌ی توپر؛ شیشه‌ای رنگ تم */
+@Composable
+fun glassSelectedIconTint(): Color =
+    if (LocalGlassMode.current) MaterialTheme.colorScheme.primary else Color.White
