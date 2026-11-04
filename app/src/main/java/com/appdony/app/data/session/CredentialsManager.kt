@@ -70,16 +70,6 @@ class CredentialsManager(context: Context) {
         }
     }
 
-    fun clearCredentials() {
-        memUsername = null
-        memPassword = null
-        try {
-            sharedPreferences?.edit()?.clear()?.apply()
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
-    }
-
     private companion object {
         const val FILE_NAME = "appdony_secure_credentials"
     }
