@@ -50,6 +50,7 @@ import com.appdony.app.ui.components.CommentsSection
 import com.appdony.app.ui.components.DetailSkeleton
 import com.appdony.app.ui.components.glassBorder
 import com.appdony.app.ui.components.LocalBottomBarClearance
+import com.appdony.app.ui.components.LocalGlassMode
 import com.appdony.app.ui.components.LoginSheet
 import com.appdony.app.ui.components.RatingBar
 import com.appdony.app.ui.components.ShimmerBox
@@ -245,40 +246,6 @@ private fun SectionTitle(text: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
     )
-}
-
-@Composable
-private fun InfoTable(rows: List<Pair<String, String>>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(AppdonyCardBg)
-    ) {
-        rows.forEachIndexed { index, (label, value) ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(label, color = AppdonyTextMuted, fontSize = 13.sp, modifier = Modifier.weight(0.4f))
-                Text(
-                    text = value,
-                    color = AppdonyTextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(0.6f),
-                    textAlign = TextAlign.Start
-                )
-            }
-            if (index != rows.lastIndex) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
 }
 
 /** ردیف «بازگشت» زیر نوار بالا (مثل سایت): فلش + متن، سمت راست */
@@ -607,22 +574,19 @@ private fun DetailContent(
             info.androidReq?.let { add("Android $it" to "نیازمندی") }
         }
     }
-    // جدول مشخصات فقط همین دو مورده؛ نسخه/حجم/نیازمندی توی ردیف بالا نشون داده می‌شن
-    val tableRows = remember(info, post) {
-        buildList {
-            add("دسته‌بندی" to post.primaryCategoryName())
-            post.date?.let { add("تاریخ انتشار" to it.substringBefore('T')) }
-        }
-    }
-
     // وقتی هوش مصنوعیِ «ثابت گوشه» روشنه، قرصش درست بالای منو می‌شینه؛ دکمه‌ی ثابت بالاترش میاد تا روش نیفته
     val context = LocalContext.current
     val settings = remember { SettingsManager(context) }
     val cornerAi by settings.aiCorner.collectAsStateWithLifecycle(initialValue = false)
     val fixedAiOn by settings.fixedAi.collectAsStateWithLifecycle(initialValue = true)
     val aiPillExtra = if (cornerAi && !fixedAiOn) 70.dp else 0.dp
+    // ارتفاع واقعی منوی پایین (بدون نوار سیستم): شیشه‌ای ≈ ۱۰۰dp، کلاسیک ≈ ۷۲dp، و وقتی ربات وسط منوئه ۲۴dp بیرون‌زدگی بالاش.
+    // MainActivity فقط ۸۸dp رزرو می‌کنه؛ مابه‌التفاوتش رو اینجا اضافه می‌کنیم تا دکمه‌ی دانلود ثابت روی ربات وسط منو نیفته
+    val glassNav = LocalGlassMode.current
+    val navRealHeight = (if (glassNav) 100.dp else 72.dp) + (if (fixedAiOn) 24.dp else 0.dp)
+    val navExtra = (navRealHeight - 88.dp).coerceAtLeast(0.dp)
     // برای بازی/برنامه یه دکمه‌ی دانلود ثابت بالای منو هست؛ آخر لیست زیرش نره
-    val stickyExtra = if (isBlog) 0.dp else 68.dp + aiPillExtra
+    val stickyExtra = if (isBlog) 0.dp else 68.dp + aiPillExtra + navExtra
     Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + stickyExtra + LocalBottomBarClearance.current)) {
         if (isBlog) {
@@ -655,20 +619,6 @@ private fun DetailContent(
                     info = info, isFavorite = isFavorite,
                     onDownload = onDownload, onToggleFavorite = onToggleFavorite, onShare = onShare
                 )
-            }
-            // امتیاز دادن فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
-            if (isLoggedIn) {
-                item {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("امتیاز دهید: ", color = AppdonyTextMuted, fontSize = 13.sp)
-                        Spacer(Modifier.width(8.dp))
-                        RatingBar(rating = userRating, onRatingChanged = onRatingChanged)
-                    }
-                }
             }
             // بقیه‌ی لینک‌ها یا پیام خطا (لینک اول توی ردیف دکمه‌هاست)
             item { DownloadSection(info = info, onDownload = onDownload) }
@@ -719,10 +669,6 @@ private fun DetailContent(
                     }
                 }
             }
-
-            // جدول مشخصات (فقط دسته‌بندی و تاریخ انتشار؛ نسخه/حجم/نیازمندی بالا نشون داده شدن)
-            item { SectionTitle("مشخصات") }
-            item { InfoTable(tableRows) }
 
             if (description.isNotEmpty()) item { SectionTitle("توضیحات") }
         }
@@ -798,15 +744,18 @@ private fun DetailContent(
             }
         }
 
-        item {
-            Spacer(Modifier.height(24.dp))
-            CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
+        // نظرها فقط زیر مطلب وبلاگ؛ بازی و برنامه نظر و امتیاز پایین صفحه ندارن
+        if (isBlog) {
+            item {
+                Spacer(Modifier.height(24.dp))
+                CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
+            }
         }
     }
     if (!isBlog) {
         StickyDownload(
             info = info, onDownload = onDownload,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + aiPillExtra + 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + navExtra + aiPillExtra + 8.dp)
         )
     }
     }
