@@ -5,8 +5,6 @@ import com.appdony.app.data.model.Comment
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.UserData
 import com.google.gson.annotations.SerializedName
-import okhttp3.ResponseBody
-import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -27,9 +25,6 @@ const val EMBED_LIGHT = "wp:featuredmedia,wp:term"
 interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me?context=edit")
     suspend fun getCurrentUser(): UserData
-
-    @GET("wp-json/wp/v2/users/me")
-    suspend fun checkAuth(): Response<ResponseBody>
 
     @GET("wp-json/wp/v2/blog")
     suspend fun getCustomBlogPosts(
@@ -65,14 +60,6 @@ interface AppdonyApi {
         @Query("page") page: Int = 1,
         @Query("orderby") orderBy: String = "date",
         @Query("order") order: String = "desc",
-        @Query("_embed") embed: String = EMBED_LIGHT,
-        @Query("_fields") fields: String = LIST_FIELDS
-    ): List<Post>
-
-    @GET("wp-json/wp/v2/posts")
-    suspend fun getPostsByMultipleCategories(
-        @Query("categories") categories: String,
-        @Query("per_page") perPage: Int = 6,
         @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
