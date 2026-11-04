@@ -21,14 +21,6 @@ internal val GoldColor = Color(0xFFFFB300)
 internal val GreenColor = Color(0xFF34C759)
 internal val RedColor = Color(0xFFFF6B6B)
 
-// رنگ‌های گربه
-internal val FurColor = Color(0xFFFFB566)
-internal val FurDark = Color(0xFFE48A3E)
-internal val CreamColor = Color(0xFFFFF1DC)
-internal val OutlineColor = Color(0xFF6B3E1E)
-internal val PinkColor = Color(0xFFFF8FA3)
-internal val EyeColor = Color(0xFF2A1A14)
-
 // رنگ کاموای هر دکمه (چت، دانلودها، جستجو): همه از رنگ تم برنامه، با کمی روشن/تیره
 internal fun yarnPalette(base: Color): List<Color> = listOf(
     base,
