@@ -1,6 +1,7 @@
 package com.appdony.app.data.repository
 
 import android.content.Context
+import android.text.Html
 import android.webkit.CookieManager
 import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.api.EMBED_LIGHT
@@ -13,10 +14,12 @@ import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.session.CredentialsManager
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
@@ -28,6 +31,13 @@ import java.io.IOException
 import java.lang.reflect.Type
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+/** خطای ارسال نظر همراه با کد HTTP و پیام خود وردپرس */
+class CommentException(
+    val httpCode: Int,
+    val wpCode: String?,
+    val serverMessage: String?
+) : Exception(serverMessage?.takeIf { it.isNotBlank() } ?: "HTTP $httpCode")
 
 class AppRepository(private val context: Context? = null) {
     // کلاینت مشترک با کش دیسکی و «اول کش، بعد تازه‌سازی»؛ صف شبکه‌ی جدا از تصاویر
@@ -117,33 +127,71 @@ class AppRepository(private val context: Context? = null) {
     suspend fun getComments(postId: Int): Result<List<Comment>> =
         getJson("${baseUrl}comments?post=$postId&per_page=50", object : TypeToken<List<Comment>>() {}.type)
 
+    // کوکی‌های ورود: اول از کوکی‌جار اصلی اپ، اگه خالی بود از CookieManager اندروید
+    private fun cookieHeader(): String {
+        val fromJar = try {
+            ApiClient.cookieJarInstance
+                ?.loadForRequest("https://appdony.ir/".toHttpUrl())
+                ?.joinToString("; ") { "${it.name}=${it.value}" }
+                .orEmpty()
+        } catch (e: Exception) { "" }
+        return fromJar.ifBlank { CookieManager.getInstance().getCookie("https://appdony.ir") ?: "" }
+    }
+
+    private fun parseWpError(raw: String): Pair<String?, String?> = try {
+        val o = JsonParser.parseString(raw).asJsonObject
+        val code = o.get("code")?.takeIf { !it.isJsonNull }?.asString
+        val msg = o.get("message")?.takeIf { !it.isJsonNull }?.asString
+            ?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
+        code to msg
+    } catch (e: Exception) { null to null }
+
+    /** نانس تازه‌ی REST با کوکی‌های فعلی (نانس قدیمی = خطای ۴۰۳) */
+    suspend fun fetchFreshNonce(): String? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("https://appdony.ir/wp-admin/admin-ajax.php?action=rest-nonce")
+                .addHeader("Cookie", cookieHeader())
+                .addHeader("Cache-Control", "no-cache")
+                .build()
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string()?.trim().orEmpty()
+                if (response.isSuccessful && Regex("^[A-Za-z0-9]{6,20}$").matches(text)) text else null
+            }
+        } catch (e: Exception) { null }
+    }
+
     suspend fun postComment(postId: Int, content: String, nonce: String): Result<Comment> = withContext(Dispatchers.IO) {
         try {
             val formBody = FormBody.Builder().add("post", postId.toString()).add("content", content).build()
             val request = Request.Builder()
                 .url("${baseUrl}comments")
                 .addHeader("X-WP-Nonce", nonce)
-                .addHeader("Cookie", CookieManager.getInstance().getCookie("https://appdony.ir") ?: "")
+                .addHeader("Cookie", cookieHeader())
                 .post(formBody)
                 .build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
-                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
-                Result.success(gson.fromJson(body, Comment::class.java))
+                val raw = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    val (wpCode, wpMessage) = parseWpError(raw)
+                    return@withContext Result.failure(CommentException(response.code, wpCode, wpMessage))
+                }
+                if (raw.isBlank()) return@withContext Result.failure(Exception("Empty body"))
+                Result.success(gson.fromJson(raw, Comment::class.java))
             }
         } catch (e: Exception) { Result.failure(e) }
     }
 
+    /** ورود دوباره با اطلاعات ذخیره‌شده؛ کاربرِ برگشتی نانس تازه رو داره */
     suspend fun autoLogin(): Result<UserData> = withContext(Dispatchers.IO) {
         val ctx = context ?: return@withContext Result.failure(Exception("Context is null"))
         val credentials = CredentialsManager(ctx)
         val username = credentials.getUsername() ?: return@withContext Result.failure(Exception("No saved credentials"))
         val password = credentials.getPassword() ?: return@withContext Result.failure(Exception("No saved credentials"))
-
-        val loginResult = WordPressLogin.login(username, password)
-        loginResult.onSuccess { user ->
-            val cookies = CookieManager.getInstance().getCookie("https://appdony.ir") ?: ""
-            getCurrentUser(cookies, user.nonce).getOrThrow()
+        try {
+            WordPressLogin.login(username, password)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
