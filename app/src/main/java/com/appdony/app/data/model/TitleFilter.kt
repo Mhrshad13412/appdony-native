@@ -76,8 +76,6 @@ private fun quotedPart(s: String): String? {
     return inner.ifBlank { null }
 }
 
-private fun hasLatin(s: String) = s.any { isLatinLetter(it) }
-
 /** بهترین دنباله‌ی انگلیسی داخل متن؛ null اگه چیزی نبود */
 private fun englishPart(raw: String): String? {
     val tokens = stripPunct(raw).split(' ').filter { it.isNotBlank() }
@@ -167,5 +165,3 @@ fun String.gameCardName(): String {
     cache[this] = result
     return result
 }
-
-fun Post.cardName(): String = cleanTitle().gameCardName()
