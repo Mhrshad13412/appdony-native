@@ -215,14 +215,18 @@ private fun NavBar(
     // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
     val barShape = remember(notch) { NotchedBarShape(corner = 28.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
-    // لبه‌ی «شیشه‌ی مایع»: از گوشه‌ی بالا-چپ برق می‌زنه، وسط تقریباً نامرئیه و پایین-راست دوباره یه برق کم‌رنگ داره
-    val rimBrush = Brush.linearGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.22f))
-        else listOf(Color.White.copy(alpha = 0.95f), outline.copy(alpha = 0.10f), outline.copy(alpha = 0.04f), Color.White.copy(alpha = 0.70f))
+    val primary = MaterialTheme.colorScheme.primary
+    // لبه‌ی باریکِ رنگی: بالا و پایین از رنگ تم برق می‌زنه، وسط تقریباً نامرئیه (مثل منوی تلگرام ادز)
+    val rimBrush = Brush.verticalGradient(
+        listOf(
+            primary.copy(alpha = if (dark) 0.42f else 0.32f),
+            outline.copy(alpha = if (dark) 0.22f else 0.16f),
+            primary.copy(alpha = if (dark) 0.30f else 0.24f)
+        )
     )
-    // برقِ نرمِ بالای شیشه
-    val sheenBrush = Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.10f else 0.30f), Color.Transparent)
+    // بدنه: بالا تیره و صاف، پایین یه درخشش از رنگ تم
+    val bodyBrush = Brush.verticalGradient(
+        listOf(Color.Transparent, primary.copy(alpha = if (dark) 0.10f else 0.07f))
     )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -240,28 +244,17 @@ private fun NavBar(
                         // تارتر از قبل (۳۰ ← ۴۴) تا شیشه‌ی مایع باشه ولی متن‌ها خوانا بمونن
                         blurRadius = 44.dp
                         backgroundColor = background
-                        // شفاف‌تر از قبل: رنگ‌های پشتش مثل نور از زیر شیشه می‌درخشن
+                        // تیره‌تر و غنی‌تر: بدنه‌ی تیره‌ی نوار با یه ته‌رنگ کم از رنگ تم
                         tints = listOf(
-                            HazeTint(surface.copy(alpha = if (dark) 0.26f else 0.38f)),
-                            HazeTint(Color.White.copy(alpha = if (dark) 0.07f else 0.22f))
+                            HazeTint(background.copy(alpha = if (dark) 0.58f else 0.50f)),
+                            HazeTint(primary.copy(alpha = if (dark) 0.07f else 0.06f))
                         )
                         // دونه‌ی خیلی ریزِ شیشه‌ی مات‌شده
                         noiseFactor = 0.03f
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
                         fallbackTint = HazeTint(surface.copy(alpha = 0.88f))
                     }
-                    .background(sheenBrush)
-                    // خط برقِ باریکِ زیر لبه‌ی بالا، مثل بازتاب نور روی شیشه
-                    .drawBehind {
-                        val h = 1.2.dp.toPx()
-                        drawRect(
-                            brush = Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color.White.copy(alpha = if (dark) 0.35f else 0.80f), Color.Transparent)
-                            ),
-                            topLeft = Offset(size.width * 0.14f, h),
-                            size = Size(size.width * 0.72f, h)
-                        )
-                    }
+                    .background(bodyBrush)
                     .border(1.dp, rimBrush, barShape)
             ) {
                 Box(modifier = Modifier.padding(NavInnerPadding)) {
@@ -385,23 +378,46 @@ private fun NavTabsArea(
         )
 
         if (glass) {
-            // کاشی انتخاب‌شده: حباب شیشه‌ای مایع؛ قطری روشن، وسطش یه ته‌رنگ از تم و لبه‌ی برق‌دار
+            // درخششِ نرمِ رنگ تم زیر کاشی انتخاب‌شده؛ با خودِ کاشی سُر می‌خوره
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorX - unit * 0.75f - GlassTileInset, y = -NavInnerPadding)
+                    .size(width = unit * 2.5f, height = NavItemHeight + NavInnerPadding * 2)
+                    .drawBehind {
+                        drawRect(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    primary.copy(alpha = if (dark) 0.34f else 0.22f),
+                                    primary.copy(alpha = if (dark) 0.10f else 0.06f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width / 2f, size.height),
+                                radius = size.width * 0.5f
+                            )
+                        )
+                    }
+            )
+            // کاشی انتخاب‌شده: گرد، با ته‌رنگ تم و لبه‌ی رنگی (مثل تلگرام ادز)
             Box(
                 modifier = Modifier
                     .offset(x = indicatorX)
                     .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
                     .clip(GlassTileShape)
                     .background(
-                        Brush.linearGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.24f), primary.copy(alpha = 0.12f), Color.White.copy(alpha = 0.07f))
-                            else listOf(Color.White.copy(alpha = 0.90f), primary.copy(alpha = 0.12f), Color.White.copy(alpha = 0.50f))
+                        Brush.verticalGradient(
+                            listOf(
+                                primary.copy(alpha = if (dark) 0.30f else 0.20f),
+                                primary.copy(alpha = if (dark) 0.12f else 0.08f)
+                            )
                         )
                     )
                     .border(
                         1.dp,
-                        Brush.linearGradient(
-                            if (dark) listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.24f))
-                            else listOf(Color.White, primary.copy(alpha = 0.18f), Color.White.copy(alpha = 0.85f))
+                        Brush.verticalGradient(
+                            listOf(
+                                primary.copy(alpha = if (dark) 0.55f else 0.40f),
+                                primary.copy(alpha = if (dark) 0.12f else 0.10f)
+                            )
                         ),
                         GlassTileShape
                     )
