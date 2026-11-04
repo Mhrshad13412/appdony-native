@@ -133,9 +133,13 @@ fun CommentsSection(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(enabled = commentText.isNotBlank() && !sending) {
-                            vm.sendComment(commentText, nonce)
-                            commentText = ""
-                            showComposer = false
+                            // متن فقط وقتی پاک می‌شه که ارسال واقعاً موفق بوده؛ اگه خطا بود می‌مونه تا دوباره بزنی
+                            vm.sendComment(commentText, nonce) { ok ->
+                                if (ok) {
+                                    commentText = ""
+                                    showComposer = false
+                                }
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
