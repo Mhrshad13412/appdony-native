@@ -35,18 +35,10 @@
     <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 
-# --- ۳. قوانین Room Database ---
--keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep @androidx.room.Entity class * { *; }
--keepclassmembers class * {
-    @androidx.room.* <methods>;
-}
--dontwarn androidx.room.paging.**
 
 # --- ۴. قوانین Retrofit و Gson ---
 -keep class com.appdony.app.data.model.** { *; }
 -keep class com.appdony.app.data.api.** { *; }
--keep class com.appdony.app.data.local.** { *; }
 -keep class com.google.gson.** { *; }
 -keep class * implements com.google.gson.TypeAdapterFactory
 -keep class * implements com.google.gson.JsonSerializer
