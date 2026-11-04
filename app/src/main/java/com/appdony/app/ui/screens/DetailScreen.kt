@@ -349,6 +349,50 @@ private fun CircleIconButton(icon: androidx.compose.ui.graphics.vector.ImageVect
     ) { Icon(icon, desc, tint = tint) }
 }
 
+/** متن دکمه‌ی دانلودِ اصلی (لینک اول)؛ هم ردیف دکمه‌ها و هم دکمه‌ی ثابتِ پایین استفاده می‌کنن */
+private fun downloadLabel(info: AppInfo): String {
+    val first = info.downloadLinks.firstOrNull()
+    val loading = first == null && !info.linksChecked
+    return when {
+        loading -> "در حال بررسی لینک..."
+        first == null -> "لینک نصب موجود نیست"
+        first.url.isBlank() -> first.title
+        first.size != null -> "${first.title} (${first.size})"
+        else -> first.title
+    }
+}
+
+/** دکمه‌ی دانلودِ ثابت بالای منوی پایین (مثل سایت) */
+@Composable
+private fun StickyDownload(info: AppInfo, onDownload: (DownloadLink) -> Unit, modifier: Modifier = Modifier) {
+    val first = info.downloadLinks.firstOrNull()
+    val loading = first == null && !info.linksChecked
+    val enabled = first != null && first.url.isNotBlank()
+    Button(
+        onClick = { first?.let { onDownload(it) } },
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = AppdonyCardBg
+        )
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = AppdonyTextMuted)
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(
+            text = downloadLabel(info),
+            color = if (enabled) Color.White else AppdonyTextMuted,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 /** ردیف دکمه‌ها: دانلود (اصلی) + نشانک + اشتراک */
 @Composable
 private fun ActionRow(
@@ -359,13 +403,7 @@ private fun ActionRow(
     val first = info.downloadLinks.firstOrNull()
     val loading = first == null && !info.linksChecked
     val enabled = first != null && first.url.isNotBlank()
-    val label = when {
-        loading -> "در حال بررسی لینک..."
-        first == null -> "لینک نصب موجود نیست"
-        first.url.isBlank() -> first.title
-        first.size != null -> "${first.title} (${first.size})"
-        else -> first.title
-    }
+    val label = downloadLabel(info)
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -548,7 +586,10 @@ private fun DetailContent(
         }
     }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + LocalBottomBarClearance.current)) {
+    // برای بازی/برنامه یه دکمه‌ی دانلود ثابت بالای منو هست؛ آخر لیست زیرش نره
+    val stickyExtra = if (isBlog) 0.dp else 68.dp
+    Box(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + stickyExtra + LocalBottomBarClearance.current)) {
         if (isBlog) {
             item {
                 Box(
@@ -726,5 +767,12 @@ private fun DetailContent(
             Spacer(Modifier.height(24.dp))
             CommentsSection(postId = post.id, isLoggedIn = isLoggedIn, nonce = nonce, onNeedLogin = onNeedLogin)
         }
+    }
+    if (!isBlog) {
+        StickyDownload(
+            info = info, onDownload = onDownload,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + 8.dp)
+        )
+    }
     }
 }
