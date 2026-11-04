@@ -42,9 +42,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -66,7 +63,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.preferences.FontSize
-import com.appdony.app.data.preferences.OnboardingManager
 import com.appdony.app.data.preferences.SettingsManager
 import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
@@ -76,7 +72,6 @@ import com.appdony.app.ui.components.AboutDialog
 import com.appdony.app.ui.components.AccountSheet
 import com.appdony.app.ui.components.AiNavTotalHeight
 import com.appdony.app.ui.components.AppBottomNav
-import com.appdony.app.ui.components.AppGuide
 import com.appdony.app.ui.components.AppTopBar
 import com.appdony.app.ui.components.FloatingAssistant
 import com.appdony.app.ui.components.SupportFloating
@@ -127,7 +122,6 @@ fun AppRoot() {
     val themeManager = remember { ThemeManager(context) }
     val settingsManager = remember { SettingsManager(context) }
     val sessionManager = remember { SessionManager(context) }
-    val onboardingManager = remember { OnboardingManager(context) }
     val scope = rememberCoroutineScope()
 
     val themeState by themeManager.state.collectAsStateWithLifecycle(initialValue = ThemeState())
@@ -137,20 +131,13 @@ fun AppRoot() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
-    // مقدار اولیه true: تا وقتی دیتاستور نخونده شده، راهنما چشمک نزنه
-    val hasSeenOnboarding by onboardingManager.hasSeenOnboarding.collectAsStateWithLifecycle(initialValue = true)
 
     var showSplash by remember { mutableStateOf(true) }
     var showLoginSheet by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
-    var guideDismissed by remember { mutableStateOf(false) }
     val navController = rememberNavController()
-    // ضبط صحنه برای بلورِ راهنما؛ فقط وقتی راهنما بازه استفاده می‌شه و به هیز ربطی نداره
-    val sceneLayer = rememberGraphicsLayer()
     var crashReport by remember { mutableStateOf(CrashReporter.read(context)) }
-
-    val guideActive = !showSplash && !hasSeenOnboarding && !guideDismissed
 
     LaunchedEffect(Unit) {
         delay(1500)
@@ -217,19 +204,7 @@ fun AppRoot() {
             com.appdony.app.ui.components.LocalGlassMode provides (uiStyle == SettingsManager.STYLE_GLASS)
           ) {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(
-                            // فقط وقتی راهنما بازه: صحنه ضبط می‌شه تا بیرون دایره بلور بشه
-                            if (guideActive) {
-                                Modifier.drawWithContent {
-                                    sceneLayer.record { this@drawWithContent.drawContent() }
-                                    drawLayer(sceneLayer)
-                                }
-                            } else Modifier
-                        )
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     if (showSplash) {
                         SplashScreen()
                     } else {
@@ -270,21 +245,6 @@ fun AppRoot() {
                         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
                     }
                     AboutDialog(versionName = versionName, onDismiss = { showAbout = false })
-                }
-
-                // راهنمای اولین ورود: فقط یک بار، بعدش دیگه هیچ‌وقت نشون داده نمی‌شه
-                if (guideActive) {
-                    val startRoute = remember { navController.currentDestination?.route ?: "games" }
-                    AppGuide(
-                        sceneLayer = sceneLayer,
-                        showPoppyStep = showAiAssistant && !fixedAi,
-                        startRoute = startRoute,
-                        onNavigate = { navController.navigateToTab(it) },
-                        onFinish = {
-                            guideDismissed = true
-                            scope.launch { onboardingManager.setSeen() }
-                        }
-                    )
                 }
 
                 val report = crashReport
