@@ -66,23 +66,6 @@ internal class BuddyState {
         hop.animateTo(0f, spring(0.35f, Spring.StiffnessMedium))
     }
 
-    /** می‌دوئه سمت لبه‌ی دایره، می‌خوره بهش، برمی‌گرده و چند ثانیه گیج می‌مونه */
-    suspend fun bonk(dir: Float) {
-        kick.animateTo(dir, tween(170, easing = FastOutLinearInEasing))
-        scare.snapTo(1f)
-        dizzy.animateTo(1f, tween(120))
-        tilt.animateTo(-dir, spring(0.4f, Spring.StiffnessMedium))
-        coroutineScope {
-            launch {
-                kick.animateTo(-dir * 0.3f, spring(0.4f, Spring.StiffnessMedium))
-                kick.animateTo(0f, spring(0.6f, Spring.StiffnessLow))
-            }
-            launch { scare.animateTo(0f, tween(350)) }
-        }
-        delay(2300)
-        dizzy.animateTo(0f, tween(300))
-        tilt.animateTo(0f, spring(0.5f, Spring.StiffnessLow))
-    }
 }
 
 /**
