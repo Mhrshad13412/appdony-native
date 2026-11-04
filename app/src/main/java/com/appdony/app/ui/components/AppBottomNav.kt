@@ -109,8 +109,11 @@ private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// ── شیشه‌ای (مثل تلگرام ادز): کاشی مستطیل گرد دور آیکن و اسم، آیکن و اسم از بالا ۱۰dp شروع می‌شن ──
-private val GlassContentTop = 10.dp
+// ── شیشه‌ای (مثل تلگرام ادز): کاشی مستطیل گرد دور آیکن و اسم، آیکن و اسم از بالا ۸dp شروع می‌شن ──
+private val GlassContentTop = 8.dp
+
+// ارتفاع هر تب توی حالت شیشه‌ای: به اندازه‌ی آیکن و اسم، نه بیشتر (کل منو با فاصله‌ی دورش می‌شه ≈ ۶۸dp)
+private val GlassItemHeight = 56.dp
 private val GlassTileInset = 2.dp
 private val GlassTileShape = RoundedCornerShape(20.dp)
 
@@ -213,20 +216,12 @@ private fun NavBar(
     }
 
     // نوار مستطیل گرد مثل تلگرام ادز (نه کپسول کامل؛ کناره‌ها یه تکه‌ی صاف دارن)
-    val barShape = remember(notch) { NotchedBarShape(corner = 28.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
+    val barShape = remember(notch) { NotchedBarShape(corner = 24.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
     val dark = background.luminance() < 0.5f
-    val primary = MaterialTheme.colorScheme.primary
-    // لبه‌ی باریکِ رنگی: بالا و پایین از رنگ تم برق می‌زنه، وسط تقریباً نامرئیه (مثل منوی تلگرام ادز)
+    // لبه‌ی باریکِ شیشه‌ای: سفیدِ کم‌رنگ، بالا کمی پررنگ‌تر و پایین کم‌رنگ‌تر (بدون رنگ تم، مثل منوی تلگرام ادز)
     val rimBrush = Brush.verticalGradient(
-        listOf(
-            primary.copy(alpha = if (dark) 0.42f else 0.32f),
-            outline.copy(alpha = if (dark) 0.22f else 0.16f),
-            primary.copy(alpha = if (dark) 0.30f else 0.24f)
-        )
-    )
-    // بدنه: بالا تیره و صاف، پایین یه درخشش از رنگ تم
-    val bodyBrush = Brush.verticalGradient(
-        listOf(Color.Transparent, primary.copy(alpha = if (dark) 0.10f else 0.07f))
+        if (dark) listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.09f))
+        else listOf(Color.White.copy(alpha = 0.95f), outline.copy(alpha = 0.16f), outline.copy(alpha = 0.10f))
     )
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -241,20 +236,18 @@ private fun NavBar(
                     .fillMaxWidth()
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
-                        // تارتر از قبل (۳۰ ← ۴۴) تا شیشه‌ی مایع باشه ولی متن‌ها خوانا بمونن
-                        blurRadius = 44.dp
+                        // بلور درشت تا رنگِ پشتش نرم پخش بشه
+                        blurRadius = 40.dp
                         backgroundColor = background
-                        // تیره‌تر و غنی‌تر: بدنه‌ی تیره‌ی نوار با یه ته‌رنگ کم از رنگ تم
+                        // مات مشکی و نیمه‌شفاف: اگه رنگی پشتش بیاد از زیرش دیده و پخش می‌شه
                         tints = listOf(
-                            HazeTint(background.copy(alpha = if (dark) 0.58f else 0.50f)),
-                            HazeTint(primary.copy(alpha = if (dark) 0.07f else 0.06f))
+                            HazeTint(if (dark) Color(0xFF08090B).copy(alpha = 0.48f) else Color.White.copy(alpha = 0.55f))
                         )
                         // دونه‌ی خیلی ریزِ شیشه‌ی مات‌شده
-                        noiseFactor = 0.03f
+                        noiseFactor = 0.02f
                         // اندروید ۱۱ و پایین‌تر بلور نداره؛ فقط یه لایه‌ی نیمه‌مات میاد
                         fallbackTint = HazeTint(surface.copy(alpha = 0.88f))
                     }
-                    .background(bodyBrush)
                     .border(1.dp, rimBrush, barShape)
             ) {
                 Box(modifier = Modifier.padding(NavInnerPadding)) {
@@ -360,6 +353,7 @@ private fun NavTabsArea(
     glass: Boolean
 ) {
     val primary = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outline
     val half = bottomNavItems.size / 2
     val aiW = if (fixedAi) AiSlotWeight else 0f
     val supportOn = SupportPresence.phase.let { it == SupportPhase.ENTER || it == SupportPhase.ON }
@@ -378,46 +372,42 @@ private fun NavTabsArea(
         )
 
         if (glass) {
-            // درخششِ نرمِ رنگ تم زیر کاشی انتخاب‌شده؛ با خودِ کاشی سُر می‌خوره
+            // سایه‌ی خیلی ریز و پخشِ رنگ تم دور کاشی، روی بدنه‌ی منو (تقریباً نامحسوس)؛ فقط کشیده می‌شه و جایی از چیدمان رو نمی‌گیره
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorX - unit * 0.75f - GlassTileInset, y = -NavInnerPadding)
-                    .size(width = unit * 2.5f, height = NavItemHeight + NavInnerPadding * 2)
+                    .matchParentSize()
                     .drawBehind {
+                        val pad = NavInnerPadding.toPx()
+                        val fromStart = indicatorX.toPx() + (unit - GlassTileInset * 2).toPx() / 2f
+                        val cx = if (layoutDirection == LayoutDirection.Rtl) size.width - fromStart else fromStart
                         drawRect(
-                            Brush.radialGradient(
+                            brush = Brush.radialGradient(
                                 colors = listOf(
-                                    primary.copy(alpha = if (dark) 0.34f else 0.22f),
-                                    primary.copy(alpha = if (dark) 0.10f else 0.06f),
-                                    Color.Transparent
+                                    primary.copy(alpha = if (dark) 0.07f else 0.05f),
+                                    primary.copy(alpha = 0f)
                                 ),
-                                center = Offset(size.width / 2f, size.height),
-                                radius = size.width * 0.5f
-                            )
+                                center = Offset(cx, size.height / 2f),
+                                radius = unit.toPx() * 1.7f
+                            ),
+                            topLeft = Offset(-pad, -pad),
+                            size = Size(size.width + pad * 2, size.height + pad * 2)
                         )
                     }
             )
-            // کاشی انتخاب‌شده: گرد، با ته‌رنگ تم و لبه‌ی رنگی (مثل تلگرام ادز)
+            // کاشی انتخاب‌شده: شیشه‌ای؛ فقط یه ته‌رنگ خیلی کم‌رنگ از تم و لبه‌ی شیشه‌ای (بالا روشن‌تر، پایین تقریباً بی‌خط).
+            // رنگ تم فقط برای آیکن و اسمشه (توی NavTab)
             Box(
                 modifier = Modifier
                     .offset(x = indicatorX)
-                    .size(width = unit - GlassTileInset * 2, height = NavItemHeight)
+                    .size(width = unit - GlassTileInset * 2, height = GlassItemHeight)
                     .clip(GlassTileShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                primary.copy(alpha = if (dark) 0.30f else 0.20f),
-                                primary.copy(alpha = if (dark) 0.12f else 0.08f)
-                            )
-                        )
-                    )
+                    .background(if (dark) Color.White.copy(alpha = 0.02f) else Color.White.copy(alpha = 0.50f))
+                    .background(primary.copy(alpha = if (dark) 0.10f else 0.08f))
                     .border(
                         1.dp,
                         Brush.verticalGradient(
-                            listOf(
-                                primary.copy(alpha = if (dark) 0.55f else 0.40f),
-                                primary.copy(alpha = if (dark) 0.12f else 0.10f)
-                            )
+                            if (dark) listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.02f))
+                            else listOf(Color.White, outline.copy(alpha = 0.14f), outline.copy(alpha = 0.04f))
                         ),
                         GlassTileShape
                     )
@@ -455,7 +445,7 @@ private fun NavTabsArea(
 private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier = Modifier) {
     val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
     Column(
-        modifier = modifier.height(NavItemHeight),
+        modifier = modifier.height(if (glass) GlassItemHeight else NavItemHeight),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(labelTop))
@@ -798,7 +788,7 @@ private fun NavTab(
 
     Column(
         modifier = modifier
-            .height(NavItemHeight)
+            .height(if (glass) GlassItemHeight else NavItemHeight)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
