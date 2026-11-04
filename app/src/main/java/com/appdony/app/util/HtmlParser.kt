@@ -4,6 +4,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.util.Locale
 
 data class DownloadLink(
     val title: String,
@@ -245,8 +246,25 @@ object HtmlParser {
         return null
     }
 
+    // جمله‌ی سئوی پست: «امتیاز ۷۵ از ۱۰۲۲۸ رأی» (امتیاز از ۱۰۰ و تعداد رأی) که سایت اون رو «3.8 ★ / 10.2K نظر» نشون می‌ده
+    private val VOTES_REGEX = Regex(
+        "(?:امتیاز|Rating)\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:از|out of|/)\\s*([0-9][0-9,]*)\\s*(?:نظر|رأی|رای|دیدگاه|votes|ratings|reviews)",
+        RegexOption.IGNORE_CASE
+    )
+
     // امتیاز (۱ تا ۵) اگه توی متن پست باشه
     private fun extractRating(text: String): String? {
+        VOTES_REGEX.find(text)?.let { m ->
+            val x = m.groupValues[1].toDoubleOrNull()
+            if (x != null) {
+                val five = when {
+                    x in 1.0..5.0 -> x
+                    x > 5.0 && x <= 100.0 -> x / 20.0
+                    else -> null
+                }
+                if (five != null) return String.format(Locale.US, "%.1f", five)
+            }
+        }
         val m = Regex("(?:امتیاز|Rating|★|⭐)\\s*[:：]?\\s*([0-5](?:\\.[0-9])?)(?![0-9])", RegexOption.IGNORE_CASE).find(text) ?: return null
         val v = m.groupValues[1]
         val d = v.toDoubleOrNull() ?: return null
@@ -255,6 +273,12 @@ object HtmlParser {
 
     // تعداد نظر/رأی مثل «10.2K نظر»
     private fun extractRatingCount(text: String): String? {
+        VOTES_REGEX.find(text)?.let { m ->
+            val n = m.groupValues[2].replace(",", "").toLongOrNull()
+            if (n != null && n > 0) {
+                return if (n >= 1000) String.format(Locale.US, "%.1fK", n / 1000.0).replace(".0K", "K") else n.toString()
+            }
+        }
         val m = Regex("([0-9]+(?:\\.[0-9]+)?\\s?[KkMm]?)\\s*(?:نظر|رأی|رای|دیدگاه|votes|ratings|reviews)", RegexOption.IGNORE_CASE).find(text) ?: return null
         return m.groupValues[1].trim().ifBlank { null }
     }
