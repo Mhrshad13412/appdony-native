@@ -10,7 +10,9 @@ data class Comment(
     @SerializedName("author_avatar_urls") val avatarUrls: Map<String, String>? = null,
     val date: String,
     val content: RenderedText,
-    val parent: Int = 0
+    val parent: Int = 0,
+    // approved = نمایش داده می‌شه | hold = منتظر تأیید مدیر
+    val status: String = "approved"
 ) {
     fun cleanContent(): String {
         return Html.fromHtml(content.rendered, Html.FROM_HTML_MODE_LEGACY)
