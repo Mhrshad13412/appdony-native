@@ -414,7 +414,8 @@ private fun NavTabsArea(
                     item = item,
                     selected = index == selectedIndex,
                     glass = glass,
-                    onClick = { if (currentRoute != item.route) onTabSelected(item.route) },
+                    // همیشه خبر می‌ده؛ اینکه روی همون صفحه‌ی تب نیازی به رفتن نیست رو MainActivity تصمیم می‌گیره (توی جزئیات، تبِ روشن باید برگردونه به لیست)
+                    onClick = { onTabSelected(item.route) },
                     modifier = Modifier.weight(1f)
                 )
             }
