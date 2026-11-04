@@ -44,7 +44,8 @@ internal class CatPose(
     val tilt: Float = 0f,       // کج شدن سر (‎-۱ تا ۱)
     val breath: Float = 0f,     // نفس کشیدن ۰ تا ۱
     val plate: Color? = null,   // رنگ کادر و صفحه‌ی صورت (مات)؛ null = از yarn ساخته می‌شه
-    val ink: Color? = null      // رنگ سر، گوشی‌ها و چشم‌ها؛ null = همون yarn
+    val ink: Color? = null,     // رنگ سر، گوشی‌ها و چشم‌ها؛ null = همون yarn
+    val screen: Color? = null   // رنگ صفحه‌ی داخل سر؛ null = همون plate (برای دکمه‌ی شیشه‌ای که plate شفافه)
 )
 
 internal fun catFurOf(theme: Color): Color = lerp(theme, Color.White, 0.30f)
@@ -81,7 +82,7 @@ internal fun DrawScope.drawCat(p: CatPose) {
         // سر: حلقه‌ی رنگی دور صفحه
         drawRoundRect(ink, Offset(c.x - half, c.y - half), Size(half * 2f, half * 2f), CornerRadius(11.5f * u))
         val inner = half - ring
-        drawRoundRect(plate, Offset(c.x - inner, c.y - inner), Size(inner * 2f, inner * 2f), CornerRadius(9.2f * u))
+        drawRoundRect(p.screen ?: plate, Offset(c.x - inner, c.y - inner), Size(inner * 2f, inner * 2f), CornerRadius(9.2f * u))
 
         // چشم‌ها
         val lx = p.lookX.coerceIn(-1f, 1f) * 1.8f * u
