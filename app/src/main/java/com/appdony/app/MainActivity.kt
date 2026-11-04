@@ -414,7 +414,8 @@ fun MainContent(
             AppBottomNav(
                 currentRoute = navHighlightRoute,
                 hazeState = hazeState,
-                onTabSelected = { route -> navController.navigateToTab(route) },
+                // روی تبِ همین صفحه‌ی اصلی نیازی به رفتن نیست؛ ولی توی جزئیات، تبِ روشن برمی‌گردونه به لیست
+                onTabSelected = { route -> if (!(isMainRoute && route == currentRoute)) navController.navigateToTab(route) },
                 // هوش مصنوعی ثابت: دکمه‌ی گرد وسط منو (شیشه‌ای و کلاسیک) چت هوش مصنوعی رو باز می‌کنه
                 fixedAi = fixedAi,
                 onAiClick = { navController.navigate("ai_chat") { launchSingleTop = true } },
