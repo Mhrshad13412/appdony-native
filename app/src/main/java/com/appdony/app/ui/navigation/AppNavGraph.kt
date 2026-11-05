@@ -37,6 +37,7 @@ import com.appdony.app.ui.screens.BlogScreen
 import com.appdony.app.ui.screens.CategoryScreen
 import com.appdony.app.ui.screens.DetailScreen
 import com.appdony.app.ui.screens.DownloadsScreen
+import com.appdony.app.ui.screens.EditorScreen
 import com.appdony.app.ui.screens.FavoritesScreen
 import com.appdony.app.ui.screens.GamesScreen
 import com.appdony.app.ui.screens.SearchScreen
@@ -112,6 +113,21 @@ private fun AdminOnly(onDenied: () -> Unit, content: @Composable () -> Unit) {
     val allowed by produceState<Boolean?>(initialValue = null) {
         val s = SessionManager(ctx)
         value = s.isLoggedIn.first() && SupportApi.isAdmin(s.userEmail.first())
+    }
+    when (allowed) {
+        true -> content()
+        false -> LaunchedEffect(Unit) { onDenied() }
+        null -> Unit
+    }
+}
+
+/** فقط حسابِ واردشده‌ای که اجازه‌ی نوشتنِ همین نوع (نوشته یا بلاگ) رو داره صفحه‌ی ادیتور رو می‌بینه */
+@Composable
+private fun WriterOnly(kind: String, onDenied: () -> Unit, content: @Composable () -> Unit) {
+    val ctx = LocalContext.current
+    val allowed by produceState<Boolean?>(null, kind) {
+        val s = SessionManager(ctx)
+        value = if (kind == "blog") s.canWriteBlog.first() else s.canWritePost.first()
     }
     when (allowed) {
         true -> content()
@@ -244,6 +260,21 @@ fun AppNavGraph(
             }
         }
         tabComposable("downloads") { DownloadsScreen() }
+
+        // ایجاد نوشته / ایجاد بلاگ (kind = post یا blog)؛ فقط برای کاربرانی که اجازه‌ی نوشتن دارن
+        composable(
+            route = "editor/{kind}",
+            arguments = listOf(navArgument("kind") { type = NavType.StringType }),
+            enterTransition = { slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it / 10 } + fadeIn(tween(300)) },
+            exitTransition = { fadeOut(tween(200)) },
+            popEnterTransition = { fadeIn(tween(240)) },
+            popExitTransition = { slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it / 10 } + fadeOut(tween(220)) }
+        ) { backStack ->
+            val kind = backStack.arguments?.getString("kind") ?: "post"
+            WriterOnly(kind = kind, onDenied = { navController.popBackStack() }) {
+                EditorScreen(kind = kind, onBack = { navController.popBackStack() })
+            }
+        }
 
         composable(
             route = "category/{categoryId}/{categoryName}",
