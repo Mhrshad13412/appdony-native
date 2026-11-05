@@ -64,7 +64,15 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** ادامه‌ی همون دانلود (از جایی که مونده)، نه شروع از صفر */
+    /** توقف: فایل نیمه‌کاره می‌مونه و با «ادامه» از همون‌جا گرفته می‌شه */
+    fun pause(item: DownloadItem) {
+        viewModelScope.launch(Dispatchers.IO) {
+            DownloadEngine.pause(getApplication(), item.id)
+            refreshOnce()
+        }
+    }
+
+    /** ادامه‌ی همون دانلود (از جایی که مونده)، نه شروع از صفر؛ هم برای «ادامه» و هم «تلاش دوباره» */
     fun retry(item: DownloadItem, onResult: (Result<Long>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val rec = store.getAll().firstOrNull { it.id == item.id }
@@ -97,11 +105,16 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 status = when {
                     record.completed || record.status == DownloadManager.STATUS_SUCCESSFUL -> DownloadManager.STATUS_SUCCESSFUL
                     record.status == DownloadManager.STATUS_FAILED -> DownloadManager.STATUS_FAILED
+                    record.status == DownloadManager.STATUS_PAUSED -> {
+                        if (message.isNullOrBlank()) message = "متوقف شد"
+                        DownloadManager.STATUS_PAUSED
+                    }
                     record.status == 0 -> DownloadManager.STATUS_FAILED // رکورد قدیمی نسخه‌های قبل
                     else -> {
-                        // وضعیت «در حال دانلود» ثبت شده ولی موتور فعال نیست = اپ وسط کار بسته شده
-                        message = "دانلود نیمه‌کاره ماند؛ «تلاش دوباره» رو بزن تا ادامه پیدا کنه"
-                        DownloadManager.STATUS_FAILED
+                        // «در حال دانلود» ثبت شده ولی موتور فعال نیست = پروسه وسط کار بسته شده؛
+                        // با باز شدن برنامه خودش ادامه پیدا می‌کنه، ولی کاربر هم می‌تونه دستی «ادامه» بزنه
+                        message = "متوقف شد؛ برای ادامه بزن"
+                        DownloadManager.STATUS_PAUSED
                     }
                 }
                 if (status == DownloadManager.STATUS_FAILED && message.isNullOrBlank()) {
