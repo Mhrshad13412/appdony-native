@@ -24,6 +24,15 @@ data class UserData(
         return username
     }
 
+    /** اجازه‌ی ساخت «نوشته» (برنامه/بازی): نقش‌های نویسنده، ویراستار، مدیر و ... */
+    fun canWritePosts(): Boolean = capabilities?.get("edit_posts") == true
+
+    /** اجازه‌ی ساخت مطلب «وبلاگ»: یکی از سطح‌های دسترسی نوشتن (قابلیت اختصاصی وبلاگ یا نوشتن عمومی) */
+    fun canWriteBlog(): Boolean {
+        val caps = capabilities ?: return false
+        return caps["edit_blogs"] == true || caps["edit_blog"] == true || caps["edit_posts"] == true
+    }
+
     fun avatarUrl(): String? {
         return avatarUrls?.get("96") ?: avatarUrls?.get("48")
     }
