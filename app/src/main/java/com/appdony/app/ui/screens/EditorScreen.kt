@@ -7,12 +7,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -91,6 +96,7 @@ import com.appdony.app.data.api.MetaApi
 import com.appdony.app.data.model.AppInfo
 import com.appdony.app.data.model.BlockEditing
 import com.appdony.app.data.model.BlockGroup
+import com.appdony.app.data.model.BlockParser
 import com.appdony.app.data.model.BlockSerializer
 import com.appdony.app.data.model.BlockType
 import com.appdony.app.data.model.EditorBlock
@@ -135,11 +141,16 @@ class EditorViewModel : ViewModel() {
     var scrollToId by mutableStateOf<Long?>(null)
     private var nextId = 1L
 
-    // ذخیره روی سایت: بعد از اولین ذخیره شناسه و لینک مطلب مشخص می‌شه و ذخیره‌های بعدی همون مطلب رو به‌روز می‌کنن
+    // ذخیره روی سایت: بعد از اولین ذخیره (یا باز شدن مطلب موجود) شناسه و لینک مطلب مشخص می‌شه
+    // و ذخیره‌های بعدی همون مطلب رو به‌روز می‌کنن
     var postId by mutableStateOf<Long?>(null)
     var link by mutableStateOf<String?>(null)
     var status by mutableStateOf("draft")
     var saving by mutableStateOf(false)
+
+    // باز کردن مطلب موجود از سایت
+    var loading by mutableStateOf(false)
+    var loadError by mutableStateOf<String?>(null)
 
     // تصویر شاخص
     var featuredId by mutableStateOf<Long?>(null)
@@ -174,6 +185,61 @@ class EditorViewModel : ViewModel() {
     /** آیا چیزی نوشته شده که هنوز ذخیره نشده؟ */
     val isDirty: Boolean
         get() = snapshot() != cleanSnapshot
+
+    // ───────────── باز کردن مطلب موجود ─────────────
+
+    /**
+     * مطلب [id] رو از سایت می‌گیره (عنوان، محتوا → بلوک‌ها، وضعیت، تصویر شاخص، تنظیمات و متاهای playclone/Yoast)
+     * و توی ادیتور می‌ذاره. اگه چیزی نشد، [loadError] پر می‌شه و دوباره امتحان ممکنه.
+     */
+    fun loadExisting(context: Context, kind: String, id: Long) {
+        if (loading || postId != null) return
+        loading = true
+        loadError = null
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val postResult = EditorApi.fetch(app, kind, id)
+            val remote = postResult.getOrNull()
+            if (remote == null) {
+                loadError = postResult.exceptionOrNull()?.message ?: "مطلب گرفته نشد"
+                loading = false
+                return@launch
+            }
+            // بدون متاها اجازه‌ی ویرایش نمی‌دیم؛ وگرنه ذخیره می‌تونست فیلدهای برنامه رو خالی کنه
+            val metaResult = MetaApi.load(id)
+            val meta = metaResult.getOrNull()
+            if (meta == null) {
+                loadError = metaResult.exceptionOrNull()?.message ?: "اطلاعات برنامه گرفته نشد"
+                loading = false
+                return@launch
+            }
+
+            title = remote.title
+            blocks.clear()
+            BlockParser.parse(remote.content).forEach { blocks.add(it.copy(id = nextId++)) }
+            if (blocks.isEmpty()) blocks.add(EditorBlock(nextId++, BlockType.PARAGRAPH))
+            focusedId = null
+            pendingFocusId = null
+            pendingListFocus = null
+
+            status = remote.status
+            link = remote.link.ifBlank { null }
+            featuredId = remote.featuredId
+            featuredUrl = remote.featuredUrl
+            settings = PostSettings(
+                slug = remote.slug,
+                date = remote.date,
+                excerpt = remote.excerpt,
+                commentsOpen = remote.commentsOpen,
+                categoryIds = remote.categoryIds
+            )
+            appInfo = meta.first
+            seo = meta.second
+            postId = remote.id
+            cleanSnapshot = snapshot()
+            loading = false
+        }
+    }
 
     /** بلوک تازه بعد از بلوک انتخاب‌شده می‌شینه؛ اگه اون یه پاراگراف خالی بود، جاش عوض می‌شه (مثل وردپرس) */
     fun insert(type: BlockType) {
@@ -446,14 +512,14 @@ class EditorViewModel : ViewModel() {
 // ───────────────────────── صفحه‌ی ادیتور ─────────────────────────
 
 /**
- * ایجاد نوشته / ایجاد مطلب وبلاگ. [kind] = "post" یا "blog".
- * بالا: نوار آیکن‌ها + کشوی «همه‌ی بلوک‌ها»؛ پایین: کشوی «۶ بلوک»؛ لبه‌ی راست: دکمه‌ی پنل‌ها.
+ * ایجاد یا ویرایش نوشته / مطلب وبلاگ. [kind] = "post" یا "blog"؛ [postId] بزرگ‌تر از صفر = ویرایش مطلب موجود.
+ * بالا: نوار آیکن‌ها + کشوی «همه‌ی بلوک‌ها»؛ پایین: کشوی «۶ بلوک»؛ لبه‌ی راست: قرص عمودی پنل‌ها.
  */
 @Composable
-fun EditorScreen(kind: String, onBack: () -> Unit) {
+fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
     val isBlog = kind == "blog"
     val ctx = LocalContext.current
-    val vm: EditorViewModel = viewModel(key = "editor_$kind")
+    val vm: EditorViewModel = viewModel(key = "editor_${kind}_$postId")
     val scheme = MaterialTheme.colorScheme
     val clipboard = LocalClipboardManager.current
 
@@ -468,6 +534,12 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
     var confirmExit by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // مطلب موجود: تا از سایت نیومده، فقط صفحه‌ی بارگذاری دیده می‌شه
+    val awaiting = postId > 0L && vm.postId == null
+    LaunchedEffect(postId) {
+        if (postId > 0L) vm.loadExisting(ctx, kind, postId)
+    }
+
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) vm.uploadFeatured(ctx, uri)
     }
@@ -480,6 +552,7 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
 
     BackHandler {
         when {
+            awaiting -> onBack()
             preview -> preview = false
             panel != null -> panel = null
             menuOpen -> menuOpen = false
@@ -503,6 +576,7 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
         "publish" -> "منتشرشده"
         "pending" -> "در انتظار بازبینی"
         "future" -> "زمان‌بندی‌شده"
+        "private" -> "خصوصی"
         else -> "پیش‌نویس"
     }
 
@@ -624,6 +698,24 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
         }
 
         if (!preview) {
+            // پرده‌ی پشت پنل: زدن روش پنل رو می‌بنده
+            AnimatedVisibility(
+                visible = panel != null,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(200))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.40f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { panel = null }
+                )
+            }
+
+            // پنل: وسط صفحه؛ از راست میاد و به راست برمی‌گرده
             SidePanelHost(
                 panel = panel,
                 vm = vm,
@@ -631,22 +723,34 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
                 onPickImage = { pickImage.launch("image/*") },
                 onClose = { panel = null },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 60.dp, top = 60.dp, bottom = 12.dp, end = 8.dp)
+                    .align(Alignment.Center)
+                    .padding(horizontal = 14.dp)
             )
-            SideDock(
-                menuOpen = menuOpen,
-                panel = panel,
-                onHandle = {
-                    if (panel != null) panel = null else menuOpen = !menuOpen
-                },
-                onPick = { item ->
-                    panel = if (panel == item) null else item
-                    menuOpen = false
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 6.dp)
+
+            // قرص عمودی: لبه‌ی راست، وسط صفحه؛ وقتی پنل بازه به راست می‌ره و برمی‌گرده
+            AnimatedVisibility(
+                visible = panel == null,
+                modifier = Modifier.align(Alignment.CenterStart),
+                enter = slideInHorizontally(tween(260)) { it } + fadeIn(tween(200)),
+                exit = slideOutHorizontally(tween(220)) { it } + fadeOut(tween(160))
+            ) {
+                SideDock(
+                    menuOpen = menuOpen,
+                    onHandle = { menuOpen = !menuOpen },
+                    onPick = { item ->
+                        panel = item
+                        menuOpen = false
+                    },
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
+        }
+
+        if (awaiting) {
+            LoadOverlay(
+                error = vm.loadError,
+                onRetry = { vm.loadExisting(ctx, kind, postId) },
+                onBack = onBack
             )
         }
     }
@@ -766,6 +870,42 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
                 TextButton(onClick = { confirmExit = false }) { Text("ادامه‌ی نوشتن") }
             }
         )
+    }
+}
+
+/** صفحه‌ی گرفتن مطلب از سایت: چرخان تا بیاد؛ اگه نشد پیام + «تلاش دوباره» و «بازگشت» */
+@Composable
+private fun LoadOverlay(error: String?, onRetry: () -> Unit, onBack: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(scheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { },
+        contentAlignment = Alignment.Center
+    ) {
+        if (error == null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = scheme.primary)
+                Spacer(Modifier.height(12.dp))
+                Text("در حال گرفتن مطلب از سایت…", color = scheme.onSurfaceVariant, fontSize = 13.sp)
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = error, color = scheme.error, fontSize = 14.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onRetry) { Text("تلاش دوباره") }
+                    TextButton(onClick = onBack) { Text("بازگشت") }
+                }
+            }
+        }
     }
 }
 
