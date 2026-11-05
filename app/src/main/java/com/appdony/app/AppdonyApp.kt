@@ -10,6 +10,8 @@ import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.data.repository.HomeRepository
 import com.appdony.app.util.AppForeground
 import com.appdony.app.util.CrashReporter
+import com.appdony.app.util.DownloadEngine
+import com.appdony.app.util.NetworkMonitor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,7 +25,20 @@ class AppdonyApp : Application(), ImageLoaderFactory {
         ApiClient.init(this)
         PopularityRemote.init(this)
         AppForeground.install(this)
+        NetworkMonitor.init(this)
+        resumeDownloads()
         prefetchHome()
+    }
+
+    // دانلودهایی که وسط کار بودن (پروسه کشته شده بود) همین اول کار از همون‌جا که مونده ادامه پیدا می‌کنن
+    private fun resumeDownloads() {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                DownloadEngine.resumeInterrupted(this@AppdonyApp)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     // ⚠️ مهم — پیش‌بارگذاری صفحه‌ی اصلی؛ تحت هیچ عنوان حذف نشه ⚠️
