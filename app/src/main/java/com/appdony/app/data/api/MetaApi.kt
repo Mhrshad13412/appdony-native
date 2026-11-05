@@ -1,6 +1,8 @@
 package com.appdony.app.data.api
 
 import com.appdony.app.data.model.AppInfo
+import com.appdony.app.data.model.CustomBox
+import com.appdony.app.data.model.DlLink
 import com.appdony.app.data.model.SeoInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,7 +13,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * ذخیره‌ی متاباکس‌های playclone و Yoast. این‌ها توی REST باز نیستن، پس دقیقاً مثل خود گوتنبرگ عمل می‌کنیم:
+ * خوندن و ذخیره‌ی متاباکس‌های playclone و Yoast. این‌ها توی REST باز نیستن، پس دقیقاً مثل خود گوتنبرگ عمل می‌کنیم:
  * صفحه‌ی ویرایش رو می‌خونیم (نانس‌ها و فیلدهای مخفی)، فرم متاباکس رو با آدرس meta-box-loader می‌فرستیم
  * و آخرش مقدار رو دوباره از سایت می‌خونیم تا ذخیره شدنش تأیید بشه.
  */
@@ -30,8 +32,87 @@ object MetaApi {
     private val INPUT = Regex("<input\\b[^>]*>", RegexOption.IGNORE_CASE)
     private val TEXTAREA = Regex("<textarea\\b([^>]*)>(.*?)</textarea>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val CHECKED = Regex("(?<![\\w-])checked\\b", RegexOption.IGNORE_CASE)
+    private val SELECTED = Regex("(?<![\\w-])selected\\b", RegexOption.IGNORE_CASE)
+    private val OPTION = Regex("<option\\b([^>]*)>", RegexOption.IGNORE_CASE)
 
     private class Page(val html: String, val fields: Map<String, String>)
+
+    // ───────────── خوندن (برای باز کردن مطلب موجود) ─────────────
+
+    /** مقدار فعلی اطلاعات برنامه/بازی و Yoast یک مطلب، دقیقاً از صفحه‌ی ویرایش سایت */
+    suspend fun load(postId: Long): Result<Pair<AppInfo, SeoInfo>> = withContext(Dispatchers.IO) {
+        try {
+            val page = fetchPage(http(), postId)
+            Result.success(parse(page))
+        } catch (e: EditorException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(EditorException("اطلاعات برنامه گرفته نشد: ${e.message ?: "خطای ناشناخته"}"))
+        }
+    }
+
+    private fun parse(page: Page): Pair<AppInfo, SeoInfo> {
+        val f = page.fields
+        fun v(key: String): String = f[key].orEmpty()
+
+        val links = rows(f, "playclone_dl_links")
+            .map { DlLink(texto = it["texto"].orEmpty(), link = it["link"].orEmpty(), page = it["page"].orEmpty()) }
+            .ifEmpty { listOf(DlLink()) }
+        val boxes = rows(f, "playclone_boxes")
+            .map { CustomBox(title = it["title"].orEmpty(), content = it["content"].orEmpty()) }
+            .ifEmpty { listOf(CustomBox()) }
+
+        val info = AppInfo(
+            descripcion = v("playclone_info[descripcion]"),
+            version = v("playclone_info[version]"),
+            tamano = v("playclone_info[tamano]"),
+            fechaActualizacion = v("playclone_info[fecha_actualizacion]"),
+            requerimientos = v("playclone_info[requerimientos]"),
+            consiguelo = v("playclone_info[consiguelo]"),
+            novedades = v("playclone_info[novedades]"),
+            dlOption = f["playclone_dl_option"] ?: "direct-download",
+            directDownload = v("playclone_direct_download"),
+            dlLinks = links,
+            screenshots = v("playclone_screenshots"),
+            videoId = v("playclone_video_id"),
+            boxes = boxes,
+            ratingAverage = v("playclone_rating_average"),
+            ratingCount = v("playclone_rating_count"),
+            appdoniPlus = f.containsKey("playclone_appdoni_plus"),
+            contentSource = selectValue(page.html, "playclone_content_source") ?: "own",
+            contentSourceCustom = v("playclone_content_source_custom")
+        )
+        val seo = SeoInfo(
+            focusKeyword = v("yoast_wpseo_focuskw"),
+            title = v("yoast_wpseo_title"),
+            description = v("yoast_wpseo_metadesc")
+        )
+        return info to seo
+    }
+
+    /** فیلدهای ردیفی مثل playclone_dl_links[0][texto] → لیستی از نقشه‌ها به ترتیب اندیس */
+    private fun rows(fields: Map<String, String>, prefix: String): List<Map<String, String>> {
+        val re = Regex("^" + Regex.escape(prefix) + "\\[(\\d+)\\]\\[(\\w+)\\]$")
+        val byIndex = sortedMapOf<Int, MutableMap<String, String>>()
+        for ((key, value) in fields) {
+            val m = re.find(key) ?: continue
+            byIndex.getOrPut(m.groupValues[1].toInt()) { mutableMapOf() }[m.groupValues[2]] = value
+        }
+        return byIndex.values.toList()
+    }
+
+    /** مقدار گزینه‌ی انتخاب‌شده‌ی یک select (اگه هیچ‌کدوم انتخاب نبود، اولی) */
+    private fun selectValue(html: String, name: String): String? {
+        val select = Regex(
+            "<select\\b[^>]*name=\"" + Regex.escape(name) + "\"[^>]*>(.*?)</select>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        ).find(html) ?: return null
+        val options = OPTION.findAll(select.groupValues[1]).toList()
+        val chosen = options.firstOrNull { SELECTED.containsMatchIn(it.groupValues[1]) } ?: options.firstOrNull()
+        return chosen?.let { attr(it.groupValues[1], "value") }
+    }
+
+    // ───────────── ذخیره ─────────────
 
     suspend fun save(postId: Long, info: AppInfo, seo: SeoInfo): Result<Unit> = withContext(Dispatchers.IO) {
         try {
