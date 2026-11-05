@@ -64,6 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.appdony.app.data.preferences.ChatHistoryManager
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.preferences.FontSize
@@ -73,6 +75,7 @@ import com.appdony.app.data.preferences.ThemeManager
 import com.appdony.app.data.preferences.ThemeMode
 import com.appdony.app.data.preferences.ThemeState
 import com.appdony.app.data.session.SessionManager
+import com.appdony.app.util.AutoUpdateWorker
 import com.appdony.app.util.CacheUtils
 import com.appdony.app.util.CatOverlayService
 import kotlinx.coroutines.launch
@@ -92,6 +95,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     val wifiOnly by settingsManager.wifiOnly.collectAsStateWithLifecycle(initialValue = false)
     val notifyBlog by settingsManager.notifyBlog.collectAsStateWithLifecycle(initialValue = true)
     val notifyUpdates by settingsManager.notifyUpdates.collectAsStateWithLifecycle(initialValue = true)
+    val autoUpdateApp by settingsManager.autoUpdateApp.collectAsStateWithLifecycle(initialValue = false)
+    val autoUpdateApps by settingsManager.autoUpdateApps.collectAsStateWithLifecycle(initialValue = false)
     val showAiAssistant by settingsManager.showAiAssistant.collectAsStateWithLifecycle(initialValue = true)
     val fixedAi by settingsManager.fixedAi.collectAsStateWithLifecycle(initialValue = true)
     val aiCorner by settingsManager.aiCorner.collectAsStateWithLifecycle(initialValue = false)
@@ -104,6 +109,15 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) { cacheSize = CacheUtils.getCacheSize(context) }
+
+    // وقتی کاربر یکی از سوئیچ‌های آپدیت خودکار رو روشن می‌کنه، همون لحظه یه بار چک می‌شه
+    val checkUpdatesNow: () -> Unit = {
+        try {
+            WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<AutoUpdateWorker>().build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     // حالت فعلی دستیار از روی تنظیم‌ها درمیاد (مثل دنده‌ی اتومات: همیشه فقط یکی فعاله)
     val aiMode = when {
@@ -228,6 +242,26 @@ fun SettingsScreen(onBack: () -> Unit) {
                 RowDivider()
                 SettingsSwitchRow("اعلان آپدیت", Icons.Outlined.Update, notifyUpdates) {
                     scope.launch { settingsManager.setNotifyUpdates(it) }
+                }
+            }
+        }
+
+        item {
+            SettingsGroup("آپدیت خودکار") {
+                SettingsSwitchRow("آپدیت خودکار اپدونی", Icons.Outlined.Update, autoUpdateApp) {
+                    scope.launch { settingsManager.setAutoUpdateApp(it) }
+                    if (it) {
+                        checkUpdatesNow()
+                        Toast.makeText(context, "نسخه‌ی جدید توی پس‌زمینه دانلود می‌شه؛ نصبش با تأیید خودته", Toast.LENGTH_LONG).show()
+                    }
+                }
+                RowDivider()
+                SettingsSwitchRow("آپدیت خودکار برنامه‌های دانلودشده", Icons.Outlined.Download, autoUpdateApps) {
+                    scope.launch { settingsManager.setAutoUpdateApps(it) }
+                    if (it) {
+                        checkUpdatesNow()
+                        Toast.makeText(context, "اگه برنامه‌ای که دانلود کردی آپدیت بشه، نسخه‌ی جدیدش خودکار دانلود می‌شه", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
