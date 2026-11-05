@@ -51,6 +51,19 @@ import kotlinx.coroutines.flow.first
 private const val TAB_ANIM_MS = 420
 private val TabEasing = FastOutSlowInEasing
 
+// ───── انیمیشن صفحه‌های «نوشته‌ها» و «ادیتور» ─────
+// رفتن جلو: صفحه‌ی تازه از چپ میاد (مثل بازشدن منوی کناری) و صفحه‌ی قبلی کمی به راست می‌ره و محو می‌شه.
+// برگشت: دقیقاً برعکس؛ صفحه‌ی جلو به چپ بسته می‌شه و قبلی از راست برمی‌گرده.
+private const val PUSH_MS = 380
+private val PushEnter: EnterTransition =
+    slideInHorizontally(tween(PUSH_MS, easing = TabEasing)) { full -> -full } + fadeIn(tween(PUSH_MS))
+private val PushExit: ExitTransition =
+    slideOutHorizontally(tween(PUSH_MS, easing = TabEasing)) { full -> full / 4 } + fadeOut(tween(PUSH_MS))
+private val PopEnter: EnterTransition =
+    slideInHorizontally(tween(PUSH_MS, easing = TabEasing)) { full -> full / 4 } + fadeIn(tween(PUSH_MS))
+private val PopExit: ExitTransition =
+    slideOutHorizontally(tween(PUSH_MS, easing = TabEasing)) { full -> -full } + fadeOut(tween(PUSH_MS))
+
 private fun tabIndexOf(route: String?): Int =
     bottomNavItems.indexOfFirst { it.route == route?.substringBefore('?') }
 
@@ -266,10 +279,10 @@ fun AppNavGraph(
         composable(
             route = "posts/{kind}",
             arguments = listOf(navArgument("kind") { type = NavType.StringType }),
-            enterTransition = { slideInHorizontally(tween(360, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(300)) },
-            exitTransition = { fadeOut(tween(200)) },
-            popEnterTransition = { fadeIn(tween(240)) },
-            popExitTransition = { slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220)) }
+            enterTransition = { PushEnter },
+            exitTransition = { PushExit },
+            popEnterTransition = { PopEnter },
+            popExitTransition = { PopExit }
         ) { backStack ->
             val kind = backStack.arguments?.getString("kind") ?: "post"
             WriterOnly(kind = kind, onDenied = { navController.popBackStack() }) {
@@ -289,10 +302,10 @@ fun AppNavGraph(
                 navArgument("kind") { type = NavType.StringType },
                 navArgument("postId") { type = NavType.LongType; defaultValue = 0L }
             ),
-            enterTransition = { slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it / 10 } + fadeIn(tween(300)) },
-            exitTransition = { fadeOut(tween(200)) },
-            popEnterTransition = { fadeIn(tween(240)) },
-            popExitTransition = { slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it / 10 } + fadeOut(tween(220)) }
+            enterTransition = { PushEnter },
+            exitTransition = { PushExit },
+            popEnterTransition = { PopEnter },
+            popExitTransition = { PopExit }
         ) { backStack ->
             val kind = backStack.arguments?.getString("kind") ?: "post"
             val postId = backStack.arguments?.getLong("postId") ?: 0L
