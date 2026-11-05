@@ -33,23 +33,23 @@ object BlockSerializer {
         val text = block.text.trim()
         return when (block.type) {
             BlockType.PARAGRAPH -> {
-                if (text.isEmpty()) null else wrap("paragraph", null, "<p>${inline(text)}</p>")
+                if (text.isEmpty()) null else wrap("paragraph", null, "<p>${rich(block)}</p>")
             }
 
             BlockType.HEADING -> {
                 if (text.isEmpty()) return null
                 val level = block.extra.ifBlank { "2" }
                 val attrs = if (level == "2") null else "{\"level\":$level}"
-                wrap("heading", attrs, "<h$level class=\"wp-block-heading\">${inline(text)}</h$level>")
+                wrap("heading", attrs, "<h$level class=\"wp-block-heading\">${rich(block)}</h$level>")
             }
 
             BlockType.LIST, BlockType.ORDERED_LIST -> {
-                val items = block.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                val items = InlineFormat.lineRanges(block.text)
                 if (items.isEmpty()) return null
                 val ordered = block.type.ordered
                 val tag = if (ordered) "ol" else "ul"
-                val inner = items.joinToString("\n\n") {
-                    "<!-- wp:list-item -->\n<li>${inline(it)}</li>\n<!-- /wp:list-item -->"
+                val inner = items.joinToString("\n\n") { (a, b) ->
+                    "<!-- wp:list-item -->\n<li>${rich(block, a, b)}</li>\n<!-- /wp:list-item -->"
                 }
                 wrap(
                     "list",
@@ -59,9 +59,9 @@ object BlockSerializer {
             }
 
             BlockType.QUOTE -> {
-                val lines = block.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                val lines = InlineFormat.lineRanges(block.text)
                 if (lines.isEmpty()) return null
-                val inner = lines.joinToString("\n\n") { wrap("paragraph", null, "<p>${inline(it)}</p>") }
+                val inner = lines.joinToString("\n\n") { (a, b) -> wrap("paragraph", null, "<p>${rich(block, a, b)}</p>") }
                 wrap("quote", null, "<blockquote class=\"wp-block-quote\">$inner</blockquote>")
             }
 
@@ -70,7 +70,7 @@ object BlockSerializer {
                 wrap(
                     "pullquote",
                     null,
-                    "<figure class=\"wp-block-pullquote\"><blockquote><p>${inline(text)}</p></blockquote></figure>"
+                    "<figure class=\"wp-block-pullquote\"><blockquote><p>${rich(block)}</p></blockquote></figure>"
                 )
             }
 
@@ -86,7 +86,7 @@ object BlockSerializer {
 
             BlockType.VERSE -> {
                 if (text.isEmpty()) return null
-                wrap("verse", null, "<pre class=\"wp-block-verse\">${inline(block.text.trimEnd())}</pre>")
+                wrap("verse", null, "<pre class=\"wp-block-verse\">${rich(block, 0, block.text.trimEnd().length)}</pre>")
             }
 
             BlockType.BUTTON -> {
@@ -185,6 +185,15 @@ object BlockSerializer {
         val open = if (attrs == null) "<!-- wp:$name -->" else "<!-- wp:$name $attrs -->"
         return "$open\n$body\n<!-- /wp:$name -->"
     }
+
+    /** متن بلوک (یا بخشی از اون) با قالب‌بندی‌هاش → HTML امن؛ فاصله‌های اول و آخر حذف می‌شن */
+    private fun rich(block: EditorBlock): String {
+        val range = InlineFormat.trimRange(block.text) ?: return ""
+        return rich(block, range.first, range.second)
+    }
+
+    private fun rich(block: EditorBlock, from: Int, to: Int): String =
+        InlineFormat.html(block.text, block.spans, from, to)
 
     /** متن ساده → HTML امن؛ خط جدید داخل یک بلوک می‌شه <br> */
     private fun inline(s: String): String = esc(s).replace("\r\n", "\n").replace("\n", "<br>")
