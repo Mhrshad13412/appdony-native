@@ -6,20 +6,25 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.appdony.app.MainActivity
 import com.appdony.app.R
 import com.appdony.app.data.api.ApiClient
+import com.appdony.app.data.model.PostMemory
 import com.appdony.app.data.preferences.DownloadRecord
 import com.appdony.app.data.preferences.DownloadStore
+import com.appdony.app.data.preferences.SettingsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -33,6 +38,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -44,11 +50,14 @@ import org.jsoup.Jsoup
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.net.UnknownHostException
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLException
 
 /** لینک آخرش به تلگرام رسید؛ فایل نیست، باید با اپ تلگرام باز بشه */
 class TelegramRedirect(val url: String) : IOException("این لینک تلگرامه؛ با دکمه‌ی خودش از صفحه‌ی برنامه باز کن")
@@ -79,6 +88,7 @@ object DownloadHelper {
      * اول لینک رو واقعاً چک می‌کنه (به فایل می‌رسه یا نه). اگه لینک خراب/قفل بود
      * اصلاً وارد صف دانلود نمی‌شه و خطا برمی‌گرده. فقط لینک سالم میره توی صف.
      * اگه لینک آخرش به تلگرام برسه، TelegramRedirect برمی‌گرده (نه دانلود).
+     * اگه همین فایل قبلاً متوقف شده بود، از همون‌جا که مونده ادامه پیدا می‌کنه.
      */
     suspend fun startDownload(
         context: Context,
@@ -96,6 +106,13 @@ object DownloadHelper {
             if (store.getAll().any { it.sourceUrl == url && DownloadEngine.isActive(it.id) }) {
                 return@withContext Result.failure(Exception("این فایل همین الان توی صف دانلوده"))
             }
+            // همین فایل قبلاً متوقف شده؛ شروع از صفر نکن، ادامه بده
+            store.getAll().firstOrNull {
+                it.sourceUrl == url && !it.completed && it.status == DownloadManager.STATUS_PAUSED
+            }?.let { paused ->
+                DownloadEngine.start(app, paused.id)
+                return@withContext Result.success(paused.id)
+            }
             val resolved = try {
                 resolve(url)
             } catch (e: TelegramRedirect) {
@@ -105,6 +122,9 @@ object DownloadHelper {
             } catch (e: IOException) {
                 return@withContext Result.failure(Exception(e.message ?: "لینک دانلود کار نمی‌کنه"))
             }
+
+            // پستی که کاربر داره ازش دانلود می‌کنه (برای آپدیت خودکار برنامه‌های دانلودشده)
+            val post = PostMemory.findByTitle(title)
 
             val id = System.currentTimeMillis()
             store.add(
@@ -118,7 +138,9 @@ object DownloadHelper {
                     totalBytes = if (resolved.size > 0) resolved.size else 0L,
                     status = DownloadManager.STATUS_PENDING,
                     message = "در صف دانلود...",
-                    wifiOnly = wifiOnly
+                    wifiOnly = wifiOnly,
+                    postId = post?.id ?: 0,
+                    postModified = post?.modified
                 )
             )
             DownloadEngine.start(app, id, resolved)
@@ -286,19 +308,26 @@ object DownloadHelper {
     }
 }
 
-/** موتور دانلود اپدونی: دانلود واقعی با درصد زنده، ادامه بعد از قطعی و چک سالم بودن فایل */
+/**
+ * موتور دانلود اپدونی: دانلود واقعی با درصد زنده، توقف/ادامه، ادامه بعد از قطعی
+ * (حتی اگه اینترنت قطع بشه یا وای‌فای نباشه صبر می‌کنه و خودش ادامه می‌ده)
+ * و چک سالم بودن فایل
+ */
 object DownloadEngine {
 
     data class Live(val title: String, val status: Int, val bytes: Long, val total: Long, val message: String?)
 
     private const val PENDING = DownloadManager.STATUS_PENDING
     private const val RUNNING = DownloadManager.STATUS_RUNNING
+    private const val PAUSED = DownloadManager.STATUS_PAUSED
     private const val OK = DownloadManager.STATUS_SUCCESSFUL
     private const val FAILED = DownloadManager.STATUS_FAILED
     private val ZIP_FAMILY = setOf("apk", "xapk", "apks", "apkm", "zip")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<Long, Job>()
+    // کارِ لغوشده‌ای که هنوز داره جمع می‌کنه؛ کار جدید اول صبر می‌کنه تموم بشه (دو نفر با هم توی یه فایل ننویسن)
+    private val stopping = ConcurrentHashMap<Long, Job>()
     private val pre = ConcurrentHashMap<Long, DownloadHelper.Resolved>()
     private val gate = Semaphore(2)
 
@@ -325,26 +354,93 @@ object DownloadEngine {
         }
     }
 
+    private fun currentBytes(rec: DownloadRecord): Long =
+        rec.filePath?.let { File(it) }?.takeIf { it.exists() }?.length() ?: rec.bytes
+
     fun start(context: Context, id: Long, resolved: DownloadHelper.Resolved? = null) {
         val app = context.applicationContext
-        if (isActive(id)) return
-        val rec = DownloadStore(app).getAll().firstOrNull { it.id == id } ?: return
-        if (resolved != null) pre[id] = resolved
-        setLive(id, Live(rec.title, PENDING, rec.bytes, rec.totalBytes, "در صف دانلود..."))
+        NetworkMonitor.init(app)
+        val store = DownloadStore(app)
+        val rec = store.getAll().firstOrNull { it.id == id } ?: return
+        if (rec.completed) return
+        synchronized(jobs) {
+            if (isActive(id)) return
+            if (resolved != null) pre[id] = resolved
+            // اگه قبلاً متوقف/ناموفق بود، وضعیت ذخیره‌شده هم «در صف» بشه تا بعد از کشته شدن پروسه دوباره ادامه پیدا کنه
+            if (rec.status != PENDING && rec.status != RUNNING) {
+                store.update(rec.copy(status = PENDING, message = "در صف دانلود..."))
+            }
+            DownloadNotifications.cancelResult(app, id)
+            setLive(id, Live(rec.title, PENDING, currentBytes(rec), rec.totalBytes, "در صف دانلود..."))
+            val job = scope.launch(start = CoroutineStart.LAZY) { runDownload(app, id) }
+            jobs[id] = job
+            job.invokeOnCompletion { jobs.remove(id, job) }
+            job.start()
+        }
         DownloadService.start(app)
-        val job = scope.launch(start = CoroutineStart.LAZY) { gate.withPermit { run(app, id) } }
-        jobs[id] = job
-        job.invokeOnCompletion { jobs.remove(id, job) }
-        job.start()
+    }
+
+    /** توقف دستی: فایل نیمه‌کاره می‌مونه و با «ادامه» از همون‌جا گرفته می‌شه */
+    fun pause(context: Context, id: Long) {
+        val app = context.applicationContext
+        val store = DownloadStore(app)
+        val rec = store.getAll().firstOrNull { it.id == id } ?: return
+        if (rec.completed) return
+        val live = _live.value[id]
+        jobs.remove(id)?.let {
+            it.cancel()
+            stopping[id] = it
+        }
+        pre.remove(id)
+        store.update(
+            rec.copy(
+                status = PAUSED,
+                bytes = live?.bytes ?: currentBytes(rec),
+                totalBytes = if ((live?.total ?: 0L) > 0) live!!.total else rec.totalBytes,
+                message = "متوقف شد"
+            )
+        )
+        setLive(id, null)
+        DownloadNotifications.paused(app, id, rec.title)
+    }
+
+    fun pauseAll(context: Context) {
+        _live.value.keys.toList().forEach { pause(context, it) }
     }
 
     fun cancelAndDelete(context: Context, id: Long) {
         jobs.remove(id)?.cancel()
+        stopping.remove(id)?.cancel()
         pre.remove(id)
-        val store = DownloadStore(context.applicationContext)
+        val app = context.applicationContext
+        val store = DownloadStore(app)
         store.getAll().firstOrNull { it.id == id }?.filePath?.let { runCatching { File(it).delete() } }
         store.remove(id)
         setLive(id, null)
+        DownloadNotifications.cancelResult(app, id)
+    }
+
+    /**
+     * دانلودهایی که وسط کار بودن (پروسه کشته شد، گوشی ریستارت شد و ...) رو دوباره راه می‌ندازه.
+     * اونایی که کاربر خودش متوقف کرده یا ناموفق شدن دست نمی‌خورن.
+     */
+    fun resumeInterrupted(context: Context): Int {
+        val app = context.applicationContext
+        var n = 0
+        DownloadStore(app).getAll().forEach { r ->
+            if (!r.completed && (r.status == PENDING || r.status == RUNNING) && !isActive(r.id)) {
+                start(app, r.id)
+                n++
+            }
+        }
+        return n
+    }
+
+    /** وقتی سیستم زمان سرویس پیش‌زمینه رو تموم کرد (اندروید ۱۵)؛ دانلودها نیمه‌کاره می‌مونن و بعداً ادامه پیدا می‌کنن */
+    fun interruptAll() {
+        jobs.values.forEach { it.cancel() }
+        jobs.clear()
+        _live.value = emptyMap()
     }
 
     private fun downloadsDir(ctx: Context): File {
@@ -366,27 +462,59 @@ object DownloadEngine {
         }
     }
 
-    private suspend fun run(ctx: Context, id: Long) {
-        val store = DownloadStore(ctx)
-        var rec = store.getAll().firstOrNull { it.id == id } ?: return
-        var lastBytes = rec.bytes
-        var lastTotal = rec.totalBytes
-        try {
-            val resolved = pre.remove(id) ?: try {
-                setLive(id, Live(rec.title, PENDING, lastBytes, lastTotal, "در حال آماده‌سازی لینک..."))
-                DownloadHelper.resolve(rec.sourceUrl)
+    private fun isNetworkError(e: IOException): Boolean =
+        e is UnknownHostException || e is SocketException || e is SocketTimeoutException || e is SSLException
+
+    private suspend fun wifiOnly(ctx: Context, rec: DownloadRecord): Boolean =
+        rec.wifiOnly || SettingsManager(ctx).wifiOnly.first()
+
+    // اگه اینترنت (یا وای‌فای، وقتی «فقط وای‌فای» روشنه) نیست، همین‌جا صبر می‌کنه تا برگرده
+    private suspend fun waitUsable(id: Long, title: String, bytes: Long, total: Long, wifiOnly: Boolean) {
+        if (NetworkMonitor.usable(wifiOnly)) return
+        val msg = if (NetworkMonitor.state.value.connected) "در انتظار وای‌فای..." else "در انتظار اینترنت..."
+        setLive(id, Live(title, PENDING, bytes, total, msg))
+        NetworkMonitor.awaitUsable(wifiOnly)
+    }
+
+    private suspend fun resolveWithRetry(
+        ctx: Context, id: Long, rec: DownloadRecord, bytes: Long, total: Long
+    ): DownloadHelper.Resolved {
+        var tries = 0
+        while (true) {
+            val wifi = wifiOnly(ctx, rec)
+            waitUsable(id, rec.title, bytes, total, wifi)
+            setLive(id, Live(rec.title, PENDING, bytes, total, "در حال آماده‌سازی لینک..."))
+            try {
+                return DownloadHelper.resolve(rec.sourceUrl)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: UnknownHostException) {
-                throw Failure("اتصال به اینترنت یا سرور برقرار نیست")
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
-                throw Failure(e.message ?: "لینک دانلود کار نمی‌کنه")
+                if (isNetworkError(e)) {
+                    if (!NetworkMonitor.usable(wifi)) continue
+                    tries++
+                    if (tries > 4) throw Failure("اتصال به اینترنت یا سرور برقرار نیست")
+                    delay(2000L * tries)
+                } else {
+                    throw Failure(e.message ?: "لینک دانلود کار نمی‌کنه")
+                }
             }
+        }
+    }
+
+    private suspend fun runDownload(ctx: Context, id: Long) {
+        stopping.remove(id)?.join()
+        val store = DownloadStore(ctx)
+        var rec = store.getAll().firstOrNull { it.id == id } ?: return
+        var lastBytes = currentBytes(rec)
+        var lastTotal = rec.totalBytes
+        try {
+            val resolved = pre.remove(id) ?: resolveWithRetry(ctx, id, rec, lastBytes, lastTotal)
 
             val file: File = rec.filePath?.let { File(it) }?.takeIf { it.parentFile?.exists() == true }
                 ?: uniqueFile(downloadsDir(ctx), DownloadHelper.buildFileName(rec.title, resolved), store, id)
             file.parentFile?.mkdirs()
+            currentCoroutineContext().ensureActive()
             rec = rec.copy(
                 fileName = file.name,
                 filePath = file.path,
@@ -399,10 +527,15 @@ object DownloadEngine {
 
             var attempt = 0
             while (true) {
+                val wifi = wifiOnly(ctx, rec)
+                waitUsable(id, rec.title, lastBytes, lastTotal, wifi)
+                val startBytes = lastBytes
                 try {
-                    transfer(id, rec.title, resolved.url, file, lastTotal) { b, t ->
-                        lastBytes = b
-                        if (t > 0) lastTotal = t
+                    gate.withPermit {
+                        transfer(id, rec.title, resolved.url, file, lastTotal, wifi) { b, t ->
+                            lastBytes = b
+                            if (t > 0) lastTotal = t
+                        }
                     }
                     break
                 } catch (e: CancellationException) {
@@ -411,8 +544,15 @@ object DownloadEngine {
                     throw e
                 } catch (e: IOException) {
                     currentCoroutineContext().ensureActive()
+                    // اگه وسط راه چیزی گرفته شده، شمارنده‌ی تلاش از نو شروع بشه
+                    if (lastBytes > startBytes) attempt = 0
+                    if (!NetworkMonitor.usable(wifi)) {
+                        // مشکل از اینترنته؛ شکست حساب نمی‌شه، بالای حلقه صبر می‌کنه تا برگرده
+                        setLive(id, Live(rec.title, PENDING, lastBytes, lastTotal, "ارتباط قطع شد؛ در انتظار اینترنت..."))
+                        continue
+                    }
                     attempt++
-                    if (attempt > 4) throw Failure("ارتباط قطع شد؛ «تلاش دوباره» رو بزن، از همین‌جا ادامه می‌ده")
+                    if (attempt > 6) throw Failure("ارتباط قطع شد؛ «تلاش دوباره» رو بزن، از همین‌جا ادامه می‌ده")
                     setLive(id, Live(rec.title, PENDING, lastBytes, lastTotal, "قطع شد؛ تلاش مجدد ($attempt)..."))
                     delay(1500L * attempt)
                 }
@@ -473,7 +613,7 @@ object DownloadEngine {
         }
         setLive(id, null)
         if (cur != null) {
-            DownloadNotifications.result(ctx, id, rec.title, msg)
+            DownloadNotifications.result(ctx, id, rec.title, msg, retry = true)
             AssistantBus.say(
                 AssistantSay(
                     "دانلود «${rec.title.removePrefix("دانلود").trim().take(40)}» انجام نشد: $msg",
@@ -506,7 +646,7 @@ object DownloadEngine {
     }
 
     private suspend fun transfer(
-        id: Long, title: String, url: String, file: File, knownTotal: Long,
+        id: Long, title: String, url: String, file: File, knownTotal: Long, wifiOnly: Boolean,
         onProgress: (Long, Long) -> Unit
     ) {
         var existing = if (file.exists()) file.length() else 0L
@@ -560,6 +700,11 @@ object DownloadEngine {
                             val now = System.currentTimeMillis()
                             if (now - lastTick >= 400) {
                                 lastTick = now
+                                // اینترنت رفت، یا «فقط وای‌فای» روشنه و روی دیتا افتادیم: همین‌جا قطع کن؛ بالا صبر می‌کنه و ادامه می‌ده
+                                val net = NetworkMonitor.state.value
+                                if (!net.connected || (wifiOnly && !net.unmetered)) {
+                                    throw IOException("ارتباط یا وای‌فای قطع شد")
+                                }
                                 onProgress(done, total)
                                 setLive(id, Live(title, RUNNING, done, total, null))
                             }
@@ -577,11 +722,20 @@ object DownloadEngine {
     }
 }
 
-/** اعلان‌های دانلود (درصد زنده + نتیجه) */
+/** اعلان‌های دانلود (درصد زنده + دکمه‌های توقف/ادامه/لغو + نتیجه) */
 object DownloadNotifications {
     const val PROGRESS_ID = 2001
+    const val ACTION_PAUSE = "com.appdony.app.DL_PAUSE"
+    const val ACTION_PAUSE_ALL = "com.appdony.app.DL_PAUSE_ALL"
+    const val ACTION_RESUME = "com.appdony.app.DL_RESUME"
+    const val ACTION_CANCEL = "com.appdony.app.DL_CANCEL"
+    const val EXTRA_ID = "dl_id"
+
     private const val CH_PROGRESS = "downloads_progress"
     private const val CH_DONE = "downloads_done"
+    private const val CH_PAUSED = "downloads_paused"
+
+    private fun notifId(id: Long): Int = (id % 100000).toInt() + 3000
 
     fun ensureChannels(ctx: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -592,6 +746,9 @@ object DownloadNotifications {
         nm.createNotificationChannel(
             NotificationChannel(CH_DONE, "نتیجه‌ی دانلود", NotificationManager.IMPORTANCE_DEFAULT)
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_PAUSED, "دانلودهای متوقف‌شده", NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
+        )
     }
 
     private fun openApp(ctx: Context): PendingIntent = PendingIntent.getActivity(
@@ -600,8 +757,17 @@ object DownloadNotifications {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    fun progress(ctx: Context, title: String, text: String, percent: Int): Notification =
-        NotificationCompat.Builder(ctx, CH_PROGRESS)
+    private fun action(ctx: Context, act: String, id: Long): PendingIntent {
+        val i = Intent(ctx, DownloadActionReceiver::class.java)
+            .setAction(act)
+            .setData(Uri.parse("appdony://download/$id"))
+            .putExtra(EXTRA_ID, id)
+        return PendingIntent.getBroadcast(ctx, 0, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    /** singleId: اگه فقط یه دانلود فعاله، دکمه‌های «توقف» و «لغو» همون؛ وگرنه «توقف همه» */
+    fun progress(ctx: Context, title: String, text: String, percent: Int, singleId: Long? = null): Notification {
+        val b = NotificationCompat.Builder(ctx, CH_PROGRESS)
             .setSmallIcon(R.drawable.ic_notification_box)
             .setContentTitle(title)
             .setContentText(text)
@@ -612,34 +778,91 @@ object DownloadNotifications {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openApp(ctx))
-            .build()
+        if (singleId != null) {
+            b.addAction(R.drawable.ic_notification_box, "توقف", action(ctx, ACTION_PAUSE, singleId))
+            b.addAction(R.drawable.ic_notification_box, "لغو", action(ctx, ACTION_CANCEL, singleId))
+        } else {
+            b.addAction(R.drawable.ic_notification_box, "توقف همه", action(ctx, ACTION_PAUSE_ALL, 1L))
+        }
+        return b.build()
+    }
 
-    fun result(ctx: Context, id: Long, title: String, text: String) {
+    /** اعلان «متوقف شد» با دکمه‌ی ادامه؛ حتی وقتی سرویس خاموشه از همین اعلان می‌شه ادامه داد */
+    fun paused(ctx: Context, id: Long, title: String) {
         try {
-            val n = NotificationCompat.Builder(ctx, CH_DONE)
+            ensureChannels(ctx)
+            val n = NotificationCompat.Builder(ctx, CH_PAUSED)
+                .setSmallIcon(R.drawable.ic_notification_box)
+                .setContentTitle(title)
+                .setContentText("دانلود متوقف شد")
+                .setOngoing(false)
+                .setOnlyAlertOnce(true)
+                .setSilent(true)
+                .setContentIntent(openApp(ctx))
+                .addAction(R.drawable.ic_notification_box, "ادامه", action(ctx, ACTION_RESUME, id))
+                .addAction(R.drawable.ic_notification_box, "لغو", action(ctx, ACTION_CANCEL, id))
+                .build()
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notifId(id), n)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun cancelResult(ctx: Context, id: Long) {
+        try {
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(notifId(id))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun result(ctx: Context, id: Long, title: String, text: String, retry: Boolean = false) {
+        try {
+            ensureChannels(ctx)
+            val b = NotificationCompat.Builder(ctx, CH_DONE)
                 .setSmallIcon(R.drawable.ic_notification_box)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setAutoCancel(true)
                 .setContentIntent(openApp(ctx))
-                .build()
-            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .notify((id % 100000).toInt() + 3000, n)
+            if (retry) b.addAction(R.drawable.ic_notification_box, "تلاش دوباره", action(ctx, ACTION_RESUME, id))
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notifId(id), b.build())
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 }
 
-/** سرویس پیش‌زمینه: تا وقتی دانلود فعاله پروسه زنده می‌مونه و اعلان درصد/حجم نشون می‌ده */
+/** دکمه‌های اعلان دانلود */
+class DownloadActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getLongExtra(DownloadNotifications.EXTRA_ID, 0L)
+        when (intent.action) {
+            DownloadNotifications.ACTION_PAUSE -> if (id != 0L) DownloadEngine.pause(context, id)
+            DownloadNotifications.ACTION_PAUSE_ALL -> DownloadEngine.pauseAll(context)
+            DownloadNotifications.ACTION_RESUME -> if (id != 0L) DownloadEngine.start(context, id)
+            DownloadNotifications.ACTION_CANCEL -> if (id != 0L) {
+                DownloadEngine.cancelAndDelete(context, id)
+                DownloadNotifications.cancelResult(context, id)
+            }
+        }
+    }
+}
+
+/**
+ * سرویس پیش‌زمینه: تا وقتی دانلود فعاله (یا منتظر اینترنته) پروسه زنده می‌مونه، حتی با بستن برنامه.
+ * START_STICKY: اگه سیستم پروسه رو کشت، سرویس دوباره بالا میاد و دانلودهای نیمه‌کاره ادامه پیدا می‌کنن.
+ */
 class DownloadService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var collector: Job? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        NetworkMonitor.init(this)
         DownloadNotifications.ensureChannels(this)
         val first = DownloadNotifications.progress(this, "اپدونی", "در حال آماده‌سازی دانلود...", -1)
         try {
@@ -650,39 +873,73 @@ class DownloadService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent == null) {
+            // سیستم بعد از کشته شدن پروسه سرویس رو دوباره بالا آورده؛ دانلودهای نیمه‌کاره رو ادامه بده
+            DownloadEngine.resumeInterrupted(this)
+        }
         if (collector == null) {
             collector = scope.launch {
                 DownloadEngine.live.collect { map ->
-                    val active = map.values.filter {
+                    val active = map.filterValues {
                         it.status == DownloadManager.STATUS_PENDING || it.status == DownloadManager.STATUS_RUNNING
                     }
                     if (active.isEmpty()) {
+                        releaseWake()
                         ServiceCompat.stopForeground(this@DownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                         stopSelf()
                         return@collect
                     }
+                    acquireWake()
                     (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                         .notify(DownloadNotifications.PROGRESS_ID, build(active))
                 }
             }
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
-    private fun build(active: List<DownloadEngine.Live>): Notification {
-        if (active.size == 1) {
-            val d = active[0]
-            return if (d.total > 0) {
-                val pct = ((d.bytes * 100) / d.total).toInt()
-                DownloadNotifications.progress(this, d.title, "$pct٪ • ${fmt(d.bytes)} از ${fmt(d.total)}", pct)
-            } else {
-                DownloadNotifications.progress(this, d.title, d.message ?: "در حال دانلود... ${fmt(d.bytes)}", -1)
-            }
+    // اندروید ۱۵: سرویس dataSync بعد از چند ساعت تایم‌اوت می‌شه؛ باید همین‌جا تمومش کنیم
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        DownloadEngine.interruptAll()
+        stopSelf()
+    }
+
+    private fun acquireWake() {
+        try {
+            val wl = wakeLock ?: (getSystemService(Context.POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "appdony:download")
+                .apply { setReferenceCounted(false) }
+                .also { wakeLock = it }
+            if (!wl.isHeld) wl.acquire(10 * 60 * 1000L)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        val total = active.sumOf { it.total }
-        val got = active.sumOf { it.bytes }
-        val pct = if (total > 0 && active.all { it.total > 0 }) ((got * 100) / total).toInt() else -1
-        return DownloadNotifications.progress(this, "${active.size} دانلود در حال انجام", "${fmt(got)} دانلود شده", pct)
+    }
+
+    private fun releaseWake() {
+        try {
+            wakeLock?.takeIf { it.isHeld }?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun build(active: Map<Long, DownloadEngine.Live>): Notification {
+        if (active.size == 1) {
+            val (id, d) = active.entries.first()
+            val pct = if (d.total > 0) ((d.bytes * 100) / d.total).toInt().coerceIn(0, 100) else -1
+            val text = when {
+                d.status == DownloadManager.STATUS_PENDING && !d.message.isNullOrBlank() -> d.message
+                d.total > 0 -> "$pct٪ • ${fmt(d.bytes)} از ${fmt(d.total)}"
+                else -> d.message ?: "در حال دانلود... ${fmt(d.bytes)}"
+            }
+            return DownloadNotifications.progress(this, d.title, text, pct, singleId = id)
+        }
+        val list = active.values
+        val total = list.sumOf { it.total }
+        val got = list.sumOf { it.bytes }
+        val pct = if (total > 0 && list.all { it.total > 0 }) ((got * 100) / total).toInt() else -1
+        return DownloadNotifications.progress(this, "${list.size} دانلود در حال انجام", "${fmt(got)} دانلود شده", pct)
     }
 
     private fun fmt(bytes: Long): String {
@@ -692,6 +949,7 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
+        releaseWake()
         scope.cancel()
         super.onDestroy()
     }
