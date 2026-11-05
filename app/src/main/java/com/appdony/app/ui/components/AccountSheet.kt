@@ -16,13 +16,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +40,8 @@ import androidx.compose.ui.unit.sp
 /**
  * منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد.
  * برای مهمان (بدون حساب): کارت کاربر و «خروج از حساب» مخفی‌اند و به‌جاشون «ورود یا ثبت‌نام» میاد.
- * «ایجاد نوشته» و «ایجاد بلاگ» فقط برای حساب‌هایی که اجازه‌ی نوشتن دارن نشون داده می‌شن (کاربر عادی نمی‌بینه).
+ * «نوشته‌ها» و «بلاگ‌ها» فقط برای حساب‌هایی که اجازه‌ی نوشتن دارن نشون داده می‌شن (کاربر عادی نمی‌بینه).
+ * هرکدوم صفحه‌ی لیست مطالب رو باز می‌کنن؛ ساخت مطلب تازه از همون صفحه با دکمه‌ی «جدید» انجام می‌شه.
  */
 @Composable
 fun AccountSheet(
@@ -49,7 +50,7 @@ fun AccountSheet(
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
     onAbout: () -> Unit, onLogin: () -> Unit, onLogout: () -> Unit,
     canWritePost: Boolean = false, canWriteBlog: Boolean = false,
-    onCreatePost: () -> Unit = {}, onCreateBlog: () -> Unit = {}
+    onPosts: () -> Unit = {}, onBlogs: () -> Unit = {}
 ) {
     FloatingDialog(onDismiss = onDismiss) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -121,10 +122,10 @@ fun AccountSheet(
         }
 
         if (isLoggedIn && canWritePost) {
-            AccountRow(Icons.Outlined.EditNote, "ایجاد نوشته", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onCreatePost() }
+            AccountRow(Icons.Outlined.EditNote, "نوشته‌ها", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onPosts() }
         }
         if (isLoggedIn && canWriteBlog) {
-            AccountRow(Icons.Outlined.PostAdd, "ایجاد بلاگ", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onCreateBlog() }
+            AccountRow(Icons.Outlined.Article, "بلاگ‌ها", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onBlogs() }
         }
         AccountRow(Icons.Outlined.Download, "دانلودها") { onDismiss(); onDownloads() }
         // همون آیکن نشان‌گذاریِ صفحه‌ی جزئیات (BookmarkBorder)
