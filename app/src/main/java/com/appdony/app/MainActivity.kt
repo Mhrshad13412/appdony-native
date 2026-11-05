@@ -61,6 +61,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.appdony.app.data.api.UserAccess
 import com.appdony.app.data.model.UserData
 import com.appdony.app.data.preferences.FontSize
 import com.appdony.app.data.preferences.SettingsManager
@@ -130,6 +131,8 @@ fun AppRoot() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    val canWritePost by sessionManager.canWritePost.collectAsStateWithLifecycle(initialValue = false)
+    val canWriteBlog by sessionManager.canWriteBlog.collectAsStateWithLifecycle(initialValue = false)
 
     var showSplash by remember { mutableStateOf(true) }
     var showLoginSheet by remember { mutableStateOf(false) }
@@ -164,6 +167,8 @@ fun AppRoot() {
             if (id > 0) com.appdony.app.data.api.SupportApi.registerUser(
                 com.appdony.app.data.api.SupportApi.threadOf(id), name
             )
+            // سطح دسترسی نوشتن (ایجاد نوشته / ایجاد بلاگ) رو از وردپرس تازه می‌کنه
+            UserAccess.refresh(context, sessionManager)
         }
     }
 
@@ -235,7 +240,11 @@ fun AppRoot() {
                         onFavorites = { navController.navigate("favorites") { launchSingleTop = true } },
                         onAbout = { showAbout = true },
                         onLogin = { showLoginSheet = true },
-                        onLogout = { scope.launch { sessionManager.clearSession() } }
+                        onLogout = { scope.launch { sessionManager.clearSession() } },
+                        canWritePost = canWritePost,
+                        canWriteBlog = canWriteBlog,
+                        onCreatePost = { navController.navigate("editor/post") { launchSingleTop = true } },
+                        onCreateBlog = { navController.navigate("editor/blog") { launchSingleTop = true } }
                     )
                 }
 
@@ -396,7 +405,8 @@ fun MainContent(
             if (!showAiAssistant) SupportPresence.reset()
         }
         if (showAiAssistant) {
-            val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" && !currentRoute.startsWith("support")
+            val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" &&
+                !currentRoute.startsWith("support") && !currentRoute.startsWith("editor")
             // توی حالت «هوش مصنوعی ثابت» دستیار شناور اصلاً ساخته نمی‌شه؛ ربات و پشتیبان فقط توی دکمه‌ی
             // وسط منو هستن. قبلاً اینجا هم یه آواتار پشتیبان شناور کنار دکمه‌ی وسط ظاهر می‌شد (دوتایی).
             if (!fixedAi) {
