@@ -102,18 +102,38 @@ enum class BlockType(
     EMBED("core/embed", "جاسازی", Icons.Outlined.Public, BlockGroup.EMBED, BlockEditing.URL),
     YOUTUBE("core/embed", "یوتیوب", Icons.Outlined.PlayCircleOutline, BlockGroup.EMBED, BlockEditing.URL),
     TWITTER("core/embed", "ایکس (توییتر)", Icons.Outlined.Public, BlockGroup.EMBED, BlockEditing.URL),
-    TELEGRAM("core/embed", "تلگرام", Icons.Outlined.Send, BlockGroup.EMBED, BlockEditing.URL)
+    TELEGRAM("core/embed", "تلگرام", Icons.Outlined.Send, BlockGroup.EMBED, BlockEditing.URL);
+
+    /** بلوک‌هایی که توی متنشون بولد، کج، خط‌خورده و لینک پشتیبانی می‌شه */
+    val supportsInline: Boolean
+        get() = when (this) {
+            PARAGRAPH, HEADING, LIST, ORDERED_LIST, QUOTE, PULLQUOTE, VERSE -> true
+            else -> false
+        }
 }
+
+/** نوع قالب‌بندی داخل متن */
+enum class SpanKind { BOLD, ITALIC, STRIKE, LINK }
+
+/** یک بازه از متن بلوک ([start] تا [end] بدون خودش) که قالب‌بندی داره؛ برای لینک، [url] آدرسشه */
+data class InlineSpan(
+    val start: Int,
+    val end: Int,
+    val kind: SpanKind,
+    val url: String = ""
+)
 
 /**
  * یک بلوک توی ادیتور. [text] متن اصلیه (برای دکمه: متن دکمه، برای جاسازی: آدرس، برای تصویر: «شناسه|آدرس»)
  * و [extra] مقدار دومه (سرنویس: سطح ۲/۳/۴، دکمه: لینک، تصویر: متن جایگزین alt).
+ * [spans] قالب‌بندی داخل متنه (بولد، کج، خط‌خورده، لینک) و موقعیتشون نسبت به [text] حساب می‌شه.
  */
 data class EditorBlock(
     val id: Long,
     val type: BlockType,
     val text: String = "",
-    val extra: String = ""
+    val extra: String = "",
+    val spans: List<InlineSpan> = emptyList()
 )
 
 /**
