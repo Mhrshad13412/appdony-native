@@ -65,10 +65,14 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +86,7 @@ import com.appdony.app.data.model.BlockSerializer
 import com.appdony.app.data.model.BlockType
 import com.appdony.app.data.model.EditorBlock
 import com.appdony.app.data.model.ImageData
+import com.appdony.app.data.model.InlineFormat
 
 // ───────────────────────── بلوک آزاد (مثل وردپرس: بدون کادر و رنگ) ─────────────────────────
 
@@ -509,7 +514,7 @@ private fun hintOf(type: BlockType): String = when (type) {
     else -> "https://…"
 }
 
-/** یک فیلد متنیِ بلوک؛ فوکوس، بک‌اسپیسِ بلوک خالی و راهنمای خالی بودن رو مدیریت می‌کنه */
+/** یک فیلد متنیِ بلوک؛ فوکوس، بک‌اسپیسِ بلوک خالی، راهنمای خالی بودن و قالب‌بندی (بولد، کج، خط‌خورده، لینک) رو مدیریت می‌کنه */
 @Composable
 private fun BlockField(
     vm: EditorViewModel,
@@ -522,10 +527,12 @@ private fun BlockField(
     main: Boolean = true,
     singleLine: Boolean = false,
     hintColor: Color = Color.Unspecified,
+    formattable: Boolean = false,
     onChange: (String) -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
     val requester = remember { FocusRequester() }
+    val toolbar = LocalTextToolbar.current as? EditorTextToolbar
     if (main) {
         val pending = vm.pendingFocusId
         LaunchedEffect(pending) {
@@ -537,17 +544,54 @@ private fun BlockField(
         }
     }
     val placeholderColor = if (hintColor == Color.Unspecified) scheme.onSurfaceVariant.copy(alpha = 0.6f) else hintColor
+
+    // متن + جای مکان‌نما و انتخاب؛ اگه متن از بیرون عوض شد (مثلاً اینتر)، با اون هماهنگ می‌شه
+    var stored by remember { mutableStateOf(TextFieldValue(value)) }
+    val shown = if (stored.text == value) {
+        stored
+    } else {
+        TextFieldValue(value, TextRange(stored.selection.end.coerceIn(0, value.length)))
+    }
+
+    val transformation = if (formattable) {
+        rememberSpanTransformation(vm, block.id, block.spans, 0, value.length)
+    } else {
+        VisualTransformation.None
+    }
+
+    fun report(selection: TextRange) {
+        if (toolbar?.linkMode == true) return
+        if (formattable && !readOnly) {
+            vm.reportSelection(block.id, selection.min, selection.max)
+        } else {
+            vm.clearSelection(block.id)
+        }
+    }
+
     BasicTextField(
-        value = value,
-        onValueChange = onChange,
+        value = shown,
+        onValueChange = { new ->
+            val textChanged = new.text != shown.text
+            stored = new
+            if (textChanged) onChange(new.text)
+            report(new.selection)
+        },
         readOnly = readOnly,
         singleLine = singleLine,
         textStyle = style,
         cursorBrush = SolidColor(scheme.primary),
+        visualTransformation = transformation,
         modifier = modifier
             .fillMaxWidth()
             .focusRequester(requester)
-            .onFocusChanged { if (it.isFocused) vm.focusedId = block.id }
+            .onFocusChanged {
+                if (it.isFocused) {
+                    vm.focusedId = block.id
+                    report(shown.selection)
+                } else if (toolbar?.linkMode != true) {
+                    vm.clearSelection(block.id)
+                }
+            }
             .onPreviewKeyEvent { event ->
                 if (main && event.type == KeyEventType.KeyDown && event.key == Key.Backspace && value.isEmpty()) {
                     vm.removeEmptyAndFocusPrevious(block.id)
@@ -574,7 +618,9 @@ private fun BlockField(
 private fun ListEditor(block: EditorBlock, vm: EditorViewModel, style: TextStyle, preview: Boolean) {
     val items = block.text.split('\n')
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        var offset = 0
         items.forEachIndexed { index, item ->
+            val start = offset
             key(index) {
                 ListItemRow(
                     block = block,
@@ -582,10 +628,12 @@ private fun ListEditor(block: EditorBlock, vm: EditorViewModel, style: TextStyle
                     index = index,
                     count = items.size,
                     value = item,
+                    offset = start,
                     style = style,
                     preview = preview
                 )
             }
+            offset += item.length + 1
         }
     }
 }
@@ -597,11 +645,27 @@ private fun ListItemRow(
     index: Int,
     count: Int,
     value: String,
+    offset: Int,
     style: TextStyle,
     preview: Boolean
 ) {
     val scheme = MaterialTheme.colorScheme
     val requester = remember { FocusRequester() }
+    val toolbar = LocalTextToolbar.current as? EditorTextToolbar
+    var stored by remember { mutableStateOf(TextFieldValue(value)) }
+    val shown = if (stored.text == value) {
+        stored
+    } else {
+        TextFieldValue(value, TextRange(stored.selection.end.coerceIn(0, value.length)))
+    }
+    val transformation = rememberSpanTransformation(vm, block.id, block.spans, offset, value.length)
+    val localSpans = remember(block.spans, offset, value.length) {
+        InlineFormat.slice(block.spans, offset, offset + value.length)
+    }
+    fun report(selection: TextRange) {
+        if (toolbar?.linkMode == true) return
+        if (!preview) vm.reportSelection(block.id, selection.min + offset, selection.max + offset)
+    }
 
     val pendingItem = vm.pendingListFocus
     LaunchedEffect(pendingItem) {
@@ -629,30 +693,47 @@ private fun ListItemRow(
             modifier = Modifier.width(26.dp)
         )
         if (preview) {
-            Text(text = value, style = style, modifier = Modifier.weight(1f))
+            Text(
+                text = styledText(value, localSpans, scheme.primary),
+                style = style,
+                modifier = Modifier.weight(1f)
+            )
         } else {
             BasicTextField(
-                value = value,
-                onValueChange = { raw ->
-                    if (raw.contains('\n')) {
-                        val cut = raw.indexOf('\n')
-                        val before = raw.substring(0, cut)
-                        val after = raw.substring(cut + 1).replace("\n", " ")
-                        when {
-                            before.isEmpty() && after.isEmpty() && count == 1 -> vm.setListItem(block.id, index, "")
-                            before.isEmpty() && after.isEmpty() && index == count - 1 -> vm.exitList(block.id)
-                            else -> vm.splitListItem(block.id, index, before, after)
+                value = shown,
+                onValueChange = { new ->
+                    val raw = new.text
+                    stored = new
+                    if (raw != shown.text) {
+                        if (raw.contains('\n')) {
+                            val cut = raw.indexOf('\n')
+                            val before = raw.substring(0, cut)
+                            val after = raw.substring(cut + 1).replace("\n", " ")
+                            when {
+                                before.isEmpty() && after.isEmpty() && count == 1 -> vm.setListItem(block.id, index, "")
+                                before.isEmpty() && after.isEmpty() && index == count - 1 -> vm.exitList(block.id)
+                                else -> vm.splitListItem(block.id, index, before, after)
+                            }
+                        } else {
+                            vm.setListItem(block.id, index, raw)
                         }
-                    } else {
-                        vm.setListItem(block.id, index, raw)
                     }
+                    report(new.selection)
                 },
                 textStyle = style,
                 cursorBrush = SolidColor(scheme.primary),
+                visualTransformation = transformation,
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(requester)
-                    .onFocusChanged { if (it.isFocused) vm.focusedId = block.id }
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            vm.focusedId = block.id
+                            report(shown.selection)
+                        } else if (toolbar?.linkMode != true) {
+                            vm.clearSelection(block.id)
+                        }
+                    }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Backspace && value.isEmpty()) {
                             vm.removeListItem(block.id, index)
@@ -692,7 +773,7 @@ private fun BlockBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean,
             }
             // اینتر توی پاراگراف و سرنویس یه پاراگراف تازه می‌سازه؛ شعر خط جدید می‌گیره
             val splitsOnEnter = type == BlockType.PARAGRAPH || type == BlockType.HEADING
-            BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview) { new ->
+            BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview, formattable = type.supportsInline) { new ->
                 if (splitsOnEnter && new.contains('\n')) vm.splitAtNewline(block.id, new) else vm.updateText(block.id, new)
             }
         }
@@ -711,7 +792,7 @@ private fun BlockBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean,
                     }
                     .padding(horizontal = 14.dp)
             ) {
-                BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview) {
+                BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview, formattable = type.supportsInline) {
                     vm.updateText(block.id, it)
                 }
             }
