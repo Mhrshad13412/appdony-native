@@ -16,12 +16,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -116,7 +116,8 @@ fun AccountSheet(
         }
 
         AccountRow(Icons.Outlined.Download, "دانلودها") { onDismiss(); onDownloads() }
-        AccountRow(Icons.Outlined.StarBorder, "علاقه‌مندی‌ها") { onDismiss(); onFavorites() }
+        // همون آیکن نشان‌گذاریِ صفحه‌ی جزئیات (BookmarkBorder)
+        AccountRow(Icons.Outlined.BookmarkBorder, "نشان‌گذاری‌ها") { onDismiss(); onFavorites() }
         AccountRow(Icons.Outlined.Settings, "تنظیمات") { onDismiss(); onSettings() }
         AccountRow(Icons.Outlined.Info, "درباره اپدونی") { onDismiss(); onAbout() }
         if (isLoggedIn) {
