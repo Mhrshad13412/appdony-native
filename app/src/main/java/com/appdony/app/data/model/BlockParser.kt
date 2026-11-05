@@ -198,7 +198,11 @@ object BlockParser {
         if (content.contains("<ul") || content.contains("<ol")) return null
         val leftover = content.replace(COMMENT, "").replace(LI_ITEM, "").trim()
         if (leftover.isNotEmpty()) return null
-        val items = LI_ITEM.findAll(content).map { plain(it.groupValues[1]) ?: return null }.toList()
+        val items = ArrayList<String>()
+        for (match in LI_ITEM.findAll(content)) {
+            val text = plain(match.groupValues[1]) ?: return null
+            items.add(text)
+        }
         if (items.isEmpty() || items.any { it.contains('\n') }) return null
         return block(if (ordered) BlockType.ORDERED_LIST else BlockType.LIST, items.joinToString("\n"))
     }
@@ -208,7 +212,11 @@ object BlockParser {
         val content = m.groupValues[1]
         val leftover = content.replace(COMMENT, "").replace(P_ITEM, "").trim()
         if (leftover.isNotEmpty()) return null
-        val paragraphs = P_ITEM.findAll(content).map { plain(it.groupValues[1]) ?: return null }.toList()
+        val paragraphs = ArrayList<String>()
+        for (match in P_ITEM.findAll(content)) {
+            val text = plain(match.groupValues[1]) ?: return null
+            paragraphs.add(text)
+        }
         if (paragraphs.isEmpty() || paragraphs.any { it.contains('\n') }) return null
         return block(BlockType.QUOTE, paragraphs.joinToString("\n"))
     }
