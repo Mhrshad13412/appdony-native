@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -101,7 +101,7 @@ fun FavoritesScreen(
             }
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "علاقه‌مندی‌ها",
+                text = "نشان‌گذاری‌ها",
                 color = AppdonyTextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
@@ -118,20 +118,20 @@ fun FavoritesScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.Favorite,
+                            imageVector = Icons.Default.Bookmark,
                             contentDescription = null,
                             tint = AppdonyTextMuted,
                             modifier = Modifier.size(56.dp)
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "هنوز چیزی ذخیره نکردی",
+                            text = "هنوز چیزی نشان‌گذاری نکردی",
                             color = AppdonyTextMuted,
                             fontSize = 14.sp
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "تو صفحه هر برنامه، قلب رو بزن",
+                            text = "تو صفحه هر برنامه، نشان رو بزن",
                             color = AppdonyTextMuted,
                             fontSize = 12.sp
                         )
