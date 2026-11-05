@@ -101,6 +101,23 @@ object BlockSerializer {
                 wrap("buttons", null, "<div class=\"wp-block-buttons\">$button</div>")
             }
 
+            BlockType.IMAGE -> {
+                val url = ImageData.url(block.text)
+                if (url.isEmpty()) return null
+                val id = ImageData.mediaId(block.text)
+                val attrs = if (id > 0) {
+                    "{\"id\":$id,\"sizeSlug\":\"large\",\"linkDestination\":\"none\"}"
+                } else {
+                    "{\"sizeSlug\":\"large\",\"linkDestination\":\"none\"}"
+                }
+                val cls = if (id > 0) " class=\"wp-image-$id\"" else ""
+                wrap(
+                    "image",
+                    attrs,
+                    "<figure class=\"wp-block-image size-large\"><img src=\"${attr(url)}\" alt=\"${attr(block.extra.trim())}\"$cls/></figure>"
+                )
+            }
+
             BlockType.SEPARATOR -> wrap(
                 "separator",
                 null,
