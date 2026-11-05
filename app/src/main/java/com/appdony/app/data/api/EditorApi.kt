@@ -23,17 +23,47 @@ data class SavedPost(val id: Long, val link: String, val status: String, val not
 
 data class UploadedMedia(val id: Long, val url: String)
 
+/** یک ردیف از لیست «نوشته‌ها / بلاگ‌ها» */
+data class PostRow(
+    val id: Long,
+    val title: String,
+    val status: String,
+    val date: String,
+    val thumb: String?
+)
+
+/** یک صفحه از لیست. [all] = true یعنی همه‌ی مطالب (مدیر/ویرایشگر)، false یعنی فقط مطالب خود کاربر */
+data class PostPage(val rows: List<PostRow>, val hasMore: Boolean, val all: Boolean)
+
+/** اطلاعات کامل یک مطلب برای باز شدن توی ادیتور */
+data class RemotePost(
+    val id: Long,
+    val title: String,
+    val content: String,
+    val status: String,
+    val link: String,
+    val featuredId: Long?,
+    val featuredUrl: String?,
+    val slug: String,
+    val date: String,
+    val excerpt: String,
+    val commentsOpen: Boolean,
+    val categoryIds: Set<Int>
+)
+
 /** خطایی که پیامش فارسی و آماده‌ی نمایش به کاربره */
 class EditorException(message: String) : Exception(message)
 
 /**
- * ذخیره‌ی نوشته/وبلاگ، دسته‌ها و آپلود تصویر با REST وردپرس. احراز هویت با کوکی‌های نشست + هدر X-WP-Nonce؛
- * اگه نانس منقضی شده بود یه بار تازه می‌گیره و اگه باز نشد با اطلاعات ذخیره‌شده دوباره وارد می‌شه.
+ * ذخیره‌ی نوشته/وبلاگ، لیست و خوندن مطالب، دسته‌ها و آپلود تصویر با REST وردپرس.
+ * احراز هویت با کوکی‌های نشست + هدر X-WP-Nonce؛ اگه نانس منقضی شده بود یه بار تازه می‌گیره
+ * و اگه باز نشد با اطلاعات ذخیره‌شده دوباره وارد می‌شه.
  */
 object EditorApi {
 
     private const val SITE = "https://appdony.ir"
     private const val NONCE_URL = "$SITE/wp-admin/admin-ajax.php?action=rest-nonce"
+    private const val PAGE_SIZE = 20
     private const val UA =
         "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
     private val NONCE_REGEX = Regex("^[A-Za-z0-9]{6,20}$")
@@ -132,6 +162,171 @@ object EditorApi {
             blogRoute = found
         }
         return found
+    }
+
+    // ───────────── لیست مطالب ─────────────
+
+    /**
+     * یک صفحه از مطالب. اگه کاربر اجازه‌ی ویرایش مطالب دیگران رو داشته باشه (مدیر، ویرایشگر) همه رو می‌گیره،
+     * وگرنه فقط مطالب خودش رو. هیچ چیزی روی گوشی ذخیره نمی‌شه.
+     */
+    suspend fun list(context: Context, kind: String, page: Int): Result<PostPage> = withContext(Dispatchers.IO) {
+        try {
+            val base = route(context, kind)
+            val (me, all) = access(context, kind)
+            val url = buildString {
+                append(base)
+                append("?context=edit&per_page=").append(PAGE_SIZE).append("&page=").append(page)
+                append("&orderby=date&order=desc&status=publish,future,draft,pending,private")
+                append("&_fields=id,title,status,date,featured_media")
+                if (!all) append("&author=").append(me)
+            }
+            val reply = send(context) { nonce -> authed(Request.Builder().url(url), nonce).get().build() }
+            if (reply.code == 400 && reply.body.contains("rest_post_invalid_page_number")) {
+                return@withContext Result.success(PostPage(emptyList(), false, all))
+            }
+            if (reply.code !in 200..299) throw EditorException(explain(kind, reply, upload = false))
+
+            val items = JsonParser.parseString(reply.body).asJsonArray.map { it.asJsonObject }
+            val featuredIds = items.mapNotNull { featuredOf(it) }
+            val thumbs = thumbnails(context, featuredIds)
+            val rows = items.map { o ->
+                val title = HtmlCompat.fromHtml(field(o, "title"), HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
+                PostRow(
+                    id = o.get("id").asLong,
+                    title = title.ifBlank { "(بدون عنوان)" },
+                    status = o.get("status")?.asString.orEmpty(),
+                    date = o.get("date")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty(),
+                    thumb = featuredOf(o)?.let { thumbs[it] }
+                )
+            }
+            Result.success(PostPage(rows, rows.size >= PAGE_SIZE, all))
+        } catch (e: EditorException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(EditorException("لیست گرفته نشد: ${e.message ?: "خطای ناشناخته"}"))
+        }
+    }
+
+    /** شناسه‌ی کاربر و اینکه اجازه‌ی ویرایش مطالب دیگران رو داره یا نه */
+    private suspend fun access(context: Context, kind: String): Pair<Long, Boolean> {
+        val reply = send(context) { nonce ->
+            authed(
+                Request.Builder().url("$SITE/wp-json/wp/v2/users/me?context=edit&_fields=id,capabilities"),
+                nonce
+            ).get().build()
+        }
+        if (reply.code !in 200..299) throw EditorException(explain(kind, reply, upload = false))
+        val o = JsonParser.parseString(reply.body).asJsonObject
+        val id = o.get("id").asLong
+        val caps = o.get("capabilities")?.takeIf { it.isJsonObject }?.asJsonObject
+        fun has(key: String): Boolean {
+            val e = caps?.get(key) ?: return false
+            return e.isJsonPrimitive && runCatching { e.asBoolean }.getOrDefault(false)
+        }
+        val all = if (kind == "blog") has("edit_others_blogs") || has("edit_others_posts") else has("edit_others_posts")
+        return id to all
+    }
+
+    private fun featuredOf(o: JsonObject): Long? =
+        o.get("featured_media")?.takeIf { it.isJsonPrimitive }?.asLong?.takeIf { it > 0 }
+
+    /** مقدار یه فیلد REST که یا رشته‌ست یا {raw, rendered} */
+    private fun field(o: JsonObject, key: String): String {
+        val e = o.get(key) ?: return ""
+        if (e.isJsonPrimitive) return e.asString
+        if (!e.isJsonObject) return ""
+        val j = e.asJsonObject
+        val v = j.get("raw")?.takeIf { it.isJsonPrimitive } ?: j.get("rendered")?.takeIf { it.isJsonPrimitive }
+        return v?.asString.orEmpty()
+    }
+
+    /** آدرس تصویرک‌ها؛ اگه نشد لیست بدون تصویر نشون داده می‌شه */
+    private suspend fun thumbnails(context: Context, ids: List<Long>): Map<Long, String> {
+        if (ids.isEmpty()) return emptyMap()
+        return try {
+            val include = ids.distinct().joinToString(",")
+            val reply = send(context) { nonce ->
+                authed(
+                    Request.Builder()
+                        .url("$SITE/wp-json/wp/v2/media?include=$include&per_page=$PAGE_SIZE&_fields=id,source_url,media_details"),
+                    nonce
+                ).get().build()
+            }
+            if (reply.code !in 200..299) return emptyMap()
+            val out = HashMap<Long, String>()
+            JsonParser.parseString(reply.body).asJsonArray.forEach { e ->
+                val o = e.asJsonObject
+                val id = o.get("id")?.asLong ?: return@forEach
+                val thumb = runCatching {
+                    o.getAsJsonObject("media_details").getAsJsonObject("sizes")
+                        .getAsJsonObject("thumbnail").get("source_url").asString
+                }.getOrNull()
+                val url = thumb ?: o.get("source_url")?.takeIf { it.isJsonPrimitive }?.asString
+                if (!url.isNullOrBlank()) out[id] = url
+            }
+            out
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    // ───────────── خوندن یک مطلب ─────────────
+
+    /** عنوان، محتوا، وضعیت، تصویر شاخص و تنظیمات یک مطلب (context=edit) */
+    suspend fun fetch(context: Context, kind: String, id: Long): Result<RemotePost> = withContext(Dispatchers.IO) {
+        try {
+            val base = route(context, kind)
+            val reply = send(context) { nonce ->
+                authed(Request.Builder().url("$base/$id?context=edit"), nonce).get().build()
+            }
+            if (reply.code !in 200..299) throw EditorException(explain(kind, reply, upload = false))
+
+            val o = JsonParser.parseString(reply.body).asJsonObject
+            val status = o.get("status")?.takeIf { it.isJsonPrimitive }?.asString ?: "draft"
+            val featuredId = featuredOf(o)
+            val featuredUrl = if (featuredId != null) mediaUrl(context, featuredId) else null
+            // تاریخ فقط برای مطلب‌های منتشرشده/زمان‌بندی‌شده/خصوصی پر می‌شه؛ پیش‌نویس «همین حالا» می‌مونه
+            val dated = status == "publish" || status == "future" || status == "private"
+            val date = if (dated) {
+                o.get("date")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty().replace('T', ' ').take(16)
+            } else ""
+            val categories = o.get("categories")?.takeIf { it.isJsonArray }?.asJsonArray
+                ?.mapNotNull { runCatching { it.asInt }.getOrNull() }?.toSet() ?: emptySet()
+
+            Result.success(
+                RemotePost(
+                    id = o.get("id").asLong,
+                    title = field(o, "title"),
+                    content = field(o, "content"),
+                    status = status,
+                    link = o.get("link")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty(),
+                    featuredId = featuredId,
+                    featuredUrl = featuredUrl,
+                    slug = o.get("slug")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty(),
+                    date = date,
+                    excerpt = field(o, "excerpt"),
+                    commentsOpen = (o.get("comment_status")?.takeIf { it.isJsonPrimitive }?.asString ?: "open") == "open",
+                    categoryIds = categories
+                )
+            )
+        } catch (e: EditorException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(EditorException("مطلب گرفته نشد: ${e.message ?: "خطای ناشناخته"}"))
+        }
+    }
+
+    private suspend fun mediaUrl(context: Context, id: Long): String? = try {
+        val reply = send(context) { nonce ->
+            authed(Request.Builder().url("$SITE/wp-json/wp/v2/media/$id?_fields=source_url"), nonce).get().build()
+        }
+        if (reply.code in 200..299) {
+            JsonParser.parseString(reply.body).asJsonObject.get("source_url")
+                ?.takeIf { it.isJsonPrimitive }?.asString?.ifBlank { null }
+        } else null
+    } catch (e: Exception) {
+        null
     }
 
     // ───────────── دسته‌ها ─────────────
