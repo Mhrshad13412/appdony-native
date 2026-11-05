@@ -167,7 +167,7 @@ fun AppRoot() {
             if (id > 0) com.appdony.app.data.api.SupportApi.registerUser(
                 com.appdony.app.data.api.SupportApi.threadOf(id), name
             )
-            // سطح دسترسی نوشتن (ایجاد نوشته / ایجاد بلاگ) رو از وردپرس تازه می‌کنه
+            // سطح دسترسی نوشتن (نوشته‌ها / بلاگ‌ها) رو از وردپرس تازه می‌کنه
             UserAccess.refresh(context, sessionManager)
         }
     }
@@ -243,8 +243,8 @@ fun AppRoot() {
                         onLogout = { scope.launch { sessionManager.clearSession() } },
                         canWritePost = canWritePost,
                         canWriteBlog = canWriteBlog,
-                        onCreatePost = { navController.navigate("editor/post") { launchSingleTop = true } },
-                        onCreateBlog = { navController.navigate("editor/blog") { launchSingleTop = true } }
+                        onPosts = { navController.navigate("posts/post") { launchSingleTop = true } },
+                        onBlogs = { navController.navigate("posts/blog") { launchSingleTop = true } }
                     )
                 }
 
@@ -400,13 +400,14 @@ fun MainContent(
             )
         }
 
-        // دکتر طاعون روی کل اپ (همه‌ی صفحه‌ها)، جز صفحه‌ی خود چت
+        // دکتر طاعون روی کل اپ (همه‌ی صفحه‌ها)، جز صفحه‌ی خود چت و صفحه‌های نوشتن (لیست مطالب و ادیتور)
         LaunchedEffect(showAiAssistant) {
             if (!showAiAssistant) SupportPresence.reset()
         }
         if (showAiAssistant) {
             val assistantVisible = currentRoute != "ai_chat" && currentRoute != "chat" &&
-                !currentRoute.startsWith("support") && !currentRoute.startsWith("editor")
+                !currentRoute.startsWith("support") && !currentRoute.startsWith("editor") &&
+                !currentRoute.startsWith("posts")
             // توی حالت «هوش مصنوعی ثابت» دستیار شناور اصلاً ساخته نمی‌شه؛ ربات و پشتیبان فقط توی دکمه‌ی
             // وسط منو هستن. قبلاً اینجا هم یه آواتار پشتیبان شناور کنار دکمه‌ی وسط ظاهر می‌شد (دوتایی).
             if (!fixedAi) {
