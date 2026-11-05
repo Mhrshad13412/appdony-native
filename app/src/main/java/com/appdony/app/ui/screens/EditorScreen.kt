@@ -105,6 +105,7 @@ import com.appdony.app.data.model.SeoInfo
 import com.appdony.app.data.model.WpCategory
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
+import com.appdony.app.ui.components.EditorLoadSkeleton
 import com.appdony.app.ui.components.FloatingDialog
 import com.appdony.app.ui.components.glassKnob
 import com.appdony.app.ui.components.glassSelectedIconTint
@@ -873,7 +874,7 @@ fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
     }
 }
 
-/** صفحه‌ی گرفتن مطلب از سایت: چرخان تا بیاد؛ اگه نشد پیام + «تلاش دوباره» و «بازگشت» */
+/** صفحه‌ی گرفتن مطلب از سایت: اسکلتِ نورانی تا بیاد؛ اگه نشد پیام + «تلاش دوباره» و «بازگشت» */
 @Composable
 private fun LoadOverlay(error: String?, onRetry: () -> Unit, onBack: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
@@ -888,11 +889,7 @@ private fun LoadOverlay(error: String?, onRetry: () -> Unit, onBack: () -> Unit)
         contentAlignment = Alignment.Center
     ) {
         if (error == null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = scheme.primary)
-                Spacer(Modifier.height(12.dp))
-                Text("در حال گرفتن مطلب از سایت…", color = scheme.onSurfaceVariant, fontSize = 13.sp)
-            }
+            EditorLoadSkeleton()
         } else {
             Column(
                 modifier = Modifier.padding(32.dp),
