@@ -1,6 +1,8 @@
 package com.appdony.app.ui.screens
 
 import android.content.Context
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +59,8 @@ import com.appdony.app.data.api.EditorApi
 import com.appdony.app.data.api.PostRow
 import com.appdony.app.ui.components.AppBanner
 import com.appdony.app.ui.components.BannerKind
+import com.appdony.app.ui.components.PostListSkeleton
+import com.appdony.app.ui.components.PostRowSkeleton
 import com.appdony.app.ui.components.glassKnob
 import com.appdony.app.ui.components.glassSelectedIconTint
 import com.appdony.app.ui.components.glassTrack
@@ -211,67 +215,75 @@ fun PostListScreen(
             }
         }
 
-        Box(modifier = Modifier.weight(1f)) {
-            val error = vm.error
-            when {
-                !vm.loadedOnce && error == null -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = scheme.primary)
-                }
+        // حالت صفحه: بین حالت‌ها نرم محو می‌شه (لودینگ ← لیست)
+        val error = vm.error
+        val pageState = when {
+            !vm.loadedOnce && error == null -> 0
+            !vm.loadedOnce -> 1
+            vm.rows.isEmpty() -> 2
+            else -> 3
+        }
+        Crossfade(
+            targetState = pageState,
+            animationSpec = tween(280),
+            modifier = Modifier.weight(1f),
+            label = "post_list_state"
+        ) { state ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (state) {
+                    0 -> PostListSkeleton()
 
-                !vm.loadedOnce && error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = error, color = scheme.error, fontSize = 14.sp, textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = { vm.refresh(ctx, kind) }) { Text("تلاش دوباره") }
-                    }
-                }
-
-                vm.rows.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Outlined.EditNote, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(44.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = if (vm.scopeAll) "هنوز مطلبی وجود نداره" else "هنوز چیزی ننوشتی",
-                            color = scheme.onSurface,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "با دکمه‌ی «جدید» اولین مطلب رو بساز",
-                            color = scheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-
-                else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(vm.rows, key = { it.id }) { row ->
-                            PostRowCard(row = row, onClick = { onOpen(row.id) })
+                    1 -> {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(text = error.orEmpty(), color = scheme.error, fontSize = 14.sp, textAlign = TextAlign.Center)
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = { vm.refresh(ctx, kind) }) { Text("تلاش دوباره") }
                         }
-                        if (vm.loadingMore) {
-                            item(key = "more") {
-                                Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = scheme.primary)
-                                }
+                    }
+
+                    2 -> {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Outlined.EditNote, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(44.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = if (vm.scopeAll) "هنوز مطلبی وجود نداره" else "هنوز چیزی ننوشتی",
+                                color = scheme.onSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "با دکمه‌ی «جدید» اولین مطلب رو بساز",
+                                color = scheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(vm.rows, key = { it.id }) { row ->
+                                PostRowCard(row = row, onClick = { onOpen(row.id) })
+                            }
+                            if (vm.loadingMore) {
+                                item(key = "more") { PostRowSkeleton() }
                             }
                         }
                     }
