@@ -22,6 +22,9 @@ class SessionManager(private val context: Context) {
         private val KEY_EMAIL = stringPreferencesKey("email")
         private val KEY_AVATAR = stringPreferencesKey("avatar_url")
         private val KEY_NONCE = stringPreferencesKey("nonce")
+        // دسترسی نوشتن: «نوشته» و «وبلاگ» (از قابلیت‌های حساب در وردپرس خونده می‌شه)
+        private val KEY_CAN_POST = booleanPreferencesKey("can_write_post")
+        private val KEY_CAN_BLOG = booleanPreferencesKey("can_write_blog")
     }
 
     val isLoggedIn: Flow<Boolean> =
@@ -45,6 +48,12 @@ class SessionManager(private val context: Context) {
     val nonce: Flow<String> =
         context.sessionDataStore.data.map { it[KEY_NONCE] ?: "" }
 
+    val canWritePost: Flow<Boolean> =
+        context.sessionDataStore.data.map { (it[KEY_LOGGED_IN] ?: false) && (it[KEY_CAN_POST] ?: false) }
+
+    val canWriteBlog: Flow<Boolean> =
+        context.sessionDataStore.data.map { (it[KEY_LOGGED_IN] ?: false) && (it[KEY_CAN_BLOG] ?: false) }
+
     suspend fun saveSession(
         userId: Int,
         username: String,
@@ -61,6 +70,14 @@ class SessionManager(private val context: Context) {
             it[KEY_EMAIL] = email
             it[KEY_AVATAR] = avatarUrl
             it[KEY_NONCE] = nonce
+        }
+    }
+
+    /** سطح دسترسی نوشتن رو ذخیره می‌کنه (بعد از ورود یا تازه‌سازی نشست) */
+    suspend fun saveWriteAccess(canPost: Boolean, canBlog: Boolean) {
+        context.sessionDataStore.edit {
+            it[KEY_CAN_POST] = canPost
+            it[KEY_CAN_BLOG] = canBlog
         }
     }
 
@@ -83,6 +100,8 @@ class SessionManager(private val context: Context) {
             it[KEY_EMAIL] = ""
             it[KEY_AVATAR] = ""
             it[KEY_NONCE] = ""
+            it[KEY_CAN_POST] = false
+            it[KEY_CAN_BLOG] = false
         }
     }
 }
