@@ -50,6 +50,7 @@ enum class BlockEditing {
     CODE,        // متن چپ‌چین و تک‌فاصله
     BUTTON,      // متن دکمه + لینک
     URL,         // فقط یک آدرس
+    IMAGE,       // تصویر: انتخاب از گالری + متن جایگزین (alt)
     DIVIDER,     // بدون متن (خط جداکننده، فاصله و ...)
     PLACEHOLDER  // کارت جایگزین؛ ویرایش کاملش توی مرحله‌های بعد میاد
 }
@@ -77,7 +78,7 @@ enum class BlockType(
     VERSE("core/verse", "شعر", Icons.Outlined.MenuBook, BlockGroup.TEXT, BlockEditing.PARAGRAPH),
     TABLE("core/table", "جدول", Icons.Outlined.TableChart, BlockGroup.TEXT, BlockEditing.PLACEHOLDER),
 
-    IMAGE("core/image", "تصویر", Icons.Outlined.Image, BlockGroup.MEDIA, BlockEditing.PLACEHOLDER),
+    IMAGE("core/image", "تصویر", Icons.Outlined.Image, BlockGroup.MEDIA, BlockEditing.IMAGE),
     GALLERY("core/gallery", "گالری", Icons.Outlined.Collections, BlockGroup.MEDIA, BlockEditing.PLACEHOLDER),
     AUDIO("core/audio", "صوت", Icons.Outlined.MusicNote, BlockGroup.MEDIA, BlockEditing.PLACEHOLDER),
     VIDEO("core/video", "ویدیو", Icons.Outlined.Videocam, BlockGroup.MEDIA, BlockEditing.PLACEHOLDER),
@@ -105,8 +106,8 @@ enum class BlockType(
 }
 
 /**
- * یک بلوک توی ادیتور. [text] متن اصلیه (برای دکمه: متن دکمه، برای جاسازی: آدرس)
- * و [extra] مقدار دومه (سرنویس: سطح ۲/۳/۴، دکمه: لینک).
+ * یک بلوک توی ادیتور. [text] متن اصلیه (برای دکمه: متن دکمه، برای جاسازی: آدرس، برای تصویر: «شناسه|آدرس»)
+ * و [extra] مقدار دومه (سرنویس: سطح ۲/۳/۴، دکمه: لینک، تصویر: متن جایگزین alt).
  */
 data class EditorBlock(
     val id: Long,
