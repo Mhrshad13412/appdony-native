@@ -34,6 +34,7 @@ object MetaApi {
     private val CHECKED = Regex("(?<![\\w-])checked\\b", RegexOption.IGNORE_CASE)
     private val SELECTED = Regex("(?<![\\w-])selected\\b", RegexOption.IGNORE_CASE)
     private val OPTION = Regex("<option\\b([^>]*)>", RegexOption.IGNORE_CASE)
+    private val POST_ID = Regex("name\\s*=\\s*[\"']post_ID[\"']", RegexOption.IGNORE_CASE)
 
     private class Page(val html: String, val fields: Map<String, String>)
 
@@ -227,16 +228,26 @@ object MetaApi {
             .header("User-Agent", UA)
             .get()
             .build()
+        var finalPath = ""
         val html = try {
             client.newCall(request).execute().use { resp ->
+                finalPath = resp.request.url.encodedPath
+                if (resp.code == 403) throw EditorException("سایت دسترسی این حساب به صفحه‌ی ویرایش رو بسته (کد 403).")
                 if (!resp.isSuccessful) throw EditorException("صفحه‌ی ویرایش باز نشد (کد ${resp.code}).")
                 resp.body?.string().orEmpty()
             }
         } catch (e: IOException) {
             throw EditorException("اینترنت قطعه یا سایت جواب نداد.")
         }
-        if (!html.contains("name=\"post_ID\"")) {
-            throw EditorException("صفحه‌ی ویرایش سایت پیدا نشد؛ شاید نشستت منقضی شده.")
+        // وردپرس فیلد post_ID رو توی گوتنبرگ با تک‌کوتیشن می‌نویسه، پس هر دو نوع نقل‌قول رو قبول می‌کنیم
+        if (!POST_ID.containsMatchIn(html)) {
+            throw EditorException(
+                when {
+                    finalPath.contains("wp-login") -> "نشستت منقضی شده؛ یه بار از حساب خارج شو و دوباره وارد شو."
+                    finalPath.contains("/wp-admin/") -> "صفحه‌ی ویرایش باز شد ولی فرم اطلاعات برنامه توش نبود (دسترسی این نقش به متاباکس‌ها بسته‌ست؟)."
+                    else -> "سایت این حساب رو از پیشخوان (wp-admin) به صفحه‌ی دیگه‌ای فرستاد؛ دسترسی پیشخوان برای این نقش بسته‌ست."
+                }
+            )
         }
         return Page(html, scrape(html))
     }
