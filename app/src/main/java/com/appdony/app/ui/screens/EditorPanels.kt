@@ -91,9 +91,11 @@ enum class SidePanel(val label: String, val short: String, val icon: ImageVector
 // ───────────────────────── دکمه‌ی کناری (قرص عمودی لبه‌ی راست، وسط) ─────────────────────────
 
 /**
- * همون سبک کشوی پایین، فقط عمودی و کوچیک: یه قرص باریک با فلش «<» (بسته) و «>» (باز) لبه‌ی راست،
- * و وقتی باز بشه نوار آیکن‌ها (هر کدوم با متن زیرش) توی یه ردیف عمودی از راست به چپ کنارش باز می‌شه.
- * زدن روی هر مورد پنل اون بخش رو باز می‌کنه.
+ * مثل کشوی پایین، فقط عمودی: «دسته» سر منوئه.
+ * بسته: فقط دسته‌ی باریک چسبیده به لبه‌ی راست.
+ * باز: نوار ابزارها از لبه‌ی راست میاد جای دسته و دسته رو با خودش به سمت وسط صفحه هل می‌ده
+ * (دسته می‌ره کنار منو و فلشش برمی‌گرده)؛ موقع بستن دقیقاً برعکس: نوار به لبه‌ی راست جمع می‌شه
+ * و دسته برمی‌گرده جای اول. زدن روی هر ابزار پنل اون بخش رو باز می‌کنه.
  */
 @Composable
 internal fun SideDock(
@@ -107,31 +109,15 @@ internal fun SideDock(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // دسته: مثل دسته‌ی کشوهای بالا و پایین، ولی عمودی
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .height(64.dp)
-                .glassTrack(RoundedCornerShape(12.dp))
-                .clickable(onClick = onHandle),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (menuOpen) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
-                contentDescription = if (menuOpen) "بستن منو" else "باز کردن منو",
-                tint = scheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        // نوار موردها: از راست به چپ باز می‌شه
+        // اول (لبه‌ی راست): نوار ابزارها؛ از لبه‌ی راست باز می‌شه و دسته رو هل می‌ده
         AnimatedVisibility(
             visible = menuOpen,
-            enter = expandHorizontally(tween(260), expandFrom = Alignment.Start) + fadeIn(tween(200)),
-            exit = shrinkHorizontally(tween(220), shrinkTowards = Alignment.Start) + fadeOut(tween(160))
+            enter = expandHorizontally(tween(280), expandFrom = Alignment.Start) + fadeIn(tween(220)),
+            exit = shrinkHorizontally(tween(240), shrinkTowards = Alignment.Start) + fadeOut(tween(160))
         ) {
             Column(
                 modifier = Modifier
-                    .padding(start = 6.dp)
+                    .padding(end = 6.dp)
                     .width(76.dp)
                     .glassTrack(RoundedCornerShape(22.dp))
                     .padding(horizontal = 4.dp, vertical = 6.dp)
@@ -157,6 +143,22 @@ internal fun SideDock(
                     }
                 }
             }
+        }
+        // بعدش: دسته (سرِ منو)؛ بسته لبه‌ی راسته، باز کنار نوار ابزار و سمت وسط صفحه
+        Box(
+            modifier = Modifier
+                .width(24.dp)
+                .height(64.dp)
+                .glassTrack(RoundedCornerShape(12.dp))
+                .clickable(onClick = onHandle),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (menuOpen) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
+                contentDescription = if (menuOpen) "بستن منو" else "باز کردن منو",
+                tint = scheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
