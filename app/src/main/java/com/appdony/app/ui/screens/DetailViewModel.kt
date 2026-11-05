@@ -49,6 +49,8 @@ class DetailViewModel(
             val postResult = if (isBlog) repo.getBlogPost(postId) else repo.getPost(postId)
 
             postResult.onSuccess { post ->
+                // همیشه توی حافظه بمونه؛ دانلودها از روی همین، پست مبدأ (برای آپدیت خودکار) رو پیدا می‌کنن
+                PostMemory.put(post)
                 val rawHtml = post.content?.rendered ?: ""
 
                 // پارس HTML سنگینه؛ خارج از ترد اصلی انجام می‌شه
