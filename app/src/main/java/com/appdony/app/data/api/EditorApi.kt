@@ -3,6 +3,8 @@ package com.appdony.app.data.api
 import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import androidx.core.text.HtmlCompat
+import com.appdony.app.data.model.WpCategory
 import com.appdony.app.data.session.CredentialsManager
 import com.appdony.app.data.session.SessionManager
 import com.google.gson.JsonObject
@@ -25,7 +27,7 @@ data class UploadedMedia(val id: Long, val url: String)
 class EditorException(message: String) : Exception(message)
 
 /**
- * ذخیره‌ی نوشته/وبلاگ و آپلود تصویر با REST وردپرس. احراز هویت با کوکی‌های نشست + هدر X-WP-Nonce؛
+ * ذخیره‌ی نوشته/وبلاگ، دسته‌ها و آپلود تصویر با REST وردپرس. احراز هویت با کوکی‌های نشست + هدر X-WP-Nonce؛
  * اگه نانس منقضی شده بود یه بار تازه می‌گیره و اگه باز نشد با اطلاعات ذخیره‌شده دوباره وارد می‌شه.
  */
 object EditorApi {
@@ -46,6 +48,7 @@ object EditorApi {
 
     /**
      * [postId] خالی = ساخت تازه، پر = به‌روزرسانی. [status]: draft / publish / pending.
+     * [extra] فیلدهای اضافه‌ی REST (نامک، تاریخ، چکیده، دیدگاه‌ها، دسته‌ها).
      * اگه کاربر اجازه‌ی انتشار نداشت، خودکار «pending» ذخیره می‌شه.
      */
     suspend fun save(
@@ -55,7 +58,8 @@ object EditorApi {
         title: String,
         content: String,
         status: String,
-        featuredId: Long?
+        featuredId: Long?,
+        extra: JsonObject? = null
     ): Result<SavedPost> = withContext(Dispatchers.IO) {
         try {
             val base = route(context, kind)
@@ -65,7 +69,7 @@ object EditorApi {
 
             fun request(nonce: String, st: String): Request =
                 authed(Request.Builder().url(url), nonce)
-                    .post(body(title, content, st, featuredId, postId != null).toRequestBody(JSON_TYPE))
+                    .post(body(title, content, st, featuredId, postId != null, extra).toRequestBody(JSON_TYPE))
                     .build()
 
             var reply = send(context) { request(it, wanted) }
@@ -92,8 +96,16 @@ object EditorApi {
         }
     }
 
-    private fun body(title: String, content: String, status: String, featured: Long?, isUpdate: Boolean): String {
+    private fun body(
+        title: String,
+        content: String,
+        status: String,
+        featured: Long?,
+        isUpdate: Boolean,
+        extra: JsonObject?
+    ): String {
         val o = JsonObject()
+        extra?.entrySet()?.forEach { o.add(it.key, it.value) }
         o.addProperty("title", title)
         o.addProperty("content", content)
         o.addProperty("status", status)
@@ -120,6 +132,33 @@ object EditorApi {
             blogRoute = found
         }
         return found
+    }
+
+    // ───────────── دسته‌ها ─────────────
+
+    suspend fun categories(context: Context): Result<List<WpCategory>> = withContext(Dispatchers.IO) {
+        try {
+            val reply = send(context) { nonce ->
+                authed(
+                    Request.Builder().url("$SITE/wp-json/wp/v2/categories?per_page=100&orderby=name&order=asc&_fields=id,name,parent"),
+                    nonce
+                ).get().build()
+            }
+            if (reply.code !in 200..299) throw EditorException(explain("categories", reply, upload = false))
+            val list = JsonParser.parseString(reply.body).asJsonArray.map {
+                val o = it.asJsonObject
+                WpCategory(
+                    id = o.get("id").asInt,
+                    name = HtmlCompat.fromHtml(o.get("name").asString, HtmlCompat.FROM_HTML_MODE_LEGACY).toString(),
+                    parent = o.get("parent")?.asInt ?: 0
+                )
+            }
+            Result.success(list)
+        } catch (e: EditorException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(EditorException("دسته‌ها گرفته نشد: ${e.message ?: "خطای ناشناخته"}"))
+        }
     }
 
     // ───────────── آپلود تصویر ─────────────
