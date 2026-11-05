@@ -18,7 +18,10 @@ data class DownloadRecord(
     val bytes: Long = 0L,
     val message: String? = null,
     val filePath: String? = null,
-    val wifiOnly: Boolean = false
+    val wifiOnly: Boolean = false,
+    // پستی که این فایل ازش دانلود شده (برای آپدیت خودکار برنامه‌های دانلودشده)؛ ۰ یعنی نامشخص
+    val postId: Int = 0,
+    val postModified: String? = null
 )
 
 class DownloadStore(context: Context) {
