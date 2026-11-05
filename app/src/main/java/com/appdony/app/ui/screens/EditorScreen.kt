@@ -1,6 +1,11 @@
 package com.appdony.app.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +40,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Close
@@ -50,6 +57,7 @@ import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -83,6 +91,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -97,9 +106,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.appdony.app.data.api.EditorApi
 import com.appdony.app.data.model.BlockEditing
 import com.appdony.app.data.model.BlockGroup
+import com.appdony.app.data.model.BlockSerializer
 import com.appdony.app.data.model.BlockType
 import com.appdony.app.data.model.BlockUsage
 import com.appdony.app.data.model.EditorBlock
@@ -109,6 +122,7 @@ import com.appdony.app.ui.components.FloatingDialog
 import com.appdony.app.ui.components.glassKnob
 import com.appdony.app.ui.components.glassSelectedIconTint
 import com.appdony.app.ui.components.glassTrack
+import kotlinx.coroutines.launch
 
 // ───────────────────────── وضعیت ادیتور (با چرخش صفحه از بین نمی‌ره) ─────────────────────────
 
@@ -120,16 +134,36 @@ class EditorViewModel : ViewModel() {
     var scrollToId by mutableStateOf<Long?>(null)
     private var nextId = 1L
 
+    // ذخیره روی سایت: بعد از اولین ذخیره شناسه و لینک مطلب مشخص می‌شه و ذخیره‌های بعدی همون مطلب رو به‌روز می‌کنن
+    var postId by mutableStateOf<Long?>(null)
+    var link by mutableStateOf<String?>(null)
+    var status by mutableStateOf("draft")
+    var saving by mutableStateOf(false)
+
+    // تصویر شاخص
+    var featuredId by mutableStateOf<Long?>(null)
+    var featuredUrl by mutableStateOf<String?>(null)
+    var uploading by mutableStateOf(false)
+
+    private var cleanSnapshot = ""
+
     init {
         val first = EditorBlock(nextId++, BlockType.PARAGRAPH)
         blocks.add(first)
         focusedId = first.id
+        cleanSnapshot = snapshot()
     }
 
-    /** آیا چیزی نوشته شده که با خروج از بین بره؟ */
+    private fun snapshot(): String = buildString {
+        append(title).append('\u0001').append(featuredId ?: 0L)
+        blocks.forEach {
+            append('\u0001').append(it.type.name).append('|').append(it.text).append('|').append(it.extra)
+        }
+    }
+
+    /** آیا چیزی نوشته شده که هنوز ذخیره نشده؟ */
     val isDirty: Boolean
-        get() = title.isNotBlank() || blocks.size > 1 ||
-            blocks.firstOrNull()?.let { it.text.isNotBlank() || it.type != BlockType.PARAGRAPH } == true
+        get() = snapshot() != cleanSnapshot
 
     /** بلوک تازه بعد از بلوک انتخاب‌شده می‌شینه؛ اگه اون یه پاراگراف خالی بود، جاش عوض می‌شه (مثل وردپرس) */
     fun insert(type: BlockType) {
@@ -226,6 +260,81 @@ class EditorViewModel : ViewModel() {
         val body = blocks.filter { it.text.isNotBlank() }.joinToString("\n\n") { it.text }
         return if (title.isBlank()) body else "$title\n\n$body"
     }
+
+    // ───────────── ذخیره‌ی واقعی روی سایت ─────────────
+
+    /** [wanted]: draft یا publish. اگه اجازه‌ی انتشار نباشه، سرور «در انتظار بازبینی» ذخیره می‌کنه. */
+    fun save(context: Context, kind: String, wanted: String) {
+        if (saving) return
+        if (uploading) {
+            AppBanner.show(BannerKind.WARNING, "صبر کن تا آپلود تصویر تموم بشه")
+            return
+        }
+        if (title.isBlank()) {
+            AppBanner.show(BannerKind.WARNING, "اول یه عنوان بنویس")
+            return
+        }
+        val serialized = BlockSerializer.serialize(blocks.toList())
+        val snap = snapshot()
+        val app = context.applicationContext
+        saving = true
+        viewModelScope.launch {
+            val result = EditorApi.save(app, kind, postId, title.trim(), serialized.html, wanted, featuredId)
+            saving = false
+            result.onSuccess { saved ->
+                postId = saved.id
+                link = saved.link.ifBlank { null }
+                status = saved.status
+                cleanSnapshot = snap
+                val done = when (saved.status) {
+                    "publish" -> "منتشر شد"
+                    "pending" -> "برای بازبینی ذخیره شد"
+                    else -> "پیش‌نویس ذخیره شد"
+                }
+                val skipped = serialized.skipped.distinct()
+                when {
+                    skipped.isNotEmpty() -> AppBanner.show(
+                        BannerKind.WARNING,
+                        "$done؛ بلوک‌های ${skipped.joinToString("، ")} هنوز ذخیره نمی‌شن",
+                        5200L
+                    )
+                    saved.note != null -> AppBanner.show(BannerKind.WARNING, saved.note, 4500L)
+                    else -> AppBanner.show(BannerKind.SUCCESS, done)
+                }
+            }.onFailure {
+                AppBanner.show(BannerKind.ERROR, it.message ?: "ذخیره نشد", 4500L)
+            }
+        }
+    }
+
+    // ───────────── تصویر شاخص ─────────────
+
+    fun uploadFeatured(context: Context, uri: Uri) {
+        if (uploading) return
+        val app = context.applicationContext
+        val previousId = featuredId
+        val previousUrl = featuredUrl
+        featuredId = null
+        featuredUrl = uri.toString() // پیش‌نمایش فوری از روی خودِ فایل
+        uploading = true
+        viewModelScope.launch {
+            val result = EditorApi.uploadImage(app, uri)
+            result.onSuccess {
+                featuredId = it.id
+                featuredUrl = it.url.ifBlank { uri.toString() }
+            }.onFailure {
+                featuredId = previousId
+                featuredUrl = previousUrl
+                AppBanner.show(BannerKind.ERROR, it.message ?: "آپلود نشد", 4500L)
+            }
+            uploading = false
+        }
+    }
+
+    fun clearFeatured() {
+        featuredId = null
+        featuredUrl = null
+    }
 }
 
 // ───────────────────────── صفحه‌ی ادیتور ─────────────────────────
@@ -247,9 +356,14 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
     var preview by rememberSaveable { mutableStateOf(false) }
     var showOutline by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     val quickBlocks = remember { BlockUsage.topSix(ctx) }
     val listState = rememberLazyListState()
+
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) vm.uploadFeatured(ctx, uri)
+    }
 
     val requestClose: () -> Unit = { if (vm.isDirty) confirmExit = true else onBack() }
     val insertBlock: (BlockType) -> Unit = { type ->
@@ -266,14 +380,21 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
         }
     }
 
-    // بلوک تازه یا جابه‌جاشده: صفحه تا اونجا اسکرول می‌شه (ردیف اول لیست خودِ عنوانه)
+    // بلوک تازه یا جابه‌جاشده: صفحه تا اونجا اسکرول می‌شه (ردیف اول لیست عنوانه و دومی تصویر شاخص)
     val scrollTarget = vm.scrollToId
     LaunchedEffect(scrollTarget) {
         if (scrollTarget != null) {
             val index = vm.blocks.indexOfFirst { it.id == scrollTarget }
-            if (index >= 0) listState.animateScrollToItem(index + 1)
+            if (index >= 0) listState.animateScrollToItem(index + 2)
             vm.scrollToId = null
         }
+    }
+
+    val saved = vm.postId != null
+    val statusLabel = when (vm.status) {
+        "publish" -> "منتشرشده"
+        "pending" -> "در انتظار بازبینی"
+        else -> "پیش‌نویس"
     }
 
     Column(
@@ -283,18 +404,42 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
             .imePadding()
     ) {
         EditorTopBar(
-            title = if (isBlog) "مطلب وبلاگ جدید" else "نوشته‌ی جدید",
-            subtitle = if (preview) "حالت پیش‌نمایش" else "${vm.blocks.size} بلوک",
+            title = when {
+                saved && isBlog -> "ویرایش مطلب وبلاگ"
+                saved -> "ویرایش نوشته"
+                isBlog -> "مطلب وبلاگ جدید"
+                else -> "نوشته‌ی جدید"
+            },
+            subtitle = when {
+                preview -> "حالت پیش‌نمایش"
+                saved -> "${vm.blocks.size} بلوک · $statusLabel"
+                else -> "${vm.blocks.size} بلوک"
+            },
             preview = preview,
+            saving = vm.saving,
+            siteReady = vm.link != null,
             showMenu = showMenu,
             onMenuChange = { showMenu = it },
             onClose = requestClose,
             onOutline = { showOutline = true },
+            onOpenSite = {
+                val link = vm.link
+                if (link != null) {
+                    if (vm.status != "publish") {
+                        AppBanner.show(BannerKind.WARNING, "هنوز منتشر نشده؛ فقط وقتی توی مرورگر وارد حساب باشی دیده می‌شه")
+                    }
+                    runCatching {
+                        ctx.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            },
             onTogglePreview = {
                 preview = !preview
                 if (preview) topOpen = false
             },
-            onSave = { AppBanner.show(BannerKind.WARNING, "ذخیره‌سازی توی مرحله‌ی بعد فعال می‌شه") },
+            onSave = { showSave = true },
             onSettings = { AppBanner.show(BannerKind.WARNING, "تنظیمات نوشته توی مرحله‌های بعد اضافه می‌شه") },
             onCopyAll = {
                 clipboard.setText(AnnotatedString(vm.toPlainText()))
@@ -330,6 +475,9 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
                     readOnly = preview,
                     onChange = { vm.title = it.replace("\n", " ") }
                 )
+            }
+            item(key = "featured") {
+                FeaturedImageCard(vm = vm, preview = preview, onPick = { pickImage.launch("image/*") })
             }
             itemsIndexed(vm.blocks, key = { _, block -> block.id }) { index, block ->
                 BlockCard(block = block, index = index, count = vm.blocks.size, vm = vm, preview = preview)
@@ -388,6 +536,65 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
         }
     }
 
+    if (showSave) {
+        FloatingDialog(onDismiss = { showSave = false }) {
+            Text(
+                text = if (isBlog) "ذخیره‌ی مطلب وبلاگ" else "ذخیره‌ی نوشته",
+                color = scheme.onSurface,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (saved) "وضعیت فعلی روی سایت: $statusLabel" else "هنوز روی سایت ذخیره نشده",
+                color = scheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            if (vm.status == "publish") {
+                SaveOption(
+                    label = "به‌روزرسانی مطلب منتشرشده",
+                    hint = "تغییرات همین الان روی سایت دیده می‌شه",
+                    primary = true
+                ) {
+                    showSave = false
+                    vm.save(ctx, kind, "publish")
+                }
+                Spacer(Modifier.height(8.dp))
+                SaveOption(
+                    label = "برگرداندن به پیش‌نویس",
+                    hint = "از سایت برداشته می‌شه",
+                    primary = false
+                ) {
+                    showSave = false
+                    vm.save(ctx, kind, "draft")
+                }
+            } else {
+                SaveOption(
+                    label = "انتشار",
+                    hint = "اگه اجازه‌ی انتشار نداشته باشی، برای بازبینی ذخیره می‌شه",
+                    primary = true
+                ) {
+                    showSave = false
+                    vm.save(ctx, kind, "publish")
+                }
+                Spacer(Modifier.height(8.dp))
+                SaveOption(
+                    label = "ذخیره به‌عنوان پیش‌نویس",
+                    hint = "فقط خودت و مدیران می‌بینن",
+                    primary = false
+                ) {
+                    showSave = false
+                    vm.save(ctx, kind, "draft")
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = { showSave = false }, modifier = Modifier.fillMaxWidth()) {
+                Text("انصراف")
+            }
+        }
+    }
+
     if (confirmExit) {
         AlertDialog(
             onDismissRequest = { confirmExit = false },
@@ -406,6 +613,28 @@ fun EditorScreen(kind: String, onBack: () -> Unit) {
     }
 }
 
+@Composable
+private fun SaveOption(label: String, hint: String, primary: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (primary) scheme.primary.copy(alpha = 0.18f) else scheme.onSurface.copy(alpha = 0.06f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (primary) scheme.primary else scheme.onSurface,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(text = hint, color = scheme.onSurfaceVariant, fontSize = 11.sp)
+    }
+}
+
 // ───────────────────────── نوار آیکن‌های بالا ─────────────────────────
 
 /**
@@ -417,10 +646,13 @@ private fun EditorTopBar(
     title: String,
     subtitle: String,
     preview: Boolean,
+    saving: Boolean,
+    siteReady: Boolean,
     showMenu: Boolean,
     onMenuChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onOutline: () -> Unit,
+    onOpenSite: () -> Unit,
     onTogglePreview: () -> Unit,
     onSave: () -> Unit,
     onSettings: () -> Unit,
@@ -450,7 +682,7 @@ private fun EditorTopBar(
         }
         BarIcon(Icons.Outlined.FormatListBulleted, "فهرست بلوک‌ها", onClick = onOutline)
         // لینک نوشته بعد از اولین ذخیره ساخته می‌شه
-        BarIcon(Icons.Outlined.OpenInNew, "باز کردن در سایت", enabled = false, onClick = {})
+        BarIcon(Icons.Outlined.OpenInNew, "باز کردن در سایت", enabled = siteReady, onClick = onOpenSite)
         BarIcon(
             icon = if (preview) Icons.Outlined.Edit else Icons.Outlined.Visibility,
             desc = if (preview) "برگشت به ویرایش" else "پیش‌نمایش",
@@ -461,10 +693,18 @@ private fun EditorTopBar(
             modifier = Modifier
                 .size(40.dp)
                 .glassKnob(CircleShape)
-                .clickable(onClick = onSave),
+                .clickable(enabled = !saving, onClick = onSave),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Outlined.Save, contentDescription = "ذخیره", tint = glassSelectedIconTint(), modifier = Modifier.size(20.dp))
+            if (saving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = glassSelectedIconTint()
+                )
+            } else {
+                Icon(Icons.Outlined.Save, contentDescription = "ذخیره", tint = glassSelectedIconTint(), modifier = Modifier.size(20.dp))
+            }
         }
         Box {
             BarIcon(Icons.Outlined.MoreVert, "گزینه‌ها", onClick = { onMenuChange(true) })
@@ -668,7 +908,7 @@ private fun QuickBar(
     }
 }
 
-// ───────────────────────── عنوان و کارت بلوک‌ها ─────────────────────────
+// ───────────────────────── عنوان، تصویر شاخص و کارت بلوک‌ها ─────────────────────────
 
 @Composable
 private fun TitleField(value: String, hint: String, readOnly: Boolean, onChange: (String) -> Unit) {
@@ -696,6 +936,78 @@ private fun TitleField(value: String, hint: String, readOnly: Boolean, onChange:
             }
         }
     )
+}
+
+/** تصویر شاخص: انتخاب از گالری گوشی، آپلود روی سایت و اتصال به مطلب موقع ذخیره */
+@Composable
+private fun FeaturedImageCard(vm: EditorViewModel, preview: Boolean, onPick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val url = vm.featuredUrl
+    if (preview && url == null) return
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(1.dp, scheme.outline.copy(alpha = 0.5f), shape)
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "تصویر شاخص",
+                color = scheme.primary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            if (!preview && url != null && !vm.uploading) {
+                MiniButton(Icons.Outlined.Edit, "تغییر تصویر", onClick = onPick)
+                MiniButton(Icons.Outlined.Delete, "حذف تصویر", tint = scheme.error) { vm.clearFeatured() }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(scheme.onSurface.copy(alpha = 0.06f))
+                .clickable(enabled = !preview && url == null && !vm.uploading, onClick = onPick),
+            contentAlignment = Alignment.Center
+        ) {
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = "تصویر شاخص",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(30.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(text = "انتخاب تصویر شاخص", color = scheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "از گالری گوشی", color = scheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+            }
+            if (vm.uploading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = scheme.primary)
+                }
+            }
+        }
+    }
 }
 
 @Composable
