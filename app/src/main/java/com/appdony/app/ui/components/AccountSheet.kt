@@ -19,8 +19,10 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,13 +40,16 @@ import androidx.compose.ui.unit.sp
 /**
  * منوی اکانت: کارت شناور، هم‌سبک با لاگین. هر دکمه اول منو را می‌بندد و بعد عمل خودش را انجام می‌دهد.
  * برای مهمان (بدون حساب): کارت کاربر و «خروج از حساب» مخفی‌اند و به‌جاشون «ورود یا ثبت‌نام» میاد.
+ * «ایجاد نوشته» و «ایجاد بلاگ» فقط برای حساب‌هایی که اجازه‌ی نوشتن دارن نشون داده می‌شن (کاربر عادی نمی‌بینه).
  */
 @Composable
 fun AccountSheet(
     isLoggedIn: Boolean,
     displayName: String, username: String, onDismiss: () -> Unit,
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
-    onAbout: () -> Unit, onLogin: () -> Unit, onLogout: () -> Unit
+    onAbout: () -> Unit, onLogin: () -> Unit, onLogout: () -> Unit,
+    canWritePost: Boolean = false, canWriteBlog: Boolean = false,
+    onCreatePost: () -> Unit = {}, onCreateBlog: () -> Unit = {}
 ) {
     FloatingDialog(onDismiss = onDismiss) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -115,6 +120,12 @@ fun AccountSheet(
             ) { onDismiss(); onLogin() }
         }
 
+        if (isLoggedIn && canWritePost) {
+            AccountRow(Icons.Outlined.EditNote, "ایجاد نوشته", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onCreatePost() }
+        }
+        if (isLoggedIn && canWriteBlog) {
+            AccountRow(Icons.Outlined.PostAdd, "ایجاد بلاگ", tint = MaterialTheme.colorScheme.primary) { onDismiss(); onCreateBlog() }
+        }
         AccountRow(Icons.Outlined.Download, "دانلودها") { onDismiss(); onDownloads() }
         // همون آیکن نشان‌گذاریِ صفحه‌ی جزئیات (BookmarkBorder)
         AccountRow(Icons.Outlined.BookmarkBorder, "نشان‌گذاری‌ها") { onDismiss(); onFavorites() }
