@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -67,10 +68,17 @@
             </intent-filter>
         </activity>
 
+        <!-- سرویس دانلود: با بستن برنامه از لیست اخیر هم زنده می‌مونه -->
         <service
             android:name=".util.DownloadService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- دکمه‌های اعلان دانلود (توقف / ادامه / لغو / تلاش دوباره) -->
+        <receiver
+            android:name=".util.DownloadActionReceiver"
+            android:exported="false" />
 
         <!-- پاپیِ بیرون از برنامه -->
         <service
