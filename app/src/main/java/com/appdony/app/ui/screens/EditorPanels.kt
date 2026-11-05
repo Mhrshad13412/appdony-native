@@ -2,9 +2,11 @@ package com.appdony.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -14,9 +16,11 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,8 +92,9 @@ enum class SidePanel(val label: String, val short: String, val icon: ImageVector
 // ───────────────────────── دکمه‌ی کناری (قرص عمودی لبه‌ی راست، وسط) ─────────────────────────
 
 /**
- * قرص عمودی مثل منوی پایین. دسته‌ی بالاش که زده بشه لیست عمودی آیکن‌ها (هرکدوم با متن زیرش) از وسط
- * به هر دو طرف باز می‌شه. زدن روی هر مورد پنل اون بخش رو باز می‌کنه.
+ * قرص عمودی لبه‌ی راست. بسته: فقط یه قرص باریک و بلند با فلش «<».
+ * باز: از سمت راست به چپ کشیده می‌شه و موردهاش (آیکن + متن) توی یه ردیف عمودی نشون داده می‌شن؛ فلش می‌شه «>».
+ * زدن روی هر مورد پنل اون بخش رو باز می‌کنه.
  */
 @Composable
 internal fun SideDock(
@@ -100,33 +105,39 @@ internal fun SideDock(
 ) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(22.dp)
-    Column(
+    Row(
         modifier = modifier
-            .width(72.dp)
-            .glassTrack(shape),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .height(IntrinsicSize.Min)
+            .glassTrack(shape)
+            .clip(shape),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // دسته: همیشه سمت راست؛ بسته «<» و باز «>»
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
+                .width(34.dp)
+                .fillMaxHeight()
+                .heightIn(min = 104.dp)
                 .clickable(onClick = onHandle),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (menuOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                imageVector = if (menuOpen) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
                 contentDescription = if (menuOpen) "بستن منو" else "باز کردن منو",
                 tint = scheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
+        // موردها: از راست به چپ باز می‌شن، یه ردیف عمودی
         AnimatedVisibility(
             visible = menuOpen,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            enter = expandHorizontally(tween(260), expandFrom = Alignment.Start) + fadeIn(tween(200)),
+            exit = shrinkHorizontally(tween(220), shrinkTowards = Alignment.Start) + fadeOut(tween(160))
         ) {
             Column(
-                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp, end = 4.dp),
+                modifier = Modifier
+                    .width(80.dp)
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 SidePanel.entries.forEach { item ->
