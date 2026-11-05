@@ -16,4 +16,7 @@ object PostMemory {
     }
 
     fun get(id: Int): Post? = map[id]
+
+    /** پیدا کردن پست از روی اسم تمیزش (همون اسمی که موقع شروع دانلود داده می‌شه) */
+    fun findByTitle(title: String): Post? = map.values.firstOrNull { it.cleanTitle() == title }
 }
