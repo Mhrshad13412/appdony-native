@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 35
         // نسخه: زیربنا.قابلیت‌ها.دیباگ‌ها (فقط همین خط رو عوض کن؛ کد نسخه خودش از روی اون ساخته می‌شه)
-        versionName = "2.52.15"
+        versionName = "2.53.0"
         versionCode = versionName!!.split(".").let { (a, b, c) -> a.toInt() * 1_000_000 + b.toInt() * 1_000 + c.toInt() }
 
         // توکن هوش مصنوعی از متغیر محیطی AI_KEY (GitHub Secret) یا از local.properties می‌آد؛ توی ریپو نمی‌مونه
