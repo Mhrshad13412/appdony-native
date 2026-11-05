@@ -3,8 +3,12 @@ package com.appdony.app.data.model
 /**
  * تبدیل بلوک‌های ادیتور به نشانه‌گذاری گوتنبرگ (<!-- wp:paragraph --> ...).
  * بلوک‌هایی که هنوز ویرایش کاملشون نیومده توی [Result.skipped] میان و ذخیره نمی‌شن.
+ * بلوک «خام» (HTML با extra = [RAW]) همون نشانه‌گذاریِ اصلی سایته و بدون هیچ تغییری برمی‌گرده.
  */
 object BlockSerializer {
+
+    /** نشانه‌ی بلوک خام: بلوک‌هایی که از سایت اومدن و ادیتور نمی‌تونه بدون از دست دادن چیزی ویرایششون کنه */
+    const val RAW = "raw"
 
     class Result(val html: String, val skipped: List<String>)
 
@@ -112,7 +116,11 @@ object BlockSerializer {
             BlockType.MORE -> wrap("more", null, "<!--more-->")
 
             BlockType.HTML -> {
-                if (text.isEmpty()) null else wrap("html", null, block.text.trim())
+                when {
+                    text.isEmpty() -> null
+                    block.extra == RAW -> text // نشانه‌گذاری اصلیِ سایت؛ بدون دست‌کاری
+                    else -> wrap("html", null, text)
+                }
             }
 
             BlockType.SHORTCODE -> {
