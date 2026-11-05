@@ -2,10 +2,10 @@ package com.appdony.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +38,8 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,9 +64,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,64 +77,77 @@ import com.appdony.app.data.model.CustomBox
 import com.appdony.app.data.model.DlLink
 import com.appdony.app.ui.components.glassTrack
 
-/** بخش‌هایی که از دکمه‌ی کناری باز می‌شن */
-enum class SidePanel(val label: String, val icon: ImageVector) {
-    FEATURED("تصویر شاخص", Icons.Outlined.AddPhotoAlternate),
-    SETTINGS("تنظیمات نوشته", Icons.Outlined.Tune),
-    APP_INFO("اطلاعات برنامه / بازی", Icons.Outlined.Android),
-    SEO("Yoast SEO", Icons.Outlined.Search)
+/** بخش‌هایی که از دکمه‌ی کناری باز می‌شن ([short] = برچسب کوتاه زیر آیکن توی قرص عمودی) */
+enum class SidePanel(val label: String, val short: String, val icon: ImageVector) {
+    FEATURED("تصویر شاخص", "تصویر شاخص", Icons.Outlined.AddPhotoAlternate),
+    SETTINGS("تنظیمات نوشته", "تنظیمات", Icons.Outlined.Tune),
+    APP_INFO("اطلاعات برنامه / بازی", "اطلاعات برنامه", Icons.Outlined.Android),
+    SEO("Yoast SEO", "سئو", Icons.Outlined.Search)
 }
 
-// ───────────────────────── دکمه‌ی کناری (قرص افقی لبه‌ی راست، وسط) ─────────────────────────
+// ───────────────────────── دکمه‌ی کناری (قرص عمودی لبه‌ی راست، وسط) ─────────────────────────
 
 /**
- * قرص افقی مثل دستگیره‌ی کشوها. باز که بشه ردیف آیکن‌ها به سمت چپ باز می‌شه (همیشه توی کادر).
- * زدن روی دستگیره وقتی پنلی بازه، پنل رو می‌بنده.
+ * قرص عمودی مثل منوی پایین. دسته‌ی بالاش که زده بشه لیست عمودی آیکن‌ها (هرکدوم با متن زیرش) از وسط
+ * به هر دو طرف باز می‌شه. زدن روی هر مورد پنل اون بخش رو باز می‌کنه.
  */
 @Composable
 internal fun SideDock(
     menuOpen: Boolean,
-    panel: SidePanel?,
     onHandle: () -> Unit,
     onPick: (SidePanel) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(16.dp)
-    Row(
+    val shape = RoundedCornerShape(22.dp)
+    Column(
         modifier = modifier
-            .clip(shape)
+            .width(72.dp)
             .glassTrack(shape),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(width = 46.dp, height = 32.dp)
+                .fillMaxWidth()
+                .height(40.dp)
                 .clickable(onClick = onHandle),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (menuOpen || panel != null) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
-                contentDescription = if (menuOpen || panel != null) "بستن منو" else "باز کردن منو",
+                imageVector = if (menuOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (menuOpen) "بستن منو" else "باز کردن منو",
                 tint = scheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
         AnimatedVisibility(
-            visible = menuOpen && panel == null,
-            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut()
+            visible = menuOpen,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
         ) {
-            Row {
+            Column(
+                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp, end = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 SidePanel.entries.forEach { item ->
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .clickable { onPick(item) },
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onPick(item) }
+                            .padding(vertical = 8.dp, horizontal = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(item.icon, contentDescription = item.label, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                        Icon(item.icon, contentDescription = item.label, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = item.short,
+                            color = scheme.onSurfaceVariant,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
+                        )
                     }
                 }
             }
@@ -139,7 +155,7 @@ internal fun SideDock(
     }
 }
 
-// ───────────────────────── پنل بازشونده (از چپ به راست) ─────────────────────────
+// ───────────────────────── پنل بازشونده (وسط صفحه؛ از راست میاد و به راست برمی‌گرده) ─────────────────────────
 
 @Composable
 internal fun SidePanelHost(
@@ -154,17 +170,19 @@ internal fun SidePanelHost(
     var last by remember { mutableStateOf(panel) }
     SideEffect { if (panel != null && last != panel) last = panel }
     val shown = panel ?: last
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.74f).dp
 
     AnimatedVisibility(
         visible = panel != null,
         modifier = modifier,
-        enter = slideInHorizontally(tween(260)) { -it } + fadeIn(tween(200)),
-        exit = slideOutHorizontally(tween(220)) { -it } + fadeOut(tween(160))
+        enter = slideInHorizontally(tween(280)) { it } + fadeIn(tween(220)),
+        exit = slideOutHorizontally(tween(240)) { it } + fadeOut(tween(180))
     ) {
-        val shape = RoundedCornerShape(22.dp)
+        val shape = RoundedCornerShape(24.dp)
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(max = maxHeight)
                 .clip(shape)
                 .background(scheme.background)
                 .glassTrack(shape)
@@ -194,7 +212,7 @@ internal fun SidePanelHost(
             HorizontalDivider(color = scheme.onSurface.copy(alpha = 0.12f))
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .heightIn(max = maxHeight - 52.dp)
                     .verticalScroll(rememberScrollState())
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
