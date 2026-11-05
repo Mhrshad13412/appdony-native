@@ -35,6 +35,10 @@ object BlockParser {
     )
     private val BR = Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE)
     private val EMBED_KEYS = setOf("url", "type", "providerNameSlug", "responsive", "className")
+    private val IMAGE_KEYS = setOf("id", "sizeSlug", "linkDestination")
+    private val IMAGE_FIGURE = Regex("^<figure class=\"wp-block-image size-large\"><img ([^>]*?)\\s*/?></figure>$", RegexOption.DOT_MATCHES_ALL)
+    private val IMG_ATTR = Regex("([a-zA-Z-]+)=\"([^\"]*)\"")
+    private val IMG_CLASS = Regex("^wp-image-(\\d+)$")
 
     /** [content] = content.raw وردپرس. شناسه‌ی همه‌ی بلوک‌ها صفره و ViewModel شناسه‌ی واقعی می‌ده. */
     fun parse(content: String): List<EditorBlock> {
@@ -184,6 +188,8 @@ object BlockParser {
 
             "core/embed" -> embed(attrs, body)
 
+            "core/image" -> image(attrs, body)
+
             else -> null
         }
         return converted ?: raw(whole)
@@ -219,6 +225,27 @@ object BlockParser {
         }
         if (paragraphs.isEmpty() || paragraphs.any { it.contains('\n') }) return null
         return block(BlockType.QUOTE, paragraphs.joinToString("\n"))
+    }
+
+    /** تصویر ساده‌ی بدون کپشن و لینک؛ هر شکل دیگه‌ای عیناً به‌صورت بلوک خام می‌مونه */
+    private fun image(attrs: JsonObject, body: String): EditorBlock? {
+        if (!IMAGE_KEYS.containsAll(attrs.keySet())) return null
+        val size = attrs.get("sizeSlug")?.takeIf { it.isJsonPrimitive }?.asString
+        if (size != null && size != "large") return null
+        val link = attrs.get("linkDestination")?.takeIf { it.isJsonPrimitive }?.asString
+        if (link != null && link != "none") return null
+        val m = IMAGE_FIGURE.find(body) ?: return null
+        val found = LinkedHashMap<String, String>()
+        for (a in IMG_ATTR.findAll(m.groupValues[1])) found[a.groupValues[1]] = a.groupValues[2]
+        if (!setOf("src", "alt", "class").containsAll(found.keys)) return null
+        val src = found["src"]?.let { unescape(it) }?.trim().orEmpty()
+        if (src.isEmpty()) return null
+        val classId = found["class"]?.let { IMG_CLASS.find(it)?.groupValues?.get(1)?.toLongOrNull() }
+        if (found["class"] != null && classId == null) return null
+        val declared = attrs.get("id")?.takeIf { it.isJsonPrimitive }?.let { runCatching { it.asLong }.getOrNull() }
+        if (declared != classId) return null
+        val alt = unescape(found["alt"].orEmpty())
+        return block(BlockType.IMAGE, ImageData.encode(classId ?: 0L, src), alt)
     }
 
     private fun embed(attrs: JsonObject, body: String): EditorBlock? {
