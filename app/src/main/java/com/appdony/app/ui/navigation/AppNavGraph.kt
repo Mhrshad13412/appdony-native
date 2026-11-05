@@ -40,6 +40,7 @@ import com.appdony.app.ui.screens.DownloadsScreen
 import com.appdony.app.ui.screens.EditorScreen
 import com.appdony.app.ui.screens.FavoritesScreen
 import com.appdony.app.ui.screens.GamesScreen
+import com.appdony.app.ui.screens.PostListScreen
 import com.appdony.app.ui.screens.SearchScreen
 import com.appdony.app.ui.screens.SettingsScreen
 import com.appdony.app.ui.screens.UpdatesScreen
@@ -121,7 +122,7 @@ private fun AdminOnly(onDenied: () -> Unit, content: @Composable () -> Unit) {
     }
 }
 
-/** فقط حسابِ واردشده‌ای که اجازه‌ی نوشتنِ همین نوع (نوشته یا بلاگ) رو داره صفحه‌ی ادیتور رو می‌بینه */
+/** فقط حسابِ واردشده‌ای که اجازه‌ی نوشتنِ همین نوع (نوشته یا بلاگ) رو داره صفحه‌ی لیست و ادیتور رو می‌بینه */
 @Composable
 private fun WriterOnly(kind: String, onDenied: () -> Unit, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
@@ -261,18 +262,42 @@ fun AppNavGraph(
         }
         tabComposable("downloads") { DownloadsScreen() }
 
-        // ایجاد نوشته / ایجاد بلاگ (kind = post یا blog)؛ فقط برای کاربرانی که اجازه‌ی نوشتن دارن
+        // لیست «نوشته‌ها» / «بلاگ‌ها» (kind = post یا blog)؛ فقط برای کاربرانی که اجازه‌ی نوشتن دارن
         composable(
-            route = "editor/{kind}",
+            route = "posts/{kind}",
             arguments = listOf(navArgument("kind") { type = NavType.StringType }),
+            enterTransition = { slideInHorizontally(tween(360, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(300)) },
+            exitTransition = { fadeOut(tween(200)) },
+            popEnterTransition = { fadeIn(tween(240)) },
+            popExitTransition = { slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220)) }
+        ) { backStack ->
+            val kind = backStack.arguments?.getString("kind") ?: "post"
+            WriterOnly(kind = kind, onDenied = { navController.popBackStack() }) {
+                PostListScreen(
+                    kind = kind,
+                    onBack = { navController.popBackStack() },
+                    onOpen = { id -> navController.navigate("editor/$kind?postId=$id") },
+                    onNew = { navController.navigate("editor/$kind") }
+                )
+            }
+        }
+
+        // ادیتور: بدون postId = مطلب تازه؛ با postId = ویرایش همون مطلب (kind = post یا blog)
+        composable(
+            route = "editor/{kind}?postId={postId}",
+            arguments = listOf(
+                navArgument("kind") { type = NavType.StringType },
+                navArgument("postId") { type = NavType.LongType; defaultValue = 0L }
+            ),
             enterTransition = { slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it / 10 } + fadeIn(tween(300)) },
             exitTransition = { fadeOut(tween(200)) },
             popEnterTransition = { fadeIn(tween(240)) },
             popExitTransition = { slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it / 10 } + fadeOut(tween(220)) }
         ) { backStack ->
             val kind = backStack.arguments?.getString("kind") ?: "post"
+            val postId = backStack.arguments?.getLong("postId") ?: 0L
             WriterOnly(kind = kind, onDenied = { navController.popBackStack() }) {
-                EditorScreen(kind = kind, onBack = { navController.popBackStack() })
+                EditorScreen(kind = kind, postId = postId, onBack = { navController.popBackStack() })
             }
         }
 
