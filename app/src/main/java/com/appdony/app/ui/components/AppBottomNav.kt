@@ -102,6 +102,7 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.pow
 import kotlin.random.Random
 
 private val NavInnerPadding = 6.dp
@@ -212,6 +213,48 @@ private fun Modifier.softShadow(
     }
 }
 
+/**
+ * سایه‌ی بدنه‌ی منوی پایین: زیر نوار غلیظ‌تره و با فاصله آروم محو می‌شه (افت درجه‌ی دوم، مثل سایه‌ی واقعی)،
+ * کناره‌ها و بالا فقط یه اثر ریز دارن. داخل خودِ شیشه کشیده نمی‌شه.
+ * [offsetY] هرچی بیشتر، سایه بیشتر زیر نوار میفته؛ [spread] تا کجا پخش بشه؛ [color].alpha غلظت درست زیر نوار؛
+ * [falloff] هرچی بیشتر، محو شدن سریع‌تر. softShadow کاشی‌ها دست‌نخورده می‌مونه.
+ */
+private fun Modifier.bodyDropShadow(
+    shape: Shape,
+    color: Color,
+    spread: Dp,
+    offsetY: Dp,
+    layers: Int = 16,
+    falloff: Float = 2.2f
+): Modifier = this.drawBehind {
+    val path = when (val o = shape.createOutline(size, layoutDirection, this)) {
+        is Outline.Generic -> o.path
+        is Outline.Rounded -> Path().apply { addRoundRect(o.roundRect) }
+        is Outline.Rectangle -> Path().apply { addRect(o.rect) }
+    }
+    val spreadPx = spread.toPx()
+    clipPath(path, ClipOp.Difference) {
+        translate(top = offsetY.toPx()) {
+            for (i in 1..layers) {
+                val reach = spreadPx * i / layers
+                // سهم این لایه: مجموع لایه‌های i تا آخر = alpha × (1 − (i−1)/L)^falloff
+                val a = color.alpha * ((1f - (i - 1f) / layers).pow(falloff) - (1f - i.toFloat() / layers).pow(falloff))
+                val layerColor = color.copy(alpha = a)
+                // زیر خودِ شکلِ جابه‌جاشده پر می‌شه (قسمتی که از زیر نوار بیرون می‌زنه)…
+                drawPath(path = path, color = layerColor)
+                // …و بیرونش به‌صورت حلقه‌های نرم پخش می‌شه
+                clipPath(path, ClipOp.Difference) {
+                    drawPath(
+                        path = path,
+                        color = layerColor,
+                        style = Stroke(width = reach * 2f, join = StrokeJoin.Round)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun AppBottomNav(
     currentRoute: String?,
@@ -267,8 +310,8 @@ private fun NavBar(
         if (dark) listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
         else listOf(Color.White.copy(alpha = 0.85f), outline.copy(alpha = 0.12f), outline.copy(alpha = 0.06f))
     )
-    // سایه‌ی بدنه: خیلی کم‌رنگ و بیشتر زیر بار (مثل تلگرام ادز)؛ بالای بدنه فقط یه اثر خیلی ریز (spread − offsetY = ۲dp)
-    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.11f) else Color.Black.copy(alpha = 0.05f)
+    // سایه‌ی بدنه: زیر نوار دیده می‌شه و نرم محو می‌شه؛ تو تم تیره غلیظ‌تر چون پس‌زمینه خودش تیره‌ست
+    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.34f) else Color.Black.copy(alpha = 0.13f)
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -280,7 +323,7 @@ private fun NavBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .softShadow(barShape, bodyShadow, spread = 10.dp, offsetY = 8.dp)
+                    .bodyDropShadow(barShape, bodyShadow, spread = 26.dp, offsetY = 8.dp)
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
                         // بلور درشت تا رنگِ پشتش نرم پخش بشه
