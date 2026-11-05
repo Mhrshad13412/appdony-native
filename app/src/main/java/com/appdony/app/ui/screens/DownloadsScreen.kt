@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -121,6 +123,7 @@ fun DownloadsScreen() {
                         item = item,
                         onOpen = { openDownload(context, item) },
                         onDelete = { vm.delete(item) },
+                        onPause = { vm.pause(item) },
                         onRetry = {
                             AppBanner.show(BannerKind.CHECKING, "در حال آماده‌سازی دانلود...", 8000L)
                             vm.retry(item) { result ->
@@ -246,10 +249,12 @@ private fun DownloadCard(
     item: DownloadItem,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
+    onPause: () -> Unit,
     onRetry: () -> Unit
 ) {
     val done = item.status == DownloadManager.STATUS_SUCCESSFUL
     val failed = item.status == DownloadManager.STATUS_FAILED
+    val paused = item.status == DownloadManager.STATUS_PAUSED
     val primary = MaterialTheme.colorScheme.primary
     val statusColor = when {
         done -> StatusGreen
@@ -268,7 +273,7 @@ private fun DownloadCard(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconWithRing(item, done, failed)
+            IconWithRing(item, done, failed || paused)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 // اسم تمیز: «دانلود روبیکا نسخه 4.1.1 برای اندروید» → «روبیکا»
@@ -298,14 +303,15 @@ private fun DownloadCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (done || failed) {
-                    Spacer(Modifier.height(8.dp))
-                    if (done) {
+                Spacer(Modifier.height(8.dp))
+                when {
+                    done -> {
                         val isApk = item.fileName.lowercase().endsWith(".apk")
                         PillButton(if (isApk) "نصب" else "باز کردن", null, primary, onOpen)
-                    } else {
-                        PillButton("تلاش دوباره", Icons.Default.Refresh, StatusYellow, onRetry)
                     }
+                    failed -> PillButton("تلاش دوباره", Icons.Default.Refresh, StatusYellow, onRetry)
+                    paused -> PillButton("ادامه", Icons.Default.PlayArrow, primary, onRetry)
+                    else -> PillButton("توقف", Icons.Default.Pause, AppdonyTextMuted, onPause)
                 }
             }
             IconButton(onClick = onDelete) {
@@ -322,7 +328,10 @@ private fun statusText(item: DownloadItem): String = when (item.status) {
     DownloadManager.STATUS_SUCCESSFUL -> "دانلود کامل شد • ${ltr(formatSize(item.total))}"
     DownloadManager.STATUS_FAILED -> item.message ?: "دانلود ناموفق بود"
     DownloadManager.STATUS_PENDING -> item.message ?: "در صف دانلود..."
-    DownloadManager.STATUS_PAUSED -> item.message ?: "متوقف شد"
+    DownloadManager.STATUS_PAUSED -> {
+        val sizes = if (item.total > 0) " • ${ltr("${item.progress}%")} از ${ltr(formatSize(item.total))}" else ""
+        (item.message ?: "متوقف شد") + sizes
+    }
     else -> if (item.total > 0) {
         "${ltr("${item.progress}%")} • ${ltr(formatSize(item.bytes))} از ${ltr(formatSize(item.total))}"
     } else {
