@@ -1,5 +1,13 @@
 package com.appdony.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -10,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,16 +27,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,24 +63,33 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.text.HtmlCompat
+import coil.compose.AsyncImage
 import com.appdony.app.data.model.BlockEditing
+import com.appdony.app.data.model.BlockSerializer
 import com.appdony.app.data.model.BlockType
 import com.appdony.app.data.model.EditorBlock
+import com.appdony.app.data.model.ImageData
 
 // ───────────────────────── بلوک آزاد (مثل وردپرس: بدون کادر و رنگ) ─────────────────────────
 
 @Composable
 internal fun BlockCard(block: EditorBlock, index: Int, count: Int, vm: EditorViewModel, preview: Boolean) {
     val focused = !preview && vm.focusedId == block.id
+    var settingsOpen by remember(block.id) { mutableStateOf(false) }
+    val showSettings = focused && settingsOpen && hasSettings(block.type)
     val cardModifier = if (preview) {
         Modifier
             .fillMaxWidth()
@@ -78,14 +104,47 @@ internal fun BlockCard(block: EditorBlock, index: Int, count: Int, vm: EditorVie
             .padding(vertical = 2.dp)
     }
     Column(modifier = cardModifier) {
-        if (focused) BlockToolbar(block = block, index = index, count = count, vm = vm)
+        if (focused) {
+            BlockToolbar(
+                block = block,
+                index = index,
+                count = count,
+                vm = vm,
+                settingsOpen = showSettings,
+                onSettings = { settingsOpen = !settingsOpen }
+            )
+        }
         BlockBody(block = block, vm = vm, preview = preview, focused = focused)
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = expandVertically(tween(220)) + fadeIn(tween(180)),
+            exit = shrinkVertically(tween(180)) + fadeOut(tween(120))
+        ) {
+            BlockSettings(block = block, vm = vm)
+        }
     }
 }
 
+/** بلوک‌هایی که آیکن تنظیمات دارن */
+private fun hasSettings(type: BlockType): Boolean = when (type) {
+    BlockType.IMAGE, BlockType.HEADING, BlockType.LIST, BlockType.ORDERED_LIST,
+    BlockType.QUOTE, BlockType.PULLQUOTE -> true
+    else -> false
+}
+
+private fun isRaw(block: EditorBlock): Boolean =
+    block.type == BlockType.HTML && block.extra == BlockSerializer.RAW
+
 /** نوار ابزار کوچیک و خنثی فقط برای بلوک انتخاب‌شده */
 @Composable
-private fun BlockToolbar(block: EditorBlock, index: Int, count: Int, vm: EditorViewModel) {
+private fun BlockToolbar(
+    block: EditorBlock,
+    index: Int,
+    count: Int,
+    vm: EditorViewModel,
+    settingsOpen: Boolean,
+    onSettings: () -> Unit
+) {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
@@ -96,14 +155,264 @@ private fun BlockToolbar(block: EditorBlock, index: Int, count: Int, vm: EditorV
         Icon(block.type.icon, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(
-            text = block.type.label,
+            text = if (isRaw(block)) "بلوک خام (HTML سایت)" else block.type.label,
             color = scheme.onSurfaceVariant,
             fontSize = 11.sp,
             modifier = Modifier.weight(1f)
         )
+        if (hasSettings(block.type)) {
+            MiniButton(
+                Icons.Outlined.Tune,
+                "تنظیمات بلوک",
+                tint = if (settingsOpen) scheme.primary else scheme.onSurfaceVariant,
+                onClick = onSettings
+            )
+        }
         MiniButton(Icons.Outlined.ArrowUpward, "بالا", enabled = index > 0) { vm.move(block.id, -1) }
         MiniButton(Icons.Outlined.ArrowDownward, "پایین", enabled = index < count - 1) { vm.move(block.id, 1) }
         MiniButton(Icons.Outlined.Delete, "حذف", tint = scheme.error) { vm.remove(block.id) }
+    }
+}
+
+// ───────────────────────── تنظیمات هر بلوک ─────────────────────────
+
+@Composable
+private fun BlockSettings(block: EditorBlock, vm: EditorViewModel) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(scheme.onSurface.copy(alpha = 0.05f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        when (block.type) {
+            BlockType.IMAGE -> ImageSettings(block = block, vm = vm)
+
+            BlockType.HEADING -> {
+                SettingLabel("سطح سرنویس")
+                LevelChips(current = block.extra) { vm.updateExtra(block.id, it) }
+            }
+
+            BlockType.LIST, BlockType.ORDERED_LIST -> {
+                SettingLabel("نوع فهرست")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingChip("نقطه‌ای", block.type == BlockType.LIST) { vm.changeType(block.id, BlockType.LIST) }
+                    SettingChip("شماره‌دار", block.type == BlockType.ORDERED_LIST) { vm.changeType(block.id, BlockType.ORDERED_LIST) }
+                }
+            }
+
+            BlockType.QUOTE, BlockType.PULLQUOTE -> {
+                SettingLabel("سبک نقل‌قول")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingChip("عادی", block.type == BlockType.QUOTE) { vm.changeType(block.id, BlockType.QUOTE) }
+                    SettingChip("برجسته", block.type == BlockType.PULLQUOTE) { vm.changeType(block.id, BlockType.PULLQUOTE) }
+                }
+            }
+
+            else -> Unit
+        }
+    }
+}
+
+@Composable
+private fun SettingLabel(text: String) {
+    Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+}
+
+@Composable
+private fun SettingChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) scheme.primary.copy(alpha = 0.22f) else scheme.onSurface.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) scheme.primary else scheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+/** متن جایگزین (alt)، تغییر و حذف تصویر */
+@Composable
+private fun ImageSettings(block: EditorBlock, vm: EditorViewModel) {
+    val scheme = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) vm.uploadBlockImage(ctx, block.id, uri)
+    }
+    val hasImage = ImageData.url(block.text).isNotEmpty()
+
+    SettingLabel("متن جایگزین (alt)")
+    val altStyle = TextStyle(
+        color = scheme.onSurface,
+        fontSize = 14.sp,
+        lineHeight = 22.sp,
+        textDirection = TextDirection.Content
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(scheme.onSurface.copy(alpha = 0.06f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        BasicTextField(
+            value = block.extra,
+            onValueChange = { vm.updateExtra(block.id, it.replace("\n", " ")) },
+            textStyle = altStyle,
+            cursorBrush = SolidColor(scheme.primary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { if (it.isFocused) vm.focusedId = block.id },
+            decorationBox = { inner ->
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (block.extra.isEmpty()) {
+                        Text(
+                            text = "تصویر رو کوتاه و واضح توصیف کن",
+                            style = altStyle.copy(color = scheme.onSurfaceVariant.copy(alpha = 0.5f))
+                        )
+                    }
+                    inner()
+                }
+            }
+        )
+    }
+    Text(
+        text = "متن alt برای سئو و کاربرهای نابینا مهمه؛ تصویر شاخص و تصاویر داخل متن باید alt داشته باشن.",
+        color = scheme.onSurfaceVariant,
+        fontSize = 11.sp,
+        lineHeight = 17.sp
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = { picker.launch("image/*") }, enabled = !vm.uploading) {
+            Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (hasImage) "تغییر تصویر" else "انتخاب تصویر")
+        }
+        if (hasImage) {
+            TextButton(onClick = {
+                vm.updateText(block.id, "")
+                vm.updateExtra(block.id, "")
+            }) {
+                Icon(Icons.Outlined.Delete, contentDescription = null, tint = scheme.error, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("حذف تصویر", color = scheme.error)
+            }
+        }
+    }
+}
+
+// ───────────────────────── بلوک تصویر و پیش‌نمایش بلوک خام ─────────────────────────
+
+@Composable
+private fun ImageBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean, focused: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) vm.uploadBlockImage(ctx, block.id, uri)
+    }
+    val url = ImageData.url(block.text)
+    if (url.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(scheme.onSurface.copy(alpha = 0.06f))
+                .clickable(enabled = !preview && !vm.uploading) { picker.launch("image/*") },
+            contentAlignment = Alignment.Center
+        ) {
+            if (vm.uploading) {
+                CircularProgressIndicator(color = scheme.primary, strokeWidth = 3.dp, modifier = Modifier.size(30.dp))
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(30.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(text = "انتخاب تصویر", color = scheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "از گالری گوشی", color = scheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            AsyncImage(
+                model = url,
+                contentDescription = block.extra.ifBlank { null },
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 90.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(scheme.onSurface.copy(alpha = 0.06f))
+            )
+            if (focused && block.extra.isBlank()) {
+                Text(
+                    text = "متن جایگزین (alt) خالیه؛ از آیکن تنظیمات بالا پر کن",
+                    color = scheme.error,
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
+}
+
+private val RAW_IMG = Regex("<img[^>]*?\\ssrc=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+private val RAW_COMMENT = Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL)
+
+/** پیش‌نمایش خوانا از بلوک خامِ سایت (تصویر + متن)؛ با زدن روی بلوک، کدش برای ویرایش باز می‌شه */
+@Composable
+private fun RawPreview(block: EditorBlock) {
+    val scheme = MaterialTheme.colorScheme
+    val image = RAW_IMG.find(block.text)?.groupValues?.get(1)?.replace("&amp;", "&")
+    val text = remember(block.text) {
+        HtmlCompat.fromHtml(block.text.replace(RAW_COMMENT, ""), HtmlCompat.FROM_HTML_MODE_COMPACT)
+            .toString()
+            .replace("\uFFFC", "")
+            .trim()
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(scheme.onSurface.copy(alpha = 0.05f))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (image != null) {
+            AsyncImage(
+                model = image,
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 60.dp)
+                    .clip(RoundedCornerShape(10.dp))
+            )
+        }
+        if (text.isNotEmpty()) {
+            Text(
+                text = text,
+                color = scheme.onSurface,
+                fontSize = 14.sp,
+                lineHeight = 22.sp,
+                maxLines = 8,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            text = "بلوک خام سایت؛ برای ویرایش کد روش بزن",
+            color = scheme.onSurfaceVariant.copy(alpha = 0.8f),
+            fontSize = 10.sp
+        )
     }
 }
 
@@ -409,18 +718,24 @@ private fun BlockBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean,
         }
 
         BlockEditing.CODE -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(scheme.onSurface.copy(alpha = 0.06f))
-                    .padding(10.dp)
-            ) {
-                BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview) {
-                    vm.updateText(block.id, it)
+            if (isRaw(block) && (preview || !focused)) {
+                RawPreview(block = block)
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(scheme.onSurface.copy(alpha = 0.06f))
+                        .padding(10.dp)
+                ) {
+                    BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview) {
+                        vm.updateText(block.id, it)
+                    }
                 }
             }
         }
+
+        BlockEditing.IMAGE -> ImageBody(block = block, vm = vm, preview = preview, focused = focused)
 
         BlockEditing.BUTTON -> {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
