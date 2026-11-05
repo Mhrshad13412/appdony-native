@@ -21,6 +21,8 @@ class SettingsManager(private val context: Context) {
         private val KEY_BETA = booleanPreferencesKey("beta_enabled")
         private val KEY_FIXED_AI = booleanPreferencesKey("fixed_ai") // دکمه‌ی ثابت هوش مصنوعی وسط منو
         private val KEY_AI_CORNER = booleanPreferencesKey("ai_corner") // دکمه‌ی ثابت هوش مصنوعی گوشه‌ی صفحه
+        private val KEY_AUTO_UPDATE_APP = booleanPreferencesKey("auto_update_app") // آپدیت خودکار خود اپدونی
+        private val KEY_AUTO_UPDATE_APPS = booleanPreferencesKey("auto_update_apps") // آپدیت خودکار برنامه‌های دانلودشده
 
         const val STYLE_GLASS = "glass"
         const val STYLE_CLASSIC = "classic"
@@ -43,6 +45,20 @@ class SettingsManager(private val context: Context) {
 
     // هوش مصنوعی ثابت گوشه (مثل دکمه‌ی پشتیبانی تلگرام ادز): پیش‌فرض روشن؛ گوشه‌ی راست، بالای منو
     val aiCorner: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AI_CORNER] ?: true }
+
+    // آپدیت خودکار خود اپدونی: پیش‌فرض خاموش
+    val autoUpdateApp: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_UPDATE_APP] ?: false }
+
+    // آپدیت خودکار برنامه‌هایی که کاربر از اپدونی دانلود کرده: پیش‌فرض خاموش
+    val autoUpdateApps: Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_UPDATE_APPS] ?: false }
+
+    suspend fun setAutoUpdateApp(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_AUTO_UPDATE_APP] = enabled }
+    }
+
+    suspend fun setAutoUpdateApps(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_AUTO_UPDATE_APPS] = enabled }
+    }
 
     suspend fun setAiCorner(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AI_CORNER] = enabled }
