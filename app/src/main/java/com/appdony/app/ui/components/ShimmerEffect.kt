@@ -18,17 +18,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-/** یک دور رفتنِ نور از راست به چپ (میلی‌ثانیه) */
-private const val SHIMMER_PERIOD_MS = 1300L
+/** یک دور رفتنِ نور از لبه‌ی راستِ صفحه تا لبه‌ی چپ (میلی‌ثانیه) */
+private const val SHIMMER_PERIOD_MS = 1500L
 
 /**
- * نور براقِ کج که از راست به چپ رد می‌شه (چیدمان فارسی/RTL: همون جهتی که منوها باز می‌شن).
- * همه‌ی جعبه‌ها از یه ساعت مشترک پیروی می‌کنن، پس کنار هم هماهنگ و هم‌فاز می‌رن.
- * فقط مرحله‌ی «رسم» دوباره اجرا می‌شه، نه کل ترکیب.
+ * برق یوتیوبی: یک نوار نورِ کج که از راست به چپِ «کل صفحه» رد می‌شه (چیدمان فارسی/RTL).
+ * نور برای هر جعبه جدا نیست؛ همه‌ی جعبه‌ها نور رو توی مختصات پنجره می‌کشن، پس یه برقِ پیوسته
+ * از روی همه‌ی ردیف‌ها و عکس‌ها و عنوان‌ها رد می‌شه و هم‌فازن.
+ * فقط مرحله‌ی «رسم» هر فریم دوباره اجرا می‌شه، نه کل ترکیب.
  */
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Int = 12) {
@@ -44,24 +51,36 @@ fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Int = 12) {
         label = "shimmer_tick"
     )
 
+    val screenW = LocalContext.current.resources.displayMetrics.widthPixels.toFloat()
     val base = MaterialTheme.colorScheme.surfaceVariant
-    val shine = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f).compositeOver(base)
-    val colors = listOf(base, shine, base)
+    // تم روشن: برق سفیدِ پررنگ؛ تم تیره: برق سفیدِ ملایم (توی هر دو دیده می‌شه)
+    val glint = if (base.luminance() > 0.5f) Color.White.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.14f)
+    val colors = listOf(base, glint.compositeOver(base), base)
+    // جای این جعبه توی پنجره (برای پیوسته بودن نور بین همه‌ی جعبه‌ها)
+    val origin = remember { floatArrayOf(0f, 0f) }
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius.dp))
+            .onGloballyPositioned { coords ->
+                val p = coords.positionInWindow()
+                origin[0] = p.x
+                origin[1] = p.y
+            }
             .drawBehind {
-                val progress = (SystemClock.uptimeMillis() % SHIMMER_PERIOD_MS).toFloat() / SHIMMER_PERIOD_MS + tick * 0f
-                val band = size.width.coerceAtLeast(240f) * 0.55f
-                // نوار نور از لبه‌ی راست وارد می‌شه و از لبه‌ی چپ بیرون می‌ره
-                val x0 = (size.width + band) * (1f - progress)
+                val frame = tick
+                val progress = (SystemClock.uptimeMillis() % SHIMMER_PERIOD_MS).toFloat() / SHIMMER_PERIOD_MS + frame * 0f
+                val band = screenW * 0.55f
+                // نوار نور (مختصات پنجره) از لبه‌ی راست وارد می‌شه و از لبه‌ی چپ بیرون می‌ره
+                val x0 = (screenW + band) * (1f - progress)
+                val sx = x0 - origin[0]
+                val sy = -origin[1]
                 drawRect(
                     brush = Brush.linearGradient(
                         colors = colors,
                         // جهت: بالا-راست به پایین-چپ؛ پس نور کج «\» رد می‌شه (آینه‌ی حالت LTR)
-                        start = Offset(x0, 0f),
-                        end = Offset(x0 - band, band * 0.45f)
+                        start = Offset(sx, sy),
+                        end = Offset(sx - band, sy + band * 0.45f)
                     )
                 )
             }
