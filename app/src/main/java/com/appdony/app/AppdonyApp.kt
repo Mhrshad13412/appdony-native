@@ -1,6 +1,11 @@
 package com.appdony.app
 
 import android.app.Application
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -9,6 +14,7 @@ import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.data.repository.HomeRepository
 import com.appdony.app.util.AppForeground
+import com.appdony.app.util.AutoUpdateWorker
 import com.appdony.app.util.CrashReporter
 import com.appdony.app.util.DownloadEngine
 import com.appdony.app.util.NetworkMonitor
@@ -16,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class AppdonyApp : Application(), ImageLoaderFactory {
 
@@ -27,6 +34,7 @@ class AppdonyApp : Application(), ImageLoaderFactory {
         AppForeground.install(this)
         NetworkMonitor.init(this)
         resumeDownloads()
+        scheduleAutoUpdate()
         prefetchHome()
     }
 
@@ -38,6 +46,21 @@ class AppdonyApp : Application(), ImageLoaderFactory {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    // چک آپدیت خودکار هر ۶ ساعت؛ خود Worker اول تنظیمات رو نگاه می‌کنه و اگه هر دو سوئیچ خاموش باشن بلافاصله تموم می‌شه
+    private fun scheduleAutoUpdate() {
+        try {
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            val request = PeriodicWorkRequestBuilder<AutoUpdateWorker>(6, TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "AutoUpdateWork", ExistingPeriodicWorkPolicy.KEEP, request
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
