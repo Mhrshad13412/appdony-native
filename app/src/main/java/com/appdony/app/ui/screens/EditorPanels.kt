@@ -16,11 +16,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,6 +72,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -92,8 +91,8 @@ enum class SidePanel(val label: String, val short: String, val icon: ImageVector
 // ───────────────────────── دکمه‌ی کناری (قرص عمودی لبه‌ی راست، وسط) ─────────────────────────
 
 /**
- * قرص عمودی لبه‌ی راست. بسته: فقط یه قرص باریک و بلند با فلش «<».
- * باز: از سمت راست به چپ کشیده می‌شه و موردهاش (آیکن + متن) توی یه ردیف عمودی نشون داده می‌شن؛ فلش می‌شه «>».
+ * همون سبک کشوی پایین، فقط عمودی و کوچیک: یه قرص باریک با فلش «<» (بسته) و «>» (باز) لبه‌ی راست،
+ * و وقتی باز بشه نوار آیکن‌ها (هر کدوم با متن زیرش) توی یه ردیف عمودی از راست به چپ کنارش باز می‌شه.
  * زدن روی هر مورد پنل اون بخش رو باز می‌کنه.
  */
 @Composable
@@ -104,20 +103,16 @@ internal fun SideDock(
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(22.dp)
     Row(
-        modifier = modifier
-            .height(IntrinsicSize.Min)
-            .glassTrack(shape)
-            .clip(shape),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // دسته: همیشه سمت راست؛ بسته «<» و باز «>»
+        // دسته: مثل دسته‌ی کشوهای بالا و پایین، ولی عمودی
         Box(
             modifier = Modifier
-                .width(34.dp)
-                .fillMaxHeight()
-                .heightIn(min = 104.dp)
+                .width(24.dp)
+                .height(64.dp)
+                .glassTrack(RoundedCornerShape(12.dp))
                 .clickable(onClick = onHandle),
             contentAlignment = Alignment.Center
         ) {
@@ -125,10 +120,10 @@ internal fun SideDock(
                 imageVector = if (menuOpen) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
                 contentDescription = if (menuOpen) "بستن منو" else "باز کردن منو",
                 tint = scheme.onSurfaceVariant,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
-        // موردها: از راست به چپ باز می‌شن، یه ردیف عمودی
+        // نوار موردها: از راست به چپ باز می‌شه
         AnimatedVisibility(
             visible = menuOpen,
             enter = expandHorizontally(tween(260), expandFrom = Alignment.Start) + fadeIn(tween(200)),
@@ -136,9 +131,10 @@ internal fun SideDock(
         ) {
             Column(
                 modifier = Modifier
-                    .width(80.dp)
-                    .padding(vertical = 6.dp, horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(start = 6.dp)
+                    .width(76.dp)
+                    .glassTrack(RoundedCornerShape(22.dp))
+                    .padding(horizontal = 4.dp, vertical = 6.dp)
             ) {
                 SidePanel.entries.forEach { item ->
                     Column(
@@ -146,18 +142,17 @@ internal fun SideDock(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
                             .clickable { onPick(item) }
-                            .padding(vertical = 8.dp, horizontal = 2.dp),
+                            .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(item.icon, contentDescription = item.label, tint = scheme.primary, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = item.short,
                             color = scheme.onSurfaceVariant,
                             fontSize = 10.sp,
-                            lineHeight = 13.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
