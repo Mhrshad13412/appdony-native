@@ -100,8 +100,11 @@ object BlockParser {
     private fun raw(markup: String): EditorBlock =
         EditorBlock(id = 0, type = BlockType.HTML, text = markup.trim(), extra = BlockSerializer.RAW)
 
-    private fun block(type: BlockType, text: String, extra: String = ""): EditorBlock =
-        EditorBlock(id = 0, type = type, text = text, extra = extra)
+    private fun block(type: BlockType, text: String, extra: String = "", spans: List<InlineSpan> = emptyList()): EditorBlock =
+        EditorBlock(id = 0, type = type, text = text, extra = extra, spans = spans)
+
+    private fun rich(type: BlockType, parsed: InlineFormat.Parsed, extra: String = ""): EditorBlock =
+        block(type, parsed.text, extra, parsed.spans)
 
     // ───────────── متن آزاد بین بلوک‌ها (نوشته‌های قدیمیِ کلاسیک) ─────────────
 
@@ -112,9 +115,14 @@ object BlockParser {
             val simple = if (!part.contains('<')) {
                 unescape(part)
             } else {
-                P_ONLY.find(part)?.let { plain(it.groupValues[1]) }
+                null
             }
-            out.add(if (simple != null) block(BlockType.PARAGRAPH, simple) else raw(part))
+            if (simple != null) {
+                out.add(block(BlockType.PARAGRAPH, simple))
+            } else {
+                val parsed = P_ONLY.find(part)?.let { InlineFormat.parse(it.groupValues[1]) }
+                out.add(if (parsed != null) rich(BlockType.PARAGRAPH, parsed) else raw(part))
+            }
         }
     }
 
@@ -127,7 +135,7 @@ object BlockParser {
 
         val converted: EditorBlock? = when (name) {
             "core/paragraph" ->
-                if (keys.isEmpty()) P_ONLY.find(body)?.let { m -> plain(m.groupValues[1])?.let { block(BlockType.PARAGRAPH, it) } }
+                if (keys.isEmpty()) P_ONLY.find(body)?.let { m -> InlineFormat.parse(m.groupValues[1])?.let { rich(BlockType.PARAGRAPH, it) } }
                 else null
 
             "core/heading" -> {
@@ -135,7 +143,7 @@ object BlockParser {
                 val level = m?.groupValues?.get(1)
                 val declared = attrs.get("level")?.let { runCatching { it.asInt.toString() }.getOrNull() }
                 if (m != null && keys.all { it == "level" } && (declared == null || declared == level)) {
-                    plain(m.groupValues[2])?.takeIf { !it.contains('\n') }?.let { block(BlockType.HEADING, it, level ?: "2") }
+                    InlineFormat.parse(m.groupValues[2])?.takeIf { !it.text.contains('\n') }?.let { rich(BlockType.HEADING, it, level ?: "2") }
                 } else null
             }
 
@@ -145,7 +153,7 @@ object BlockParser {
                 if (keys.isEmpty()) quote(body) else null
 
             "core/pullquote" ->
-                if (keys.isEmpty()) PULLQUOTE.find(body)?.let { m -> plain(m.groupValues[1])?.let { block(BlockType.PULLQUOTE, it) } }
+                if (keys.isEmpty()) PULLQUOTE.find(body)?.let { m -> InlineFormat.parse(m.groupValues[1])?.let { rich(BlockType.PULLQUOTE, it) } }
                 else null
 
             "core/code" ->
@@ -156,7 +164,7 @@ object BlockParser {
                 else null
 
             "core/verse" ->
-                if (keys.isEmpty()) VERSE.find(body)?.let { m -> plain(m.groupValues[1])?.let { block(BlockType.VERSE, it) } }
+                if (keys.isEmpty()) VERSE.find(body)?.let { m -> InlineFormat.parse(m.groupValues[1])?.let { rich(BlockType.VERSE, it) } }
                 else null
 
             "core/buttons" ->
@@ -204,13 +212,13 @@ object BlockParser {
         if (content.contains("<ul") || content.contains("<ol")) return null
         val leftover = content.replace(COMMENT, "").replace(LI_ITEM, "").trim()
         if (leftover.isNotEmpty()) return null
-        val items = ArrayList<String>()
+        val items = ArrayList<InlineFormat.Parsed>()
         for (match in LI_ITEM.findAll(content)) {
-            val text = plain(match.groupValues[1]) ?: return null
-            items.add(text)
+            val parsed = InlineFormat.parse(match.groupValues[1]) ?: return null
+            items.add(parsed)
         }
-        if (items.isEmpty() || items.any { it.contains('\n') }) return null
-        return block(if (ordered) BlockType.ORDERED_LIST else BlockType.LIST, items.joinToString("\n"))
+        if (items.isEmpty() || items.any { it.text.contains('\n') }) return null
+        return rich(if (ordered) BlockType.ORDERED_LIST else BlockType.LIST, join(items))
     }
 
     private fun quote(body: String): EditorBlock? {
@@ -218,13 +226,13 @@ object BlockParser {
         val content = m.groupValues[1]
         val leftover = content.replace(COMMENT, "").replace(P_ITEM, "").trim()
         if (leftover.isNotEmpty()) return null
-        val paragraphs = ArrayList<String>()
+        val paragraphs = ArrayList<InlineFormat.Parsed>()
         for (match in P_ITEM.findAll(content)) {
-            val text = plain(match.groupValues[1]) ?: return null
-            paragraphs.add(text)
+            val parsed = InlineFormat.parse(match.groupValues[1]) ?: return null
+            paragraphs.add(parsed)
         }
-        if (paragraphs.isEmpty() || paragraphs.any { it.contains('\n') }) return null
-        return block(BlockType.QUOTE, paragraphs.joinToString("\n"))
+        if (paragraphs.isEmpty() || paragraphs.any { it.text.contains('\n') }) return null
+        return rich(BlockType.QUOTE, join(paragraphs))
     }
 
     /** تصویر ساده‌ی بدون کپشن و لینک؛ هر شکل دیگه‌ای عیناً به‌صورت بلوک خام می‌مونه */
@@ -274,6 +282,19 @@ object BlockParser {
         val withBreaks = html.replace(BR, "\n")
         if (withBreaks.contains('<')) return null
         return unescape(withBreaks)
+    }
+
+    /** چند خط (مورد فهرست یا پاراگراف نقل‌قول) رو با خط جدید به هم می‌چسبونه و موقعیت قالب‌بندی‌ها رو درست می‌کنه */
+    private fun join(parts: List<InlineFormat.Parsed>): InlineFormat.Parsed {
+        val sb = StringBuilder()
+        val spans = ArrayList<InlineSpan>()
+        parts.forEachIndexed { index, part ->
+            if (index > 0) sb.append('\n')
+            val offset = sb.length
+            sb.append(part.text)
+            part.spans.forEach { spans.add(it.copy(start = it.start + offset, end = it.end + offset)) }
+        }
+        return InlineFormat.Parsed(sb.toString(), spans)
     }
 
     private fun unescape(s: String): String {
