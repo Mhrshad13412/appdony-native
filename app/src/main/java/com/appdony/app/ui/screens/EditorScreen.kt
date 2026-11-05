@@ -64,6 +64,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -80,6 +81,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -100,6 +102,7 @@ import com.appdony.app.data.model.BlockParser
 import com.appdony.app.data.model.BlockSerializer
 import com.appdony.app.data.model.BlockType
 import com.appdony.app.data.model.EditorBlock
+import com.appdony.app.data.model.InlineFormat
 import com.appdony.app.data.model.PostSettings
 import com.appdony.app.data.model.SeoInfo
 import com.appdony.app.data.model.WpCategory
@@ -142,6 +145,10 @@ class EditorViewModel : ViewModel() {
     var scrollToId by mutableStateOf<Long?>(null)
     private var nextId = 1L
 
+    // قالب‌بندی داخل متن: انتخابِ فعلی، و بازه‌ای که دکمه‌ی لینک روش زده شده
+    var fmtSel by mutableStateOf<FormatSel?>(null)
+    var linkTarget by mutableStateOf<FormatSel?>(null)
+
     // ذخیره روی سایت: بعد از اولین ذخیره (یا باز شدن مطلب موجود) شناسه و لینک مطلب مشخص می‌شه
     // و ذخیره‌های بعدی همون مطلب رو به‌روز می‌کنن
     var postId by mutableStateOf<Long?>(null)
@@ -179,7 +186,7 @@ class EditorViewModel : ViewModel() {
         append(title).append('\u0001').append(featuredId ?: 0L)
         append('\u0001').append(appInfo).append('\u0001').append(seo).append('\u0001').append(settings)
         blocks.forEach {
-            append('\u0001').append(it.type.name).append('|').append(it.text).append('|').append(it.extra)
+            append('\u0001').append(it.type.name).append('|').append(it.text).append('|').append(it.extra).append('|').append(it.spans)
         }
     }
 
@@ -268,7 +275,11 @@ class EditorViewModel : ViewModel() {
 
     fun updateText(id: Long, text: String) {
         val i = blocks.indexOfFirst { it.id == id }
-        if (i >= 0 && blocks[i].text != text) blocks[i] = blocks[i].copy(text = text)
+        if (i >= 0 && blocks[i].text != text) {
+            val old = blocks[i]
+            // قالب‌بندی‌ها (بولد، لینک و ...) با تایپ و پاک کردن جابه‌جا می‌شن
+            blocks[i] = old.copy(text = text, spans = InlineFormat.shift(old.text, text, old.spans))
+        }
     }
 
     fun updateExtra(id: Long, extra: String) {
@@ -287,8 +298,14 @@ class EditorViewModel : ViewModel() {
         }
         val before = raw.substring(0, cut)
         val after = raw.substring(cut + 1).replace("\n", " ")
-        blocks[i] = blocks[i].copy(text = before)
-        val next = EditorBlock(nextId++, BlockType.PARAGRAPH, text = after)
+        val shifted = InlineFormat.shift(blocks[i].text, raw, blocks[i].spans)
+        blocks[i] = blocks[i].copy(text = before, spans = InlineFormat.slice(shifted, 0, cut))
+        val next = EditorBlock(
+            nextId++,
+            BlockType.PARAGRAPH,
+            text = after,
+            spans = InlineFormat.slice(shifted, cut + 1, raw.length)
+        )
         blocks.add(i + 1, next)
         focusedId = next.id
         pendingFocusId = next.id
@@ -518,6 +535,15 @@ class EditorViewModel : ViewModel() {
  */
 @Composable
 fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
+    // منوی انتخاب متنِ سیستم (ترجمه، خواندن با صدای بلند، ...) با منوی خودمون عوض می‌شه
+    val toolbar = remember { EditorTextToolbar() }
+    CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+        EditorScreenContent(kind = kind, postId = postId, onBack = onBack, toolbar = toolbar)
+    }
+}
+
+@Composable
+private fun EditorScreenContent(kind: String, postId: Long, onBack: () -> Unit, toolbar: EditorTextToolbar) {
     val isBlog = kind == "blog"
     val ctx = LocalContext.current
     val vm: EditorViewModel = viewModel(key = "editor_${kind}_$postId")
@@ -754,6 +780,9 @@ fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
                 onBack = onBack
             )
         }
+
+        // منوی انتخاب متن: بولد، کج، خط‌خورده، لینک، کپی و ...
+        EditorTextToolbarHost(toolbar = toolbar, vm = vm)
     }
 
     if (showOutline) {
@@ -1184,49 +1213,3 @@ private fun QuickBar(
                             .clickable { onPick(type) }
                             .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(type.icon, contentDescription = type.label, tint = scheme.primary, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = type.label,
-                            color = scheme.onSurfaceVariant,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ───────────────────────── عنوان ─────────────────────────
-
-@Composable
-private fun TitleField(value: String, hint: String, readOnly: Boolean, onChange: (String) -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val style = MaterialTheme.typography.titleLarge.copy(
-        color = scheme.onSurface,
-        fontSize = 24.sp,
-        lineHeight = 36.sp,
-        fontWeight = FontWeight.Bold,
-        textDirection = TextDirection.Content
-    )
-    BasicTextField(
-        value = value,
-        onValueChange = onChange,
-        readOnly = readOnly,
-        textStyle = style,
-        cursorBrush = SolidColor(scheme.primary),
-        modifier = Modifier.fillMaxWidth(),
-        decorationBox = { inner ->
-            Box(modifier = Modifier.fillMaxWidth()) {
-                if (value.isEmpty()) {
-                    Text(text = hint, style = style.copy(color = scheme.onSurfaceVariant.copy(alpha = 0.6f)))
-                }
-                inner()
-            }
-        }
-    )
-}
