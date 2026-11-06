@@ -43,7 +43,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -66,7 +65,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -83,7 +81,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -539,12 +536,10 @@ class EditorViewModel : ViewModel() {
 @Composable
 fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
     // منوی انتخاب متنِ سیستم (ترجمه، خواندن با صدای بلند، ...) با منوی خودمون عوض می‌شه.
-    // توی Compose 1.9 باید provider جدید منوی سیستم هم null بشه، وگرنه LocalTextToolbar نادیده گرفته می‌شه.
+    // توی Compose 1.9 هر دو provider منو باید با provider خودمون پر بشن؛ اگه یکیشون null باشه
+    // Compose هر دو رو با نسخه‌ی پیش‌فرض سیستم عوض می‌کنه (جزئیات توی EditorTextToolbar.kt).
     val toolbar = remember { EditorTextToolbar() }
-    CompositionLocalProvider(
-        LocalTextToolbar provides toolbar,
-        LocalTextContextMenuToolbarProvider provides null
-    ) {
+    ProvideEditorTextToolbar(toolbar) {
         EditorScreenContent(kind = kind, postId = postId, onBack = onBack, toolbar = toolbar)
     }
 }
