@@ -86,6 +86,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -114,17 +115,21 @@ private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// ── شیشه‌ای (مثل تلگرام ادز): کاشی گرد دور آیکن و اسم، آیکن و اسم از بالا ۷dp شروع می‌شن ──
-private val GlassContentTop = 7.dp
+// ── شیشه‌ای (مثل تلگرام ادز): کاشی گرد دور آیکن و اسم، آیکن و اسم از بالا ۶dp شروع می‌شن ──
+private val GlassContentTop = 6.dp
 
-// ارتفاع هر تب توی حالت شیشه‌ای؛ با ۵dp فاصله‌ی بالا و پایین و ۱dp بوردر، بدنه‌ی منو دقیقاً ۶۴dp می‌شه (هم‌ارتفاع نوار پایین گوگل پلی)
-private val GlassItemHeight = 52.dp
+// فاصله‌ی آیکن تا اسم و ارتفاع خط اسم توی حالت شیشه‌ای (ارتفاع خط ثابت تا چیدمانِ عمودی روی همه‌ی فونت‌ها یکسان بمونه)
+private val GlassLabelGap = 5.dp
+private val GlassLabelLineHeight = 14.sp
+
+// ارتفاع هر تب توی حالت شیشه‌ای؛ با ۴dp فاصله‌ی بالا و پایین و ۱dp بوردر، بدنه‌ی منو دقیقاً ۶۴dp می‌شه (هم‌ارتفاع نوار پایین گوگل پلی)
+private val GlassItemHeight = 54.dp
 
 // گردیِ بدنه‌ی شیشه‌ای و فاصله‌ی کاشی از لبه‌ی بدنه (از بالا و پایین و چپ و راست یکسانه).
 // کاشی دقیقاً همه‌ی خونه‌ی تبش رو پر می‌کنه، پس وقتی روی اولین یا آخرین تبه، فاصله‌اش از لبه همون GlassEdgeInset می‌شه
 // و چون ردیوس کاشی = ردیوس بدنه − فاصله‌ی کاشی از لبه‌ی بدنه‌ست (۱dp پدینگ و بوردر + GlassEdgeInset)، گوشه‌ها هم‌مرکزن و هیچ تیکه‌ای بیرون نمی‌زنه.
-private val GlassBarCorner = 24.dp
-private val GlassEdgeInset = 5.dp
+private val GlassBarCorner = 28.dp
+private val GlassEdgeInset = 4.dp
 private val GlassTileShape = RoundedCornerShape(GlassBarCorner - GlassEdgeInset - 1.dp)
 
 // دکمه‌ی هوش مصنوعی مثل بام: دایره‌ی توپر که تو یه «برش گرد» از خودِ نوار می‌شینه
@@ -311,19 +316,19 @@ private fun NavBar(
         else listOf(Color.White.copy(alpha = 0.85f), outline.copy(alpha = 0.12f), outline.copy(alpha = 0.06f))
     )
     // سایه‌ی بدنه: زیر نوار دیده می‌شه و نرم محو می‌شه؛ تو تم تیره غلیظ‌تر چون پس‌زمینه خودش تیره‌ست
-    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.34f) else Color.Black.copy(alpha = 0.13f)
+    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.70f) else Color.Black.copy(alpha = 0.24f)
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 8.dp + bump, bottom = 14.dp)
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp + bump, bottom = 14.dp)
         ) {
             // شیشه‌ی مات: محتوای پشتش (که زیرش اسکرول می‌شه) محو می‌شه؛ برش دکمه هم جزو همین شکله
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .bodyDropShadow(barShape, bodyShadow, spread = 26.dp, offsetY = 8.dp)
+                    .bodyDropShadow(barShape, bodyShadow, spread = 28.dp, offsetY = 10.dp, falloff = 1.6f)
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
                         // بلور درشت تا رنگِ پشتش نرم پخش بشه
@@ -550,7 +555,7 @@ private fun NavTabsArea(
 /** خونه‌ی وسط: خود دکمه از بالا میاد؛ اینجا فقط اسمش (کامل، بدون بریدگی) هم‌تراز اسم بقیه‌ی تب‌ها می‌شینه */
 @Composable
 private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier = Modifier) {
-    val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
+    val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else NavPillTop + NavPillHeight + 3.dp
     Column(
         modifier = modifier.height(if (glass) GlassItemHeight else NavItemHeight),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -563,6 +568,7 @@ private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier =
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Visible,
+            lineHeight = if (glass) GlassLabelLineHeight else TextUnit.Unspecified,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.wrapContentWidth(unbounded = true)
         )
@@ -927,7 +933,7 @@ private fun NavTab(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val iconTop = if (glass) GlassContentTop else NavPillTop + (NavPillHeight - NavIconSize) / 2
-        val labelTop = if (glass) GlassContentTop + NavIconSize + 3.dp else NavPillTop + NavPillHeight + 3.dp
+        val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else NavPillTop + NavPillHeight + 3.dp
         Spacer(Modifier.height(iconTop))
         // آیکن انتخاب‌شده با یه فنر نرم کمی بزرگ می‌شه
         val iconScale by animateFloatAsState(
@@ -946,6 +952,7 @@ private fun NavTab(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
+            lineHeight = if (glass) GlassLabelLineHeight else TextUnit.Unspecified,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
