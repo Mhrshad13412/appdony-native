@@ -180,6 +180,9 @@ internal fun SidePanelHost(
     val shown = panel ?: last
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.74f).dp
 
+    // خلاصه‌ی نوشته رو به چت هوش مصنوعی (داخل اپ، شناور و بیرون برنامه) می‌ده؛ چیزی نشون نمی‌ده
+    EditorAiBridge(vm = vm, isBlog = isBlog)
+
     AnimatedVisibility(
         visible = panel != null,
         modifier = modifier,
@@ -229,7 +232,7 @@ internal fun SidePanelHost(
                     SidePanel.FEATURED -> FeaturedBody(vm = vm, onPick = onPickImage)
                     SidePanel.SETTINGS -> SettingsBody(vm = vm, isBlog = isBlog)
                     SidePanel.APP_INFO -> AppInfoBody(vm = vm)
-                    SidePanel.SEO -> SeoBody(vm = vm)
+                    SidePanel.SEO -> SeoPanel(vm = vm)
                     null -> Unit
                 }
             }
@@ -240,7 +243,7 @@ internal fun SidePanelHost(
 // ───────────────────────── ابزارهای فرم ─────────────────────────
 
 @Composable
-private fun PField(
+internal fun PField(
     label: String,
     value: String,
     onChange: (String) -> Unit,
@@ -293,7 +296,7 @@ private fun PField(
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text = text,
         color = MaterialTheme.colorScheme.primary,
@@ -304,7 +307,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun PChip(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun PChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier = Modifier
@@ -545,16 +548,3 @@ private fun AppInfoBody(vm: EditorViewModel) {
 
 private fun <T> List<T>.set(index: Int, change: (T) -> T): List<T> =
     mapIndexed { i, item -> if (i == index) change(item) else item }
-
-// ───────────────────────── Yoast SEO ─────────────────────────
-
-@Composable
-private fun SeoBody(vm: EditorViewModel) {
-    val scheme = MaterialTheme.colorScheme
-    val s = vm.seo
-    PField("کلمه‌ی کلیدی کانونی", s.focusKeyword, { vm.seo = vm.seo.copy(focusKeyword = it) })
-    PField("عنوان سئو", s.title, { vm.seo = vm.seo.copy(title = it) })
-    Text("${s.title.length} / 60 نویسه", color = scheme.onSurfaceVariant, fontSize = 11.sp)
-    PField("توضیحات متا", s.description, { vm.seo = vm.seo.copy(description = it) }, lines = 3)
-    Text("${s.description.length} / 160 نویسه", color = scheme.onSurfaceVariant, fontSize = 11.sp)
-}
