@@ -2,6 +2,7 @@ package com.appdony.app.data.api
 
 import android.util.Log
 import com.appdony.app.BuildConfig
+import com.appdony.app.util.EditorAiContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,22 +71,28 @@ object AiApi {
 
     private class ApiException(val code: Int, message: String) : Exception(message)
 
-    /** مدل رو کاربر انتخاب می‌کنه؛ چون سهم هر مدل جداست، فالبک خودکار به مدل دیگه نداریم */
+    /**
+     * مدل رو کاربر انتخاب می‌کنه؛ چون سهم هر مدل جداست، فالبک خودکار به مدل دیگه نداریم.
+     * [systemOverride]: اگه پر باشه به‌جای شخصیت «پاپی» همین به‌عنوان system فرستاده می‌شه (برای کارهای تک‌منظوره مثل سئو).
+     * [maxTokens]: سقف طول جواب.
+     */
     suspend fun sendMessage(
         userMessage: String,
         model: String,
         history: List<Pair<String, String>> = emptyList(),
         siteContext: String = "",
         assistantNotes: String = "",
-        imageBase64: String? = null
+        imageBase64: String? = null,
+        systemOverride: String? = null,
+        maxTokens: Int = 2000
     ): Result<AiReply> = withContext(Dispatchers.IO) {
         if (API_KEY.isBlank()) {
             lastDebug = "AI_KEY خالیه"
             return@withContext Result.failure(Exception("کلید هوش مصنوعی توی اپ تنظیم نشده."))
         }
         try {
-            val messages = buildMessages(userMessage, history, siteContext, assistantNotes, imageBase64)
-            Result.success(requestOnce(model, messages))
+            val messages = buildMessages(userMessage, history, siteContext, assistantNotes, imageBase64, systemOverride)
+            Result.success(requestOnce(model, messages, maxTokens))
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiException) {
@@ -103,10 +110,11 @@ object AiApi {
         history: List<Pair<String, String>>,
         siteContext: String,
         assistantNotes: String,
-        imageBase64: String?
+        imageBase64: String?,
+        systemOverride: String?
     ): JSONArray {
         // همه‌ی بخش‌های system توی یک پیام ادغام می‌شن
-        val systemText = buildString {
+        val systemText = systemOverride ?: buildString {
             append(AiPrompt.SYSTEM)
             if (siteContext.isNotBlank()) {
                 append("\n\nپست‌های مرتبط اپدونی (اگه به سؤال ربطی نداشتن نادیده بگیر):\n")
@@ -115,6 +123,14 @@ object AiApi {
             if (assistantNotes.isNotBlank()) {
                 append("\n\nاین‌ها پیام‌هایی هستن که خودت (پاپی) به‌تازگی به کاربر نشون دادی. با همین‌ها هماهنگ جواب بده:\n")
                 append(assistantNotes)
+            }
+            // اگه کاربر الان توی ادیتور نوشته/وبلاگ داره می‌نویسه، چت (شناور و بیرون برنامه هم) از نوشته‌اش خبر داره
+            val editor = EditorAiContext.promptBlock()
+            if (editor.isNotBlank()) {
+                append("\n\n")
+                append(AiPrompt.EDITOR_RULES)
+                append("\n")
+                append(editor)
             }
         }
 
@@ -163,12 +179,12 @@ object AiApi {
 
     private fun estimateTokens(s: String): Int = (s.length / 3).coerceAtLeast(1)
 
-    private suspend fun requestOnce(model: String, messages: JSONArray): AiReply {
+    private suspend fun requestOnce(model: String, messages: JSONArray, maxTokens: Int): AiReply {
         // temperature عمداً نیست؛ max_tokens بالاست چون DeepSeek قبل از جواب «فکر» می‌کنه
         val json = JSONObject()
             .put("model", model)
             .put("messages", messages)
-            .put("max_tokens", 2000)
+            .put("max_tokens", maxTokens)
 
         val request = Request.Builder()
             .url("$BASE_URL/chat/completions")
