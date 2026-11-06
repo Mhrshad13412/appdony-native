@@ -114,11 +114,11 @@ private val NavPillWidth = 60.dp
 private val NavPillHeight = 32.dp
 private val NavPillTop = 4.dp
 
-// ── شیشه‌ای (مثل تلگرام ادز): کاشی گرد دور آیکن و اسم، آیکن و اسم از بالا ۱۱dp شروع می‌شن ──
-private val GlassContentTop = 11.dp
+// ── شیشه‌ای (مثل تلگرام ادز): کاشی گرد دور آیکن و اسم، آیکن و اسم از بالا ۷dp شروع می‌شن ──
+private val GlassContentTop = 7.dp
 
-// ارتفاع هر تب توی حالت شیشه‌ای (بدنه بلندتر از قبل؛ کل منو با فاصله‌ی دورش می‌شه ≈ ۷۸dp)
-private val GlassItemHeight = 64.dp
+// ارتفاع هر تب توی حالت شیشه‌ای؛ با ۵dp فاصله‌ی بالا و پایین و ۱dp بوردر، بدنه‌ی منو دقیقاً ۶۴dp می‌شه (هم‌ارتفاع نوار پایین گوگل پلی)
+private val GlassItemHeight = 52.dp
 
 // گردیِ بدنه‌ی شیشه‌ای و فاصله‌ی کاشی از لبه‌ی بدنه (از بالا و پایین و چپ و راست یکسانه).
 // کاشی دقیقاً همه‌ی خونه‌ی تبش رو پر می‌کنه، پس وقتی روی اولین یا آخرین تبه، فاصله‌اش از لبه همون GlassEdgeInset می‌شه
@@ -144,7 +144,7 @@ private val AiNotchRadius = AiButtonSize / 2 + AiNotchGap
 private val AiNotchCenterY = AiButtonSize / 2 - AiBump
 
 /** ارتفاع کل منو وقتی دکمه‌ی هوش مصنوعی وسطشه (برای کسانی که جا رزرو می‌کنن) */
-val AiNavTotalHeight = 104.dp + AiBump
+val AiNavTotalHeight = 92.dp + AiBump
 
 /**
  * فاصله‌ای که لیست‌های صفحه‌های اصلی باید پایین نگه دارن تا آخرِ لیست زیر منوی پایین نره.
