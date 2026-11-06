@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,6 +43,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -533,11 +535,16 @@ class EditorViewModel : ViewModel() {
  * ایجاد یا ویرایش نوشته / مطلب وبلاگ. [kind] = "post" یا "blog"؛ [postId] بزرگ‌تر از صفر = ویرایش مطلب موجود.
  * بالا: نوار آیکن‌ها + کشوی «همه‌ی بلوک‌ها»؛ پایین: کشوی «۶ بلوک»؛ لبه‌ی راست: قرص عمودی پنل‌ها.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(kind: String, postId: Long = 0L, onBack: () -> Unit) {
-    // منوی انتخاب متنِ سیستم (ترجمه، خواندن با صدای بلند، ...) با منوی خودمون عوض می‌شه
+    // منوی انتخاب متنِ سیستم (ترجمه، خواندن با صدای بلند، ...) با منوی خودمون عوض می‌شه.
+    // توی Compose 1.9 باید provider جدید منوی سیستم هم null بشه، وگرنه LocalTextToolbar نادیده گرفته می‌شه.
     val toolbar = remember { EditorTextToolbar() }
-    CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+    CompositionLocalProvider(
+        LocalTextToolbar provides toolbar,
+        LocalTextContextMenuToolbarProvider provides null
+    ) {
         EditorScreenContent(kind = kind, postId = postId, onBack = onBack, toolbar = toolbar)
     }
 }
