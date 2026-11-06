@@ -5,6 +5,7 @@ import com.appdony.app.BuildConfig
 import com.appdony.app.util.EditorAiContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -34,6 +35,10 @@ object AiApi {
 
     private const val TAG = "AiApi"
     private const val BASE_URL = "https://api.avalai.ir/v1"
+
+    // وقتی سرویس موقتاً شلوغه (۴۲۹ / ۵۰۲ / ۵۰۳) تا دو بار با کمی صبر دوباره تلاش می‌شه
+    private const val MAX_RETRIES = 2
+    private const val MAX_RETRY_WAIT_SEC = 8
 
     @Volatile
     var lastDebug: String = ""
@@ -69,7 +74,7 @@ object AiApi {
         })
     }
 
-    private class ApiException(val code: Int, message: String) : Exception(message)
+    private class ApiException(val code: Int, message: String, val retryAfterSec: Int = 0) : Exception(message)
 
     /**
      * مدل رو کاربر انتخاب می‌کنه؛ چون سهم هر مدل جداست، فالبک خودکار به مدل دیگه نداریم.
@@ -92,7 +97,7 @@ object AiApi {
         }
         try {
             val messages = buildMessages(userMessage, history, siteContext, assistantNotes, imageBase64, systemOverride)
-            Result.success(requestOnce(model, messages, maxTokens))
+            Result.success(requestWithRetry(model, messages, maxTokens))
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiException) {
@@ -172,12 +177,29 @@ object AiApi {
         400 -> "درخواست یا عکس پذیرفته نشد (کد ۴۰۰)."
         401, 403 -> "کلید هوش مصنوعی درست نیست یا دسترسی نداره."
         402 -> "اعتبار پاپی تموم شده. کمی بعد دوباره بپرس."
-        429 -> "تعداد پیام‌ها زیاده. چند لحظه صبر کن و دوباره بپرس."
+        429 -> "سرویس هوش مصنوعی الان شلوغه. چند ثانیه صبر کن و دوباره امتحان کن."
         null -> "مشکلی پیش اومد. دوباره امتحان کن."
         else -> "سرویس هوش مصنوعی در دسترس نیست (کد ${e.code})."
     }
 
     private fun estimateTokens(s: String): Int = (s.length / 3).coerceAtLeast(1)
+
+    /** خطای موقتِ سرویس (شلوغی) رو با صبر کوتاه دوباره امتحان می‌کنه؛ بقیه‌ی خطاها همون‌جا برمی‌گردن */
+    private suspend fun requestWithRetry(model: String, messages: JSONArray, maxTokens: Int): AiReply {
+        var attempt = 0
+        while (true) {
+            try {
+                return requestOnce(model, messages, maxTokens)
+            } catch (e: ApiException) {
+                val temporary = e.code == 429 || e.code == 502 || e.code == 503
+                if (!temporary || attempt >= MAX_RETRIES) throw e
+                attempt++
+                val waitSec = (if (e.retryAfterSec > 0) e.retryAfterSec else attempt * 2)
+                    .coerceAtMost(MAX_RETRY_WAIT_SEC)
+                delay(waitSec * 1000L)
+            }
+        }
+    }
 
     private suspend fun requestOnce(model: String, messages: JSONArray, maxTokens: Int): AiReply {
         // temperature عمداً نیست؛ max_tokens بالاست چون DeepSeek قبل از جواب «فکر» می‌کنه
@@ -196,7 +218,10 @@ object AiApi {
 
         client.newCall(request).await().use { response ->
             val text = response.body?.string()
-            if (!response.isSuccessful) throw ApiException(response.code, text.orEmpty().take(200))
+            if (!response.isSuccessful) {
+                val retryAfter = response.header("Retry-After")?.trim()?.toIntOrNull() ?: 0
+                throw ApiException(response.code, text.orEmpty().take(200), retryAfter)
+            }
             if (text.isNullOrBlank()) throw ApiException(204, "empty body")
 
             val root = JSONObject(text)
