@@ -75,15 +75,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -95,7 +86,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -122,11 +112,9 @@ import com.appdony.app.ui.components.FloatingDialog
 import com.appdony.app.ui.components.glassKnob
 import com.appdony.app.ui.components.glassSelectedIconTint
 import com.appdony.app.ui.components.glassTrack
-import com.appdony.app.ui.components.isGlassDark
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
-import kotlin.math.pow
 
 /** ۶ بلوک ثابت کشوی پایین (هیچ شمارشی روی گوشی ذخیره نمی‌شه) */
 private val QUICK_BLOCKS = listOf(
@@ -298,6 +286,11 @@ class EditorViewModel : ViewModel() {
         if (i >= 0 && blocks[i].extra != extra) blocks[i] = blocks[i].copy(extra = extra)
     }
 
+    // آخرین اینتر پردازش‌شده؛ بعضی کیبوردها (مثل جی‌برد فارسی) یه اینتر رو دوباره می‌فرستن و دو بلوک می‌ساخت
+    private var lastSplitId = -1L
+    private var lastSplitRaw = ""
+    private var lastSplitAt = 0L
+
     /** اینتر توی پاراگراف/سرنویس: بقیه‌ی متن می‌ره توی یه پاراگراف تازه (مثل وردپرس) */
     fun splitAtNewline(id: Long, raw: String) {
         val i = blocks.indexOfFirst { it.id == id }
@@ -307,6 +300,12 @@ class EditorViewModel : ViewModel() {
             updateText(id, raw)
             return
         }
+        // همون اینتر برای بار دوم (پژواک کیبورد) نادیده گرفته می‌شه
+        val now = System.currentTimeMillis()
+        if (id == lastSplitId && raw == lastSplitRaw && now - lastSplitAt < 400L) return
+        lastSplitId = id
+        lastSplitRaw = raw
+        lastSplitAt = now
         val before = raw.substring(0, cut)
         val after = raw.substring(cut + 1).replace("\n", " ")
         val shifted = InlineFormat.shift(blocks[i].text, raw, blocks[i].spans)
@@ -1191,42 +1190,6 @@ private fun BlockTile(type: BlockType, onClick: () -> Unit) {
     }
 }
 
-/**
- * سایه‌ی نرم با نور از بالا (مثل کاشی‌های منوی پایین): دور شکل و زیرش پخش می‌شه ولی بالای شکل تقریباً خالیه.
- * داخل خودِ شکل کشیده نمی‌شه تا شیشه تیره نشه. [offsetY] هرچی بیشتر، سایه بیشتر زیر شکل میفته و کمتر بالاش.
- * [color].alpha غلظت نزدیک لبه‌ست و با افت درجه‌ی دوم محو می‌شه. باید قبل از clip گذاشته بشه.
- */
-private fun Modifier.topLitShadow(
-    shape: Shape,
-    color: Color,
-    spread: Dp,
-    offsetY: Dp,
-    layers: Int = 14,
-    falloff: Float = 2.2f
-): Modifier = this.drawBehind {
-    // وقتی کشو بسته‌ست و اندازه‌اش صفره، سایه‌ای کشیده نمی‌شه
-    if (size.minDimension < 2f) return@drawBehind
-    val path = when (val o = shape.createOutline(size, layoutDirection, this)) {
-        is Outline.Generic -> o.path
-        is Outline.Rounded -> Path().apply { addRoundRect(o.roundRect) }
-        is Outline.Rectangle -> Path().apply { addRect(o.rect) }
-    }
-    val spreadPx = spread.toPx()
-    clipPath(path, ClipOp.Difference) {
-        translate(top = offsetY.toPx()) {
-            for (i in 1..layers) {
-                val reach = spreadPx * i / layers
-                val share = (1f - (i - 1f) / layers).pow(falloff) - (1f - i.toFloat() / layers).pow(falloff)
-                drawPath(
-                    path = path,
-                    color = color.copy(alpha = color.alpha * share),
-                    style = Stroke(width = reach * 2f, join = StrokeJoin.Round)
-                )
-            }
-        }
-    }
-}
-
 /** کشوی پایین: ۶ بلوک ثابت */
 @Composable
 private fun QuickBar(
@@ -1243,22 +1206,14 @@ private fun QuickBar(
             .padding(bottom = 8.dp)
     ) {
         DrawerHandle(open = open, onTop = false, onClick = onToggle)
-        // سایه روی خودِ AnimatedVisibility می‌شینه تا موقع باز و بسته شدن کشو بریده نشه
         AnimatedVisibility(
             visible = open,
-            modifier = Modifier
-                .padding(top = if (open) 6.dp else 0.dp)
-                .topLitShadow(
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color.Black.copy(alpha = if (isGlassDark()) 0.45f else 0.18f),
-                    spread = 16.dp,
-                    offsetY = 9.dp
-                ),
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut()
         ) {
             Row(
                 modifier = Modifier
+                    .padding(top = 6.dp)
                     .fillMaxWidth()
                     .glassTrack(RoundedCornerShape(22.dp))
                     .padding(horizontal = 4.dp, vertical = 6.dp)
