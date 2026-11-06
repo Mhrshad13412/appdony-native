@@ -69,9 +69,6 @@ import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -562,15 +559,9 @@ private fun BlockField(
         VisualTransformation.None
     }
 
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-
     fun report(selection: TextRange) {
         if (toolbar?.linkMode == true) return
         if (formattable && !readOnly) {
-            if (!selection.collapsed) {
-                toolbar?.selectionBounds = { fieldSelectionRect(layoutResult, coords, selection) }
-            }
             vm.reportSelection(block.id, selection.min, selection.max)
         } else {
             vm.clearSelection(block.id)
@@ -590,10 +581,8 @@ private fun BlockField(
         textStyle = style,
         cursorBrush = SolidColor(scheme.primary),
         visualTransformation = transformation,
-        onTextLayout = { layoutResult = it },
         modifier = modifier
             .fillMaxWidth()
-            .onGloballyPositioned { coords = it }
             .focusRequester(requester)
             .onFocusChanged {
                 if (it.isFocused) {
@@ -673,16 +662,9 @@ private fun ListItemRow(
     val localSpans = remember(block.spans, offset, value.length) {
         InlineFormat.slice(block.spans, offset, offset + value.length)
     }
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     fun report(selection: TextRange) {
         if (toolbar?.linkMode == true) return
-        if (!preview) {
-            if (!selection.collapsed) {
-                toolbar?.selectionBounds = { fieldSelectionRect(layoutResult, coords, selection) }
-            }
-            vm.reportSelection(block.id, selection.min + offset, selection.max + offset)
-        }
+        if (!preview) vm.reportSelection(block.id, selection.min + offset, selection.max + offset)
     }
 
     val pendingItem = vm.pendingListFocus
@@ -741,10 +723,8 @@ private fun ListItemRow(
                 textStyle = style,
                 cursorBrush = SolidColor(scheme.primary),
                 visualTransformation = transformation,
-                onTextLayout = { layoutResult = it },
                 modifier = Modifier
                     .weight(1f)
-                    .onGloballyPositioned { coords = it }
                     .focusRequester(requester)
                     .onFocusChanged {
                         if (it.isFocused) {
@@ -794,7 +774,11 @@ private fun BlockBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean,
             // اینتر توی پاراگراف و سرنویس یه پاراگراف تازه می‌سازه؛ شعر خط جدید می‌گیره
             val splitsOnEnter = type == BlockType.PARAGRAPH || type == BlockType.HEADING
             BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview, formattable = type.supportsInline) { new ->
-                if (splitsOnEnter && new.contains('\n')) vm.splitAtNewline(block.id, new) else vm.updateText(block.id, new)
+                when {
+                    type == BlockType.PARAGRAPH && vm.autoFormat(block.id, new) -> Unit
+                    splitsOnEnter && new.contains('\n') -> vm.splitAtNewline(block.id, new)
+                    else -> vm.updateText(block.id, new)
+                }
             }
         }
 
@@ -813,7 +797,8 @@ private fun BlockBody(block: EditorBlock, vm: EditorViewModel, preview: Boolean,
                     .padding(horizontal = 14.dp)
             ) {
                 BlockField(vm = vm, block = block, value = block.text, hint = hintOf(type), style = style, readOnly = preview, formattable = type.supportsInline) {
-                    vm.updateText(block.id, it)
+                    // نقل‌قول معمولی: اینتر دوم از نقل‌قول بیرون میاره (مثل وردپرس)؛ نقل‌قول برجسته همون رفتار قبلی
+                    if (type == BlockType.QUOTE) vm.quoteChanged(block.id, it) else vm.updateText(block.id, it)
                 }
             }
         }
