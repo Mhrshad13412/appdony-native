@@ -316,7 +316,8 @@ private fun NavBar(
         else listOf(Color.White.copy(alpha = 0.85f), outline.copy(alpha = 0.12f), outline.copy(alpha = 0.06f))
     )
     // سایه‌ی بدنه: زیر نوار دیده می‌شه و نرم محو می‌شه؛ تو تم تیره غلیظ‌تر چون پس‌زمینه خودش تیره‌ست
-    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.70f) else Color.Black.copy(alpha = 0.24f)
+    // نور از بالا میاد (مثل کاشی‌ها): بالا تقریباً بی‌سایه، کناره‌ها کم، پایین کمی بیشتر
+    val bodyShadow = if (dark) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.14f)
 
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Box(
@@ -328,7 +329,7 @@ private fun NavBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .bodyDropShadow(barShape, bodyShadow, spread = 28.dp, offsetY = 10.dp, falloff = 1.6f)
+                    .bodyDropShadow(barShape, bodyShadow, spread = 14.dp, offsetY = 11.dp, falloff = 2.0f)
                     .clip(barShape)
                     .hazeEffect(state = hazeState) {
                         // بلور درشت تا رنگِ پشتش نرم پخش بشه
