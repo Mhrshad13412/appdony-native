@@ -296,7 +296,7 @@ internal fun PField(
 }
 
 @Composable
-internal fun SectionTitle(text: String) {
+internal fun EditorSectionTitle(text: String) {
     Text(
         text = text,
         color = MaterialTheme.colorScheme.primary,
@@ -420,7 +420,7 @@ private fun SettingsBody(vm: EditorViewModel, isBlog: Boolean) {
     SwitchRow("دیدگاه‌ها باز باشه", s.commentsOpen) { vm.settings = vm.settings.copy(commentsOpen = it) }
 
     if (!isBlog) {
-        SectionTitle("دسته‌ها")
+        EditorSectionTitle("دسته‌ها")
         when {
             vm.loadingCategories -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             vm.categories.isEmpty() -> Text("دسته‌ای پیدا نشد", color = scheme.onSurfaceVariant, fontSize = 12.sp)
@@ -460,7 +460,7 @@ private fun AppInfoBody(vm: EditorViewModel) {
     val scheme = MaterialTheme.colorScheme
     val a = vm.appInfo
 
-    SectionTitle("مشخصات")
+    EditorSectionTitle("مشخصات")
     PField("توضیح کوتاه", a.descripcion, { vm.appInfo = vm.appInfo.copy(descripcion = it) })
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PField("نسخه", a.version, { vm.appInfo = vm.appInfo.copy(version = it) }, modifier = Modifier.weight(1f), ltr = true)
@@ -471,7 +471,7 @@ private fun AppInfoBody(vm: EditorViewModel) {
     PField("لینک گوگل‌پلی", a.consiguelo, { vm.appInfo = vm.appInfo.copy(consiguelo = it) }, ltr = true)
     PField("تازه‌ها (HTML)", a.novedades, { vm.appInfo = vm.appInfo.copy(novedades = it) }, lines = 4)
 
-    SectionTitle("لینک‌های دانلود")
+    EditorSectionTitle("لینک‌های دانلود")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PChip("دانلود مستقیم", a.dlOption == "direct-download") { vm.appInfo = vm.appInfo.copy(dlOption = "direct-download") }
         PChip("چند لینک", a.dlOption == "links") { vm.appInfo = vm.appInfo.copy(dlOption = "links") }
@@ -502,11 +502,11 @@ private fun AppInfoBody(vm: EditorViewModel) {
         }
     }
 
-    SectionTitle("رسانه")
+    EditorSectionTitle("رسانه")
     PField("آدرس اسکرین‌شات‌ها (هر خط یک URL)", a.screenshots, { vm.appInfo = vm.appInfo.copy(screenshots = it) }, ltr = true, lines = 4)
     PField("شناسه‌ی ویدیو یوتیوب", a.videoId, { vm.appInfo = vm.appInfo.copy(videoId = it) }, ltr = true, hint = "dQw4w9WgXcQ")
 
-    SectionTitle("باکس‌های سفارشی")
+    EditorSectionTitle("باکس‌های سفارشی")
     a.boxes.forEachIndexed { i, box ->
         Column(
             modifier = Modifier
@@ -528,13 +528,13 @@ private fun AppInfoBody(vm: EditorViewModel) {
         Text("افزودن باکس")
     }
 
-    SectionTitle("امتیاز نمایشی")
+    EditorSectionTitle("امتیاز نمایشی")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PField("میانگین", a.ratingAverage, { vm.appInfo = vm.appInfo.copy(ratingAverage = it) }, modifier = Modifier.weight(1f), ltr = true, hint = "4.2")
         PField("تعداد", a.ratingCount, { vm.appInfo = vm.appInfo.copy(ratingCount = it) }, modifier = Modifier.weight(1f), ltr = true)
     }
 
-    SectionTitle("اپدونی پلاس و منبع")
+    EditorSectionTitle("اپدونی پلاس و منبع")
     SwitchRow("این اپ مخصوص اعضای اپدونی پلاس است", a.appdoniPlus) { vm.appInfo = vm.appInfo.copy(appdoniPlus = it) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PChip("خودمان", a.contentSource == "own") { vm.appInfo = vm.appInfo.copy(contentSource = "own") }
