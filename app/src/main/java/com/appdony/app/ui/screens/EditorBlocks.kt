@@ -69,6 +69,9 @@ import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -559,9 +562,15 @@ private fun BlockField(
         VisualTransformation.None
     }
 
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
     fun report(selection: TextRange) {
         if (toolbar?.linkMode == true) return
         if (formattable && !readOnly) {
+            if (!selection.collapsed) {
+                toolbar?.selectionBounds = { fieldSelectionRect(layoutResult, coords, selection) }
+            }
             vm.reportSelection(block.id, selection.min, selection.max)
         } else {
             vm.clearSelection(block.id)
@@ -581,8 +590,10 @@ private fun BlockField(
         textStyle = style,
         cursorBrush = SolidColor(scheme.primary),
         visualTransformation = transformation,
+        onTextLayout = { layoutResult = it },
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coords = it }
             .focusRequester(requester)
             .onFocusChanged {
                 if (it.isFocused) {
@@ -662,9 +673,16 @@ private fun ListItemRow(
     val localSpans = remember(block.spans, offset, value.length) {
         InlineFormat.slice(block.spans, offset, offset + value.length)
     }
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     fun report(selection: TextRange) {
         if (toolbar?.linkMode == true) return
-        if (!preview) vm.reportSelection(block.id, selection.min + offset, selection.max + offset)
+        if (!preview) {
+            if (!selection.collapsed) {
+                toolbar?.selectionBounds = { fieldSelectionRect(layoutResult, coords, selection) }
+            }
+            vm.reportSelection(block.id, selection.min + offset, selection.max + offset)
+        }
     }
 
     val pendingItem = vm.pendingListFocus
@@ -723,8 +741,10 @@ private fun ListItemRow(
                 textStyle = style,
                 cursorBrush = SolidColor(scheme.primary),
                 visualTransformation = transformation,
+                onTextLayout = { layoutResult = it },
                 modifier = Modifier
                     .weight(1f)
+                    .onGloballyPositioned { coords = it }
                     .focusRequester(requester)
                     .onFocusChanged {
                         if (it.isFocused) {
