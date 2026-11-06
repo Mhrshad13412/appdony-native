@@ -162,6 +162,8 @@ class EditorViewModel : ViewModel() {
     // تصویر شاخص
     var featuredId by mutableStateOf<Long?>(null)
     var featuredUrl by mutableStateOf<String?>(null)
+    var featuredAlt by mutableStateOf("")
+    private var syncedAlt = ""
     var uploading by mutableStateOf(false)
 
     // پنل‌های کناری
@@ -182,7 +184,7 @@ class EditorViewModel : ViewModel() {
     }
 
     private fun snapshot(): String = buildString {
-        append(title).append('\u0001').append(featuredId ?: 0L)
+        append(title).append('\u0001').append(featuredId ?: 0L).append('\u0001').append(featuredAlt)
         append('\u0001').append(appInfo).append('\u0001').append(seo).append('\u0001').append(settings)
         blocks.forEach {
             append('\u0001').append(it.type.name).append('|').append(it.text).append('|').append(it.extra).append('|').append(it.spans)
@@ -233,6 +235,8 @@ class EditorViewModel : ViewModel() {
             link = remote.link.ifBlank { null }
             featuredId = remote.featuredId
             featuredUrl = remote.featuredUrl
+            featuredAlt = remote.featuredAlt
+            syncedAlt = remote.featuredAlt
             settings = PostSettings(
                 slug = remote.slug,
                 date = remote.date,
@@ -286,10 +290,21 @@ class EditorViewModel : ViewModel() {
         if (i >= 0 && blocks[i].extra != extra) blocks[i] = blocks[i].copy(extra = extra)
     }
 
-    // آخرین اینتر پردازش‌شده؛ بعضی کیبوردها (مثل جی‌برد فارسی) یه اینتر رو دوباره می‌فرستن و دو بلوک می‌ساخت
-    private var lastSplitId = -1L
-    private var lastSplitRaw = ""
-    private var lastSplitAt = 0L
+    // آخرین اینتر پردازش‌شده؛ بعضی کیبوردها (مثل جی‌برد فارسی) یه اینتر رو دوباره می‌فرستن و دو بلوک/مورد می‌ساخت
+    private var lastEnterKey = ""
+    private var lastEnterAt = 0L
+
+    /** true یعنی این اینتر پژواکِ اینترِ قبلیه (همون اینتر با فاصله‌ی خیلی کم) و باید نادیده گرفته بشه */
+    private fun duplicateEnter(key: String): Boolean {
+        val now = System.currentTimeMillis()
+        val dt = now - lastEnterAt
+        val dup = (key == lastEnterKey && dt < 400L) || dt < 90L
+        if (!dup) {
+            lastEnterKey = key
+            lastEnterAt = now
+        }
+        return dup
+    }
 
     /** اینتر توی پاراگراف/سرنویس: بقیه‌ی متن می‌ره توی یه پاراگراف تازه (مثل وردپرس) */
     fun splitAtNewline(id: Long, raw: String) {
@@ -301,11 +316,7 @@ class EditorViewModel : ViewModel() {
             return
         }
         // همون اینتر برای بار دوم (پژواک کیبورد) نادیده گرفته می‌شه
-        val now = System.currentTimeMillis()
-        if (id == lastSplitId && raw == lastSplitRaw && now - lastSplitAt < 400L) return
-        lastSplitId = id
-        lastSplitRaw = raw
-        lastSplitAt = now
+        if (duplicateEnter("p:$id:$raw")) return
         val before = raw.substring(0, cut)
         val after = raw.substring(cut + 1).replace("\n", " ")
         val shifted = InlineFormat.shift(blocks[i].text, raw, blocks[i].spans)
@@ -339,6 +350,7 @@ class EditorViewModel : ViewModel() {
     fun splitListItem(id: Long, index: Int, before: String, after: String) {
         val items = listItems(id) ?: return
         if (index !in items.indices) return
+        if (duplicateEnter("l:$id:$index:$before|$after")) return
         items[index] = before
         items.add(index + 1, after)
         updateText(id, items.joinToString("\n"))
@@ -362,13 +374,60 @@ class EditorViewModel : ViewModel() {
     fun exitList(id: Long) {
         val items = listItems(id) ?: return
         val i = blocks.indexOfFirst { it.id == id }
-        if (items.size > 1) items.removeAt(items.lastIndex)
+        if (duplicateEnter("x:$id")) return
+        // همه‌ی موردهای خالیِ آخر برداشته می‌شن (مثل وردپرس)؛ ولی حداقل یه مورد می‌مونه
+        while (items.size > 1 && items.last().isEmpty()) items.removeAt(items.lastIndex)
         updateText(id, items.joinToString("\n"))
         val next = EditorBlock(nextId++, BlockType.PARAGRAPH)
         blocks.add(i + 1, next)
         focusedId = next.id
         pendingFocusId = next.id
         scrollToId = next.id
+    }
+
+    /**
+     * نقل‌قول: اینتر دوم پشت‌سرهم (دو خط خالیِ آخر) از نقل‌قول بیرونت میاره و یه پاراگراف تازه شروع می‌شه (مثل وردپرس).
+     * [raw] متن فیلده که آخرش دو تا خط جدیده.
+     */
+    fun quoteChanged(id: Long, raw: String) {
+        val i = blocks.indexOfFirst { it.id == id }
+        if (i < 0) return
+        if (!raw.endsWith("\n\n")) {
+            if (raw.endsWith("\n")) lastEnterAt = System.currentTimeMillis()
+            updateText(id, raw)
+            return
+        }
+        // اینتر دوم خیلی نزدیک به اینتر اول = پژواک کیبورد؛ فقط یه خط جدید نگه داشته می‌شه
+        if (System.currentTimeMillis() - lastEnterAt < 90L) {
+            updateText(id, raw.dropLast(1))
+            return
+        }
+        updateText(id, raw.trimEnd('\n'))
+        val next = EditorBlock(nextId++, BlockType.PARAGRAPH)
+        blocks.add(i + 1, next)
+        focusedId = next.id
+        pendingFocusId = next.id
+        scrollToId = next.id
+        lastEnterAt = System.currentTimeMillis()
+    }
+
+    /**
+     * میان‌بُرهای وردپرس توی پاراگراف: «- » یا «* » = فهرست، «1. » = فهرست شماره‌دار، «> » = نقل‌قول.
+     * اگه متنِ تایپ‌شده یکی از این‌ها بود، بلوک عوض می‌شه و true برمی‌گرده.
+     */
+    fun autoFormat(id: Long, raw: String): Boolean {
+        val i = blocks.indexOfFirst { it.id == id }
+        if (i < 0 || blocks[i].type != BlockType.PARAGRAPH || blocks[i].text.isNotEmpty()) return false
+        val target = when (raw) {
+            "- ", "* ", "• " -> BlockType.LIST
+            "1. ", "۱. ", "1) " -> BlockType.ORDERED_LIST
+            "> " -> BlockType.QUOTE
+            else -> return false
+        }
+        blocks[i] = blocks[i].copy(type = target, text = "", spans = emptyList())
+        focusedId = id
+        if (target.editing == BlockEditing.LIST) pendingListFocus = id to 0 else pendingFocusId = id
+        return true
     }
 
     fun move(id: Long, delta: Int) {
@@ -451,6 +510,7 @@ class EditorViewModel : ViewModel() {
         val app = context.applicationContext
         val info = appInfo
         val seoNow = seo
+        val altNow = featuredAlt.trim()
         val withMeta = info != AppInfo() || seoNow != SeoInfo()
 
         saving = true
@@ -460,6 +520,13 @@ class EditorViewModel : ViewModel() {
             var metaError: String? = null
             if (post != null && withMeta) {
                 metaError = MetaApi.save(post.id, info, seoNow).exceptionOrNull()?.message
+            }
+            // متن جایگزین (alt) تصویر شاخص روی خودِ رسانه‌ی سایت ذخیره می‌شه
+            var altError: String? = null
+            val mediaId = featuredId
+            if (post != null && mediaId != null && altNow != syncedAlt) {
+                val altResult = EditorApi.updateMediaAlt(app, mediaId, altNow)
+                if (altResult.isSuccess) syncedAlt = altNow else altError = altResult.exceptionOrNull()?.message
             }
             saving = false
 
@@ -476,6 +543,7 @@ class EditorViewModel : ViewModel() {
                 }
                 val notes = ArrayList<String>()
                 if (metaError != null) notes.add(metaError)
+                if (altError != null) notes.add(altError)
                 val skipped = serialized.skipped.distinct()
                 if (skipped.isNotEmpty()) notes.add("بلوک‌های ${skipped.joinToString("، ")} هنوز ذخیره نمی‌شن")
                 if (saved.note != null) notes.add(saved.note)
@@ -497,8 +565,11 @@ class EditorViewModel : ViewModel() {
         val app = context.applicationContext
         val previousId = featuredId
         val previousUrl = featuredUrl
+        val previousAlt = featuredAlt
         featuredId = null
         featuredUrl = uri.toString() // پیش‌نمایش فوری از روی خودِ فایل
+        featuredAlt = ""
+        syncedAlt = ""
         uploading = true
         viewModelScope.launch {
             val result = EditorApi.uploadImage(app, uri)
@@ -508,6 +579,7 @@ class EditorViewModel : ViewModel() {
             }.onFailure {
                 featuredId = previousId
                 featuredUrl = previousUrl
+                featuredAlt = previousAlt
                 AppBanner.show(BannerKind.ERROR, it.message ?: "آپلود نشد", 4500L)
             }
             uploading = false
@@ -517,6 +589,8 @@ class EditorViewModel : ViewModel() {
     fun clearFeatured() {
         featuredId = null
         featuredUrl = null
+        featuredAlt = ""
+        syncedAlt = ""
     }
 
     // ───────────── دسته‌ها (فقط توی حافظه‌ی همین صفحه) ─────────────
@@ -1123,7 +1197,7 @@ private fun DrawerHandle(open: Boolean, onTop: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** کشوی بالا: همه‌ی بلوک‌ها به‌صورت دسته‌بندی‌شده */
+/** کشوی بالا: همه‌ی بلوک‌ها به‌صورت دسته‌بندی‌شده (فهرست شماره‌دار جدا نیست؛ از تنظیمات خودِ «فهرست» انتخاب می‌شه) */
 @Composable
 private fun AllBlocksPanel(onPick: (BlockType) -> Unit) {
     val scheme = MaterialTheme.colorScheme
@@ -1150,7 +1224,7 @@ private fun AllBlocksPanel(onPick: (BlockType) -> Unit) {
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
-                items(BlockType.entries.filter { it.group == group }, key = { it.name }) { type ->
+                items(BlockType.entries.filter { it.group == group && it != BlockType.ORDERED_LIST }, key = { it.name }) { type ->
                     BlockTile(type = type, onClick = { onPick(type) })
                 }
             }
