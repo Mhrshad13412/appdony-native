@@ -86,7 +86,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -110,15 +109,16 @@ private val NavInnerPadding = 6.dp
 private val NavItemHeight = 60.dp
 private val NavIconSize = 24.dp
 
-// ── کلاسیک (مثل گوگل پلی): قرص پهن پشت آیکن، اسم زیر قرص ──
-private val NavPillWidth = 60.dp
-private val NavPillHeight = 32.dp
-private val NavPillTop = 4.dp
+// ── کلاسیک: یه مربع گرد (کاشی) که هم آیکن و هم اسم تب انتخاب‌شده رو یکجا در بر می‌گیره ──
+private val ClassicTileShape = RoundedCornerShape(16.dp)
+private val ClassicTileMaxWidth = 68.dp
+private val ClassicContentTop = 9.dp
+private val ClassicLabelGap = 4.dp
 
 // ── شیشه‌ای (مثل تلگرام ادز): کاشی گرد دور آیکن و اسم، آیکن و اسم از بالا ۶dp شروع می‌شن ──
 private val GlassContentTop = 6.dp
 
-// فاصله‌ی آیکن تا اسم و ارتفاع خط اسم توی حالت شیشه‌ای (ارتفاع خط ثابت تا چیدمانِ عمودی روی همه‌ی فونت‌ها یکسان بمونه)
+// فاصله‌ی آیکن تا اسم و ارتفاع خط اسم (ارتفاع خط ثابت تا چیدمانِ عمودی روی همه‌ی فونت‌ها یکسان بمونه)
 private val GlassLabelGap = 5.dp
 private val GlassLabelLineHeight = 14.sp
 
@@ -372,7 +372,7 @@ private fun NavBar(
     }
 }
 
-/** حالت کلاسیک (مثل گوگل پلی/بام): نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
+/** حالت کلاسیک: نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -441,7 +441,7 @@ private fun ClassicBottomNav(
  * (کمی پهن‌تر از بقیه) و دو تب یه طرفش، دو تب طرف دیگه‌ش.
  * هایلایت از تبی به تب دیگه با یه فنر نرم سُر می‌خوره:
  *  - شیشه‌ای: کاشی گردِ شیشه‌ای هم‌مرکز با بدنه با ته‌رنگ تم دور آیکن و اسم (مثل تلگرام)
- *  - کلاسیک: قرص پهن پشت آیکن (مثل گوگل پلی)
+ *  - کلاسیک: مربع گردِ توپر که آیکن و اسم رو با هم در بر می‌گیره
  */
 @Composable
 private fun NavTabsArea(
@@ -467,10 +467,12 @@ private fun NavTabsArea(
         val tileWidth = unit
         val before = selectedIndex + if (fixedAi && selectedIndex >= half) aiW else 0f
         val slotStart = unit * before
+        // کلاسیک: کاشی تقریباً مربع و وسطِ خونه‌ی تب
+        val classicTileW = if (unit - 8.dp < ClassicTileMaxWidth) unit - 8.dp else ClassicTileMaxWidth
 
         // آفست توی RTL از راست حساب می‌شه، یعنی هم‌جهت با ترتیب آیتم‌ها
         val indicatorX by animateDpAsState(
-            targetValue = if (glass) slotStart else slotStart + (unit - NavPillWidth) / 2,
+            targetValue = if (glass) slotStart else slotStart + (unit - classicTileW) / 2,
             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
             label = "nav_indicator_x"
         )
@@ -527,10 +529,11 @@ private fun NavTabsArea(
         } else {
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorX, y = NavPillTop)
-                    .size(width = NavPillWidth, height = NavPillHeight)
-                    .clip(CircleShape)
-                    .background(primary.copy(alpha = 0.24f))
+                    .offset(x = indicatorX, y = 0.dp)
+                    .size(width = classicTileW, height = NavItemHeight)
+                    .clip(ClassicTileShape)
+                    .background(primary.copy(alpha = 0.22f))
+                    .border(1.dp, primary.copy(alpha = 0.32f), ClassicTileShape)
             )
         }
 
@@ -555,7 +558,7 @@ private fun NavTabsArea(
 /** خونه‌ی وسط: خود دکمه از بالا میاد؛ اینجا فقط اسمش (کامل، بدون بریدگی) هم‌تراز اسم بقیه‌ی تب‌ها می‌شینه */
 @Composable
 private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier = Modifier) {
-    val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else NavPillTop + NavPillHeight + 3.dp
+    val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else ClassicContentTop + NavIconSize + ClassicLabelGap
     Column(
         modifier = modifier.height(if (glass) GlassItemHeight else NavItemHeight),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -568,7 +571,7 @@ private fun AiSlotLabel(supportOn: Boolean, glass: Boolean, modifier: Modifier =
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Visible,
-            lineHeight = if (glass) GlassLabelLineHeight else TextUnit.Unspecified,
+            lineHeight = GlassLabelLineHeight,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.wrapContentWidth(unbounded = true)
         )
@@ -932,8 +935,8 @@ private fun NavTab(
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val iconTop = if (glass) GlassContentTop else NavPillTop + (NavPillHeight - NavIconSize) / 2
-        val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else NavPillTop + NavPillHeight + 3.dp
+        val iconTop = if (glass) GlassContentTop else ClassicContentTop
+        val labelTop = if (glass) GlassContentTop + NavIconSize + GlassLabelGap else ClassicContentTop + NavIconSize + ClassicLabelGap
         Spacer(Modifier.height(iconTop))
         // آیکن انتخاب‌شده با یه فنر نرم کمی بزرگ می‌شه
         val iconScale by animateFloatAsState(
@@ -952,7 +955,7 @@ private fun NavTab(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            lineHeight = if (glass) GlassLabelLineHeight else TextUnit.Unspecified,
+            lineHeight = GlassLabelLineHeight,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
