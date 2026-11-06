@@ -1213,3 +1213,49 @@ private fun QuickBar(
                             .clickable { onPick(type) }
                             .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(type.icon, contentDescription = type.label, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = type.label,
+                            color = scheme.onSurfaceVariant,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────── عنوان ─────────────────────────
+
+@Composable
+private fun TitleField(value: String, hint: String, readOnly: Boolean, onChange: (String) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val style = MaterialTheme.typography.titleLarge.copy(
+        color = scheme.onSurface,
+        fontSize = 24.sp,
+        lineHeight = 36.sp,
+        fontWeight = FontWeight.Bold,
+        textDirection = TextDirection.Content
+    )
+    BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        readOnly = readOnly,
+        textStyle = style,
+        cursorBrush = SolidColor(scheme.primary),
+        modifier = Modifier.fillMaxWidth(),
+        decorationBox = { inner ->
+            Box(modifier = Modifier.fillMaxWidth()) {
+                if (value.isEmpty()) {
+                    Text(text = hint, style = style.copy(color = scheme.onSurfaceVariant.copy(alpha = 0.6f)))
+                }
+                inner()
+            }
+        }
+    )
+}
