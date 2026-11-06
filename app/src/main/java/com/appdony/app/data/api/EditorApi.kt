@@ -44,6 +44,7 @@ data class RemotePost(
     val link: String,
     val featuredId: Long?,
     val featuredUrl: String?,
+    val featuredAlt: String = "",
     val slug: String,
     val date: String,
     val excerpt: String,
@@ -285,7 +286,8 @@ object EditorApi {
             val o = JsonParser.parseString(reply.body).asJsonObject
             val status = o.get("status")?.takeIf { it.isJsonPrimitive }?.asString ?: "draft"
             val featuredId = featuredOf(o)
-            val featuredUrl = if (featuredId != null) mediaUrl(context, featuredId) else null
+            val featuredMedia = if (featuredId != null) mediaInfo(context, featuredId) else null
+            val featuredUrl = featuredMedia?.first
             // تاریخ فقط برای مطلب‌های منتشرشده/زمان‌بندی‌شده/خصوصی پر می‌شه؛ پیش‌نویس «همین حالا» می‌مونه
             val dated = status == "publish" || status == "future" || status == "private"
             val date = if (dated) {
@@ -303,6 +305,7 @@ object EditorApi {
                     link = o.get("link")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty(),
                     featuredId = featuredId,
                     featuredUrl = featuredUrl,
+                    featuredAlt = featuredMedia?.second.orEmpty(),
                     slug = o.get("slug")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty(),
                     date = date,
                     excerpt = field(o, "excerpt"),
@@ -317,16 +320,37 @@ object EditorApi {
         }
     }
 
-    private suspend fun mediaUrl(context: Context, id: Long): String? = try {
+    /** آدرس و متن جایگزین (alt) یک رسانه؛ اگه نشد null */
+    private suspend fun mediaInfo(context: Context, id: Long): Pair<String?, String>? = try {
         val reply = send(context) { nonce ->
-            authed(Request.Builder().url("$SITE/wp-json/wp/v2/media/$id?_fields=source_url"), nonce).get().build()
+            authed(Request.Builder().url("$SITE/wp-json/wp/v2/media/$id?_fields=source_url,alt_text"), nonce).get().build()
         }
         if (reply.code in 200..299) {
-            JsonParser.parseString(reply.body).asJsonObject.get("source_url")
-                ?.takeIf { it.isJsonPrimitive }?.asString?.ifBlank { null }
+            val o = JsonParser.parseString(reply.body).asJsonObject
+            val url = o.get("source_url")?.takeIf { it.isJsonPrimitive }?.asString?.ifBlank { null }
+            val alt = o.get("alt_text")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+            url to alt
         } else null
     } catch (e: Exception) {
         null
+    }
+
+    /** متن جایگزین (alt) رسانه‌ی تصویر شاخص رو روی سایت به‌روز می‌کنه */
+    suspend fun updateMediaAlt(context: Context, id: Long, alt: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val payload = JsonObject().apply { addProperty("alt_text", alt) }.toString()
+            val reply = send(context) { nonce ->
+                authed(Request.Builder().url("$SITE/wp-json/wp/v2/media/$id"), nonce)
+                    .post(payload.toRequestBody(JSON_TYPE))
+                    .build()
+            }
+            if (reply.code !in 200..299) throw EditorException("متن جایگزین (alt) تصویر شاخص ذخیره نشد")
+            Result.success(Unit)
+        } catch (e: EditorException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(EditorException("متن جایگزین (alt) تصویر شاخص ذخیره نشد: ${e.message ?: "خطای ناشناخته"}"))
+        }
     }
 
     // ───────────── دسته‌ها ─────────────
