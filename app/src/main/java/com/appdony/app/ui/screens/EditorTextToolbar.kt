@@ -71,6 +71,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -117,6 +119,15 @@ class EditorTextToolbar : TextToolbar {
     /** یه نقطه‌ی مختصات سالم توی صفحه؛ برای تبدیل جای انتخاب به مختصات پنجره */
     internal var anchor: LayoutCoordinates? = null
 
+    /**
+     * جای دقیق متن انتخاب‌شده توی مختصات پنجره؛ فیلدِ فعال خودش ثبتش می‌کنه.
+     * منو همین رو به‌جای مستطیل عمومی Compose می‌گیره تا درست بالای خودِ متن بشینه.
+     */
+    internal var selectionBounds: (() -> Rect?)? = null
+
+    /** جای فعلی انتخاب؛ اگه فیلد فعالی نباشه null */
+    internal fun liveRect(): Rect? = runCatching { selectionBounds?.invoke() }.getOrNull()
+
     override val status: TextToolbarStatus
         get() = if (request != null) TextToolbarStatus.Shown else TextToolbarStatus.Hidden
 
@@ -144,6 +155,7 @@ class EditorTextToolbar : TextToolbar {
 
     /** جای متن انتخاب‌شده رو از مختصات خودش به مختصات پنجره می‌بره */
     private fun windowRect(data: TextContextMenuDataProvider): Rect {
+        liveRect()?.let { return it }
         val a = anchor?.takeIf { it.isAttached } ?: return Rect.Zero
         val local = data.contentBounds(a)
         return Rect(a.localToWindow(local.topLeft), a.localToWindow(local.bottomRight))
@@ -224,7 +236,7 @@ private class ToolbarPositioner(
         val x = (rect.center.x.toInt() - popupContentSize.width / 2)
             .coerceIn(margin, maxOf(margin, windowSize.width - popupContentSize.width - margin))
         val above = rect.top.toInt() - popupContentSize.height - gap
-        val below = rect.bottom.toInt() + gap * 4
+        val below = rect.bottom.toInt() + gap * 7
         val y = if (above >= margin) above else below
         val maxY = maxOf(0, windowSize.height - bottomInset - popupContentSize.height - margin)
         return IntOffset(x, y.coerceIn(0, maxY))
@@ -243,9 +255,13 @@ internal fun EditorTextToolbarHost(toolbar: EditorTextToolbar, vm: EditorViewMod
     DisposableEffect(toolbar) { onDispose { toolbar.anchor = null } }
 
     val request = toolbar.request ?: return
-    val gap = with(LocalDensity.current) { 10.dp.roundToPx() }
+    // با عوض شدن انتخاب (کشیدن دسته‌ها) منو دوباره روی متن می‌شینه
+    @Suppress("UNUSED_VARIABLE")
+    val selectionTrigger = vm.fmtSel
+    val rect = toolbar.liveRect() ?: request.rect
+    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    val positioner = remember(request.rect, gap, imeBottom) { ToolbarPositioner(request.rect, gap, imeBottom) }
+    val positioner = remember(rect, gap, imeBottom) { ToolbarPositioner(rect, gap, imeBottom) }
     if (toolbar.linkMode) {
         LinkPopup(toolbar = toolbar, vm = vm, positioner = positioner)
     } else {
@@ -480,4 +496,22 @@ private fun ToolButton(
             modifier = Modifier.size(21.dp)
         )
     }
+}
+
+/**
+ * جای متن انتخاب‌شده‌ی یک فیلد رو از روی چیدمان خودِ متن حساب می‌کنه و به مختصات پنجره می‌بره.
+ * [selection] نسبت به همین فیلده؛ اگه چیزی انتخاب نشده یا فیلد دیگه روی صفحه نیست null برمی‌گرده.
+ */
+internal fun fieldSelectionRect(
+    layout: TextLayoutResult?,
+    coords: LayoutCoordinates?,
+    selection: TextRange
+): Rect? {
+    if (layout == null || coords == null || !coords.isAttached || selection.collapsed) return null
+    val length = layout.layoutInput.text.length
+    val start = selection.min.coerceIn(0, length)
+    val end = selection.max.coerceIn(0, length)
+    if (end <= start) return null
+    val local = layout.getPathForRange(start, end).getBounds()
+    return Rect(coords.localToWindow(local.topLeft), coords.localToWindow(local.bottomRight))
 }
