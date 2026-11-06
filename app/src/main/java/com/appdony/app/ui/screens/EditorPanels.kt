@@ -382,6 +382,15 @@ private fun FeaturedBody(vm: EditorViewModel, onPick: () -> Unit) {
             }
         }
     }
+    if (url != null) {
+        Spacer(Modifier.height(10.dp))
+        PField(
+            label = "متن جایگزین (alt)",
+            value = vm.featuredAlt,
+            onChange = { vm.featuredAlt = it.replace("\n", " ") },
+            hint = "تصویر شاخص رو کوتاه و واضح توصیف کن"
+        )
+    }
     if (url != null && !vm.uploading) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onPick) {
