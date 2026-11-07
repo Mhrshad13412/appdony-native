@@ -5,8 +5,12 @@ import com.appdony.app.data.api.ApiClient
 import com.appdony.app.data.model.CategoryNames
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.PopularityRemote
+import com.appdony.app.data.model.TopChartsData
+import com.appdony.app.data.model.TopChartsRanker
 import com.appdony.app.data.model.sortedByFame
 import com.appdony.app.util.LatestOnly
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class HomeSection(
     val id: Int,
@@ -79,6 +83,15 @@ class HomeRepository {
     suspend fun loadPlus(isGames: Boolean): List<Post> {
         val id = if (isGames) PLUS_GAMES_ID else PLUS_APPS_ID
         return LatestOnly.latestPerApp(api.getPostsByCategory(categoryId = id, perPage = 20)).take(10)
+    }
+
+    /** بلوک «برترین‌ها»: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز (فقط پست‌های همون تب، بدون پست‌های پلاس) */
+    suspend fun loadTopCharts(rootId: Int?): TopChartsData {
+        PopularityRemote.ensureFresh()
+        val list = if (rootId != null) api.getPostsByCategory(categoryId = rootId, perPage = 60) else api.getPosts(perPage = 60)
+        val unique = LatestOnly.latestPerApp(list.filterNot(::isPlusPost))
+        // پارس متن پست‌ها سنگینه؛ دور از ترد اصلی
+        return withContext(Dispatchers.Default) { TopChartsRanker.build(unique, TopChartsRanker.SIZE) }
     }
 
     // ⚠️ مهم — لود سبک و مرحله‌ای؛ تحت هیچ عنوان حذف نشه ⚠️
