@@ -46,6 +46,7 @@ import com.appdony.app.ui.components.LocalBottomBarClearance
 import com.appdony.app.ui.components.SectionHeader
 import com.appdony.app.ui.components.SectionRowSkeleton
 import com.appdony.app.ui.components.SectionTitleSkeleton
+import com.appdony.app.ui.components.TopChartsBlock
 import com.appdony.app.ui.theme.AppdonyTextMuted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,6 +69,7 @@ fun HomeScreen(
     val homeContext = androidx.compose.ui.platform.LocalContext.current
     val beta by androidx.compose.runtime.remember { com.appdony.app.data.preferences.SettingsManager(homeContext) }
         .beta.collectAsStateWithLifecycle(initialValue = false)
+    val topCharts by viewModel.topCharts.collectAsStateWithLifecycle()
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val hasError by viewModel.hasError.collectAsStateWithLifecycle()
@@ -102,6 +104,11 @@ fun HomeScreen(
             }
         }
 
+        // «برترین‌ها»: ۱۰ تا از بیشترین نصب و بیشترین امتیاز، درست بعد از بلاک پلاس و قبل از ردیف‌ها
+        item(key = "top_charts") {
+            TopChartsBlock(data = topCharts, onPostClick = onPostClick)
+        }
+
         if (isLoading) {
             items(3, key = { "skeleton_$it" }) {
                 Column {
@@ -117,15 +124,16 @@ fun HomeScreen(
             LaunchedEffect(state.section.id) {
                 viewModel.loadSection(state.section.id)
             }
-            CategorySection(
-                state = state,
-                onPostClick = onPostClick,
-                onMoreClick = {
-                    // ردیف‌های ویژه دسته‌ی واقعی ندارن؛ دسته‌ی اصلی تب باز می‌شه
-                    val target = if (state.section.id < 0) viewModel.rootCategoryId else state.section.id
-                    if (target != null) onCategoryClick(target, state.section.title)
-                }
-            )
+            val onMore: () -> Unit = {
+                // ردیف‌های ویژه دسته‌ی واقعی ندارن؛ دسته‌ی اصلی تب باز می‌شه
+                val target = if (state.section.id < 0) viewModel.rootCategoryId else state.section.id
+                if (target != null) onCategoryClick(target, state.section.title)
+            }
+            if (state.plusStyle) {
+                PlusSimpleSection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
+            } else {
+                CategorySection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
+            }
         }
 
         if (!isLoading && sections.isEmpty()) {
@@ -185,7 +193,7 @@ private fun PlusBlock(posts: List<Post>?, onPostClick: (Int) -> Unit) {
 }
 
 @Composable
-private fun PlusCard(post: Post, onClick: () -> Unit) {
+private fun PlusCard(post: Post, onClick: () -> Unit, simple: Boolean = false) {
     val icon = post.safeImage()
     val category = post.embedded?.terms?.firstOrNull()?.firstOrNull()?.name
     // اسکرین‌شات از توی متن پست پیدا می‌شه (پشت صحنه، تا اسکرول سنگین نشه)
@@ -201,7 +209,8 @@ private fun PlusCard(post: Post, onClick: () -> Unit) {
         onClick = onClick,
         isNew = post.isNew(),
         androidReq = meta.androidReq,
-        version = meta.version
+        version = meta.version,
+        simple = simple
     )
 }
 
@@ -214,6 +223,45 @@ private fun Post.firstScreenshot(featured: String?): String? = try {
     HtmlParser.parsePostContent(content.rendered).screenshots.firstOrNull { shotName(it) != featuredName }
 } catch (e: Exception) {
     null
+}
+
+// ───────────── ردیف‌های «پلاس ساده» ─────────────
+// همون کارت اپدونی پلاس (اسکرین‌شات بزرگ + آیکن + اسم) ولی به رنگ تم و بدون نور/برق/نقطه؛
+// عنوان و دکمه‌ی «مشاهده همه» هم مثل ردیف‌های معمولیه
+
+@Composable
+private fun PlusSimpleSection(
+    state: SectionState,
+    onPostClick: (Int) -> Unit,
+    onMoreClick: () -> Unit
+) {
+    val posts = state.posts
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(title = state.section.title, onMoreClick = onMoreClick)
+
+        if (posts == null) {
+            LazyRow(
+                userScrollEnabled = false,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(2) { BannerSkeleton() }
+            }
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
+                    FadeIn(key = "${state.section.id}-plus-${post.id}", index = index) {
+                        PlusCard(post = post, onClick = { onPostClick(post.id) }, simple = true)
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+    }
 }
 
 // ───────────── ردیف‌های دسته‌بندی ─────────────
