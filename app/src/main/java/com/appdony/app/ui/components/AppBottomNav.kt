@@ -373,7 +373,7 @@ private fun NavBar(
     }
 }
 
-/** حالت کلاسیک: نوار مات چسبیده به لبه‌های صفحه، بدون بوردر و بدون بلور */
+/** حالت کلاسیک: نوار مات چسبیده به لبه‌های صفحه، بدون هیچ بوردر (نه دور نوار و نه دور کاشی تب انتخاب‌شده) و بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -515,7 +515,6 @@ private fun NavTabsArea(
                     .size(width = classicTileW, height = NavItemHeight)
                     .clip(ClassicTileShape)
                     .background(primary.copy(alpha = 0.22f))
-                    .border(1.dp, primary.copy(alpha = 0.32f), ClassicTileShape)
             )
         }
 
