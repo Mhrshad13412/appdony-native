@@ -77,6 +77,9 @@ private val SeoRed = Color(0xFFE5484D)
 private val SeoOrange = Color(0xFFF5A623)
 private val SeoGreen = Color(0xFF30A46C)
 
+// کلید دکمه‌ی «بهینه‌سازی کامل»؛ برای اینکه فقط همون دکمه حالت «در حال کار» نشون بده
+private const val KEY_ALL = "all"
+
 private fun levelColor(level: SeoLevel): Color = when (level) {
     SeoLevel.PROBLEM -> SeoRed
     SeoLevel.IMPROVE -> SeoOrange
@@ -123,6 +126,9 @@ internal data class RelatedLink(val title: String, val url: String)
 internal class SeoPanelModel : ViewModel() {
     var busy by mutableStateOf(false)
         private set
+    // کدوم دکمه درخواست رو زده؛ فقط همون دکمه «صبر کن» نشون می‌ده، بقیه فقط تا آخر کار قفل می‌مونن
+    var activeKey by mutableStateOf<String?>(null)
+        private set
     var proposals by mutableStateOf<List<SeoProposal>>(emptyList())
         private set
     var picked by mutableStateOf<Set<Int>>(emptySet())
@@ -131,15 +137,17 @@ internal class SeoPanelModel : ViewModel() {
     var relatedBusy by mutableStateOf(false)
         private set
 
-    fun propose(context: Context, input: SeoInput, fields: Set<SeoField>) {
-        if (busy) return
+    fun propose(context: Context, input: SeoInput, fields: Set<SeoField>, source: String? = null) {
+        if (busy || relatedBusy) return
         busy = true
+        activeKey = source
         proposals = emptyList()
         related = emptyList()
         val app = context.applicationContext
         viewModelScope.launch {
             val result = SeoAi.propose(app, input, fields)
             busy = false
+            activeKey = null
             result.onSuccess { list ->
                 if (list.isEmpty()) {
                     AppBanner.show(BannerKind.WARNING, "پیشنهاد تازه‌ای نیومد؛ دوباره امتحان کن")
@@ -158,15 +166,17 @@ internal class SeoPanelModel : ViewModel() {
         picked = emptySet()
     }
 
-    fun loadRelated(input: SeoInput, selfUrl: String?) {
-        if (relatedBusy) return
+    fun loadRelated(input: SeoInput, selfUrl: String?, source: String? = null) {
+        if (relatedBusy || busy) return
         relatedBusy = true
+        activeKey = source
         proposals = emptyList()
         viewModelScope.launch {
             val query = input.keyword.ifBlank { input.title }.trim()
             val found = if (query.isBlank()) emptyList() else fetchRelated(query, selfUrl)
             related = found
             relatedBusy = false
+            activeKey = null
             if (found.isEmpty()) {
                 AppBanner.show(BannerKind.WARNING, "مطلب مرتبطی پیدا نشد؛ اول کلمه‌ی کلیدی یا عنوان رو بنویس")
             }
@@ -267,19 +277,20 @@ internal fun SeoPanel(vm: EditorViewModel) {
         if (fields.isEmpty()) {
             AppBanner.show(BannerKind.SUCCESS, "چیزی برای اصلاح با هوش مصنوعی نمونده 👌")
         } else {
-            model.propose(ctx, input, fields)
+            model.propose(ctx, input, fields, KEY_ALL)
         }
     }
 
     AiButton(
-        label = if (model.busy) "هوش مصنوعی داره سئو رو بررسی می‌کنه…" else "بهینه‌سازی کامل سئو با هوش مصنوعی",
-        busy = model.busy,
+        label = if (model.activeKey == KEY_ALL) "هوش مصنوعی داره سئو رو بررسی می‌کنه…" else "بهینه‌سازی کامل سئو با هوش مصنوعی",
+        busy = model.activeKey == KEY_ALL,
+        enabled = !model.busy && !model.relatedBusy,
         onClick = { optimizeAll() }
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PChip("✨ کلمه‌ی کلیدی", false) { model.propose(ctx, input, setOf(SeoField.KEYWORD)) }
-        PChip("✨ عنوان سئو", false) { model.propose(ctx, input, setOf(SeoField.TITLE)) }
-        PChip("✨ توضیحات متا", false) { model.propose(ctx, input, setOf(SeoField.META)) }
+        PChip("✨ کلمه‌ی کلیدی", false) { model.propose(ctx, input, setOf(SeoField.KEYWORD), "chip:keyword") }
+        PChip("✨ عنوان سئو", false) { model.propose(ctx, input, setOf(SeoField.TITLE), "chip:title") }
+        PChip("✨ توضیحات متا", false) { model.propose(ctx, input, setOf(SeoField.META), "chip:meta") }
     }
 
     // پیشنهادهای هوش مصنوعی (با تیک؛ تا تأیید نکنی اعمال نمی‌شه)
@@ -389,8 +400,9 @@ internal fun SeoPanel(vm: EditorViewModel) {
                 CheckRow(
                     check = c,
                     busy = model.busy || model.relatedBusy,
-                    onFix = { field -> model.propose(ctx, input, setOf(field)) },
-                    onLinks = { model.loadRelated(input, vm.link) }
+                    activeKey = model.activeKey,
+                    onFix = { field, key -> model.propose(ctx, input, setOf(field), key) },
+                    onLinks = { key -> model.loadRelated(input, vm.link, key) }
                 )
             }
         }
@@ -402,8 +414,9 @@ internal fun SeoPanel(vm: EditorViewModel) {
                 CheckRow(
                     check = c,
                     busy = model.busy || model.relatedBusy,
-                    onFix = { field -> model.propose(ctx, input, setOf(field)) },
-                    onLinks = { model.loadRelated(input, vm.link) }
+                    activeKey = model.activeKey,
+                    onFix = { field, key -> model.propose(ctx, input, setOf(field), key) },
+                    onLinks = { key -> model.loadRelated(input, vm.link, key) }
                 )
             }
         }
@@ -412,7 +425,7 @@ internal fun SeoPanel(vm: EditorViewModel) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GroupHeader("نتایج خوب", goods.size, SeoGreen, openGood) { openGood = !openGood }
             if (openGood) goods.forEach { c ->
-                CheckRow(check = c, busy = true, onFix = {}, onLinks = {})
+                CheckRow(check = c, busy = true, activeKey = null, onFix = { _, _ -> }, onLinks = {})
             }
         }
     }
@@ -427,14 +440,14 @@ private fun lengthColor(len: Int, min: Int, max: Int): Color = when {
 // ───────────────────────── اجزای ظاهری ─────────────────────────
 
 @Composable
-private fun AiButton(label: String, busy: Boolean, onClick: () -> Unit) {
+private fun AiButton(label: String, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(scheme.primary.copy(alpha = if (busy) 0.10f else 0.20f))
-            .clickable(enabled = !busy, onClick = onClick)
+            .background(scheme.primary.copy(alpha = if (enabled) 0.20f else 0.10f))
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
@@ -591,10 +604,14 @@ private fun GroupHeader(title: String, count: Int, color: Color, open: Boolean, 
 private fun CheckRow(
     check: SeoCheck,
     busy: Boolean,
-    onFix: (SeoField) -> Unit,
-    onLinks: () -> Unit
+    activeKey: String?,
+    onFix: (SeoField, String) -> Unit,
+    onLinks: (String) -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
+    // هر دکمه کلید خودش رو داره تا موقع کار فقط همون دکمه «صبر کن» بشه، نه همه‌ی دکمه‌های «درستش کن»
+    val fixKey = "${check.title}:fix"
+    val linksKey = "${check.title}:links"
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
@@ -615,10 +632,10 @@ private fun CheckRow(
                 Spacer(Modifier.padding(top = 2.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (field != null) {
-                        PChip(if (busy) "⏳ صبر کن…" else "✨ درستش کن", !busy) { if (!busy) onFix(field) }
+                        PChip(if (activeKey == fixKey) "⏳ صبر کن…" else "✨ درستش کن", !busy) { if (!busy) onFix(field, fixKey) }
                     }
                     if (check.suggestLinks) {
-                        PChip(if (busy) "⏳ صبر کن…" else "🔗 پیشنهاد لینک", !busy) { if (!busy) onLinks() }
+                        PChip(if (activeKey == linksKey) "⏳ صبر کن…" else "🔗 پیشنهاد لینک", !busy) { if (!busy) onLinks(linksKey) }
                     }
                 }
             }
