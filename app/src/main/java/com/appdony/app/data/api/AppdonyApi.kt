@@ -22,6 +22,13 @@ const val LIST_FIELDS = "id,title,excerpt,date,modified,content,categories,featu
 // فقط تصویر شاخص و دسته؛ نویسنده/پاسخ‌ها و ... دیگه دانلود نمی‌شن
 const val EMBED_LIGHT = "wp:featuredmedia,wp:term"
 
+/** فقط آی‌دی و آدرس پست؛ برای وصل کردن ردیف‌های بلوک «برترین‌ها»ی سایت به پست‌ها */
+data class PostRef(
+    val id: Int,
+    val slug: String = "",
+    val link: String = ""
+)
+
 interface AppdonyApi {
     @GET("wp-json/wp/v2/users/me?context=edit")
     suspend fun getCurrentUser(): UserData
@@ -71,6 +78,13 @@ interface AppdonyApi {
         @Query("_embed") embed: String = EMBED_LIGHT,
         @Query("_fields") fields: String = LIST_FIELDS
     ): List<Post>
+
+    @GET("wp-json/wp/v2/posts")
+    suspend fun getPostRefsBySlugs(
+        @Query("slug") slugs: String,
+        @Query("per_page") perPage: Int = 20,
+        @Query("_fields") fields: String = "id,slug,link"
+    ): List<PostRef>
 
     @GET("wp-json/wp/v2/posts")
     suspend fun searchPosts(
