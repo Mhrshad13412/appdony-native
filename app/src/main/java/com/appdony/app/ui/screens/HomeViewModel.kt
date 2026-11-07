@@ -105,7 +105,7 @@ class HomeViewModel(
 
                 launch {
                     _topCharts.value = try {
-                        repository.loadTopCharts(structure.rootId)
+                        repository.loadTopCharts(isGames, structure.rootId)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
