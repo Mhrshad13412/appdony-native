@@ -373,7 +373,7 @@ private fun NavBar(
     }
 }
 
-/** حالت کلاسیک: نوار مات چسبیده به لبه‌های صفحه، خط نازک بالا (دور برش هم می‌چرخه)، بدون بلور */
+/** حالت کلاسیک: نوار مات چسبیده به لبه‌های صفحه، بدون بوردر و بدون بلور */
 @Composable
 private fun ClassicBottomNav(
     selectedIndex: Int,
@@ -386,7 +386,6 @@ private fun ClassicBottomNav(
     val bump = if (fixedAi) AiBump else 0.dp
     val notch = if (fixedAi) AiNotchRadius else 0.dp
     val surface = MaterialTheme.colorScheme.surface
-    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
     val barShape = remember(notch) { NotchedBarShape(corner = 0.dp, notchRadius = notch, notchCenterY = AiNotchCenterY) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -396,24 +395,6 @@ private fun ClassicBottomNav(
                 .padding(top = bump)
                 .clip(barShape)
                 .background(surface)
-                .drawBehind {
-                    // فقط خط لبه‌ی بالا و دور برش؛ کناره‌ها و پایین بی‌خط می‌مونن
-                    val edge = barShape.createOutline(size, layoutDirection, this)
-                    if (edge is Outline.Generic) {
-                        clipRect(
-                            left = 2.dp.toPx(),
-                            top = 0f,
-                            right = size.width - 2.dp.toPx(),
-                            bottom = 48.dp.toPx()
-                        ) {
-                            drawPath(
-                                path = edge.path,
-                                color = lineColor,
-                                style = Stroke(width = 2.dp.toPx())
-                            )
-                        }
-                    }
-                }
                 .navigationBarsPadding()
                 .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
         ) {
