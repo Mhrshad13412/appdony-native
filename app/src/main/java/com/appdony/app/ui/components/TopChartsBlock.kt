@@ -33,17 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.appdony.app.data.model.PostMemory
 import com.appdony.app.data.model.TopChartEntry
 import com.appdony.app.data.model.TopChartsData
-import com.appdony.app.data.model.cardCategory
-import com.appdony.app.data.model.cleanTitle
-import com.appdony.app.data.model.featuredImageUrl
 import com.appdony.app.ui.theme.AppdonyTextMuted
-import java.util.Locale
 
 /**
- * بلوک «برترین‌ها»: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز.
+ * بلوک «برترین‌ها»: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز، دقیقاً همون چیزی که سایت توی بلوک «برترین‌ها»ش نشون می‌ده.
  * ردیف‌ها همون AppRowItem ـن (کلاسیک: کارت مات؛ شیشه‌ای: شیشه‌ی منوی پایین) و کلیدِ دو حالتی هم با glassTrack/glassKnob.
  * [data] = null یعنی هنوز لود نشده (اسکلت)؛ اگه هر دو لیست خالی بود بلوک نمایش داده نمی‌شه.
  */
@@ -77,7 +72,7 @@ fun TopChartsBlock(
                         )
                     }
                     list.forEachIndexed { index, entry ->
-                        key(entry.post.id) {
+                        key(entry.link.ifBlank { entry.title }) {
                             TopChartRow(rank = index + 1, entry = entry, onPostClick = onPostClick)
                         }
                     }
@@ -143,23 +138,18 @@ private fun TopChartsTabs(selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun TopChartRow(rank: Int, entry: TopChartEntry, onPostClick: (Int) -> Unit) {
-    val post = entry.post
-    // پست برای باز شدن سریع صفحه‌ی جزئیات تو حافظه نگه داشته می‌شه (مثل PostCard)
-    remember(post.id) { PostMemory.put(post) }
-    val title = remember(post.id) { post.cleanTitle() }
-    val image = remember(post.id) { try { post.featuredImageUrl() } catch (e: Exception) { null } }
     // مثل سایت: «★ 4.9 · دسته»
-    val subtitle = remember(post.id, entry.rating) {
+    val subtitle = remember(entry.link, entry.rating, entry.category) {
         listOfNotNull(
-            entry.rating?.let { "★ " + String.format(Locale.US, "%.1f", it) },
-            post.cardCategory()
+            entry.rating?.let { "★ $it" },
+            entry.category.takeIf { it.isNotBlank() }
         ).joinToString(" · ").ifBlank { "رایگان" }
     }
     AppRowItem(
         rank = rank,
-        title = title,
-        imageUrl = image,
-        onClick = { onPostClick(post.id) },
+        title = entry.title,
+        imageUrl = entry.imageUrl,
+        onClick = { entry.postId?.let(onPostClick) },
         subtitle = subtitle
     )
 }
