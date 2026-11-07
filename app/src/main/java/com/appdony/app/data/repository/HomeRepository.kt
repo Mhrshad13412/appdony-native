@@ -2,15 +2,23 @@ package com.appdony.app.data.repository
 
 import android.text.Html
 import com.appdony.app.data.api.ApiClient
+import com.appdony.app.data.api.PostRef
 import com.appdony.app.data.model.CategoryNames
 import com.appdony.app.data.model.Post
 import com.appdony.app.data.model.PopularityRemote
 import com.appdony.app.data.model.TopChartsData
 import com.appdony.app.data.model.TopChartsRanker
+import com.appdony.app.data.model.TopChartsScraper
 import com.appdony.app.data.model.sortedByFame
 import com.appdony.app.util.LatestOnly
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.Request
+import java.net.URLDecoder
 
 data class HomeSection(
     val id: Int,
@@ -38,6 +46,8 @@ class HomeRepository {
         const val SEC_POPULAR = -1
         const val SEC_NEWEST = -2
         const val SEC_UPDATED = -3
+
+        private const val SITE_UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
     }
 
     suspend fun loadStructure(isGames: Boolean): HomeStructure {
@@ -85,8 +95,67 @@ class HomeRepository {
         return LatestOnly.latestPerApp(api.getPostsByCategory(categoryId = id, perPage = 20)).take(10)
     }
 
-    /** بلوک «برترین‌ها»: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز (فقط پست‌های همون تب، بدون پست‌های پلاس) */
-    suspend fun loadTopCharts(rootId: Int?): TopChartsData {
+    /**
+     * بلوک «برترین‌ها»: دقیقاً همون لیست‌هایی که خود سایت تو بلوک «برترین‌ها»ی صفحه‌ی اصلی (بازی‌ها) یا صفحه‌ی برنامه‌ها نشون می‌ده.
+     * اگه صفحه‌ی سایت گرفته یا خونده نشد، محاسبه‌ی محلی قبلی جایگزین می‌شه.
+     */
+    suspend fun loadTopCharts(isGames: Boolean, rootId: Int?): TopChartsData {
+        val fromSite = try {
+            scrapeTopCharts(isGames)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        return fromSite ?: loadLocalTopCharts(rootId)
+    }
+
+    private suspend fun scrapeTopCharts(isGames: Boolean): TopChartsData? = withContext(Dispatchers.IO) {
+        val url = if (isGames) ApiClient.BASE_URL else ApiClient.BASE_URL + "apps/"
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", SITE_UA)
+            .header("Accept", "text/html,application/xhtml+xml")
+            .header("Accept-Language", "fa,en;q=0.8")
+            .build()
+        val html = ApiClient.lightClient(20).newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) return@withContext null
+            resp.body?.string().orEmpty()
+        }
+        val parsed = TopChartsScraper.parse(html, url) ?: return@withContext null
+        val ids = resolvePostIds((parsed.installed + parsed.rated).map { it.link })
+        TopChartsData(
+            installed = parsed.installed.map { it.copy(postId = ids[TopChartsScraper.slugKey(it.link)]) },
+            rated = parsed.rated.map { it.copy(postId = ids[TopChartsScraper.slugKey(it.link)]) }
+        )
+    }
+
+    /** آی‌دی پست هر ردیف رو از روی نامک آدرسش پیدا می‌کنه (چند درخواست کوچیک، چون نامک‌های فارسی طولانی‌ان) */
+    private suspend fun resolvePostIds(links: List<String>): Map<String, Int> = coroutineScope {
+        val keys = links.mapNotNull { TopChartsScraper.slugKey(it) }.distinct()
+        val refs: List<PostRef> = keys.chunked(5).map { chunk ->
+            async {
+                try {
+                    api.getPostRefsBySlugs(slugs = chunk.joinToString(","), perPage = 20)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            }
+        }.awaitAll().flatten()
+
+        val out = HashMap<String, Int>()
+        refs.forEach { ref ->
+            TopChartsScraper.slugKey(ref.link)?.let { out[it] = ref.id }
+            val decoded = try { URLDecoder.decode(ref.slug, "UTF-8").lowercase() } catch (e: Exception) { ref.slug.lowercase() }
+            if (decoded.isNotBlank()) out.putIfAbsent(decoded, ref.id)
+        }
+        out
+    }
+
+    /** جایگزین وقتی صفحه‌ی سایت در دسترس نبود: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز (فقط پست‌های همون تب، بدون پست‌های پلاس) */
+    private suspend fun loadLocalTopCharts(rootId: Int?): TopChartsData {
         PopularityRemote.ensureFresh()
         val list = if (rootId != null) api.getPostsByCategory(categoryId = rootId, perPage = 60) else api.getPosts(perPage = 60)
         val unique = LatestOnly.latestPerApp(list.filterNot(::isPlusPost))
