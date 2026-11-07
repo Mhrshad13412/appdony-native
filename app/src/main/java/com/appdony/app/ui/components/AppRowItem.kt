@@ -34,7 +34,7 @@ import com.appdony.app.ui.theme.AppdonyTextMuted
 import com.appdony.app.ui.theme.AppdonyTextPrimary
 
 @Composable
-fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, showRank: Boolean = true) {
+fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, showRank: Boolean = true, subtitle: String = "رایگان") {
     val shownTitle = remember(title) { title.gameCardName() }
     Row(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).appdonyCard().clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showRank) {
@@ -52,7 +52,7 @@ fun AppRowItem(rank: Int, title: String, imageUrl: String?, onClick: () -> Unit,
         Column(modifier = Modifier.weight(1f)) {
             Text(text = shownTitle, color = AppdonyTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(text = "رایگان", color = AppdonyTextMuted, fontSize = 12.sp)
+            Text(text = subtitle, color = AppdonyTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
