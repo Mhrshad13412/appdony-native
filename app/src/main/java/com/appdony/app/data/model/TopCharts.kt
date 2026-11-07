@@ -1,15 +1,24 @@
 package com.appdony.app.data.model
 
 import com.appdony.app.util.HtmlParser
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToLong
 
-/** یک ردیف بلوک «برترین‌ها»: پست + امتیاز (۱ تا ۵) + تعداد رأی */
+/**
+ * یک ردیف بلوک «برترین‌ها»؛ عنوان، آیکون، دسته و امتیاز دقیقاً همون چیزیه که سایت نشون می‌ده.
+ * [postId] آی‌دی پست برای باز شدن صفحه‌ی جزئیاته (null یعنی پیدا نشده) و [link] آدرس پست توی سایت.
+ */
 data class TopChartEntry(
-    val post: Post,
-    val rating: Double?,
-    val votes: Long
+    val postId: Int?,
+    val title: String,
+    val imageUrl: String?,
+    val category: String,
+    val rating: String?,
+    val link: String = ""
 )
 
 /** دو لیست ۱۰ تایی بلوک «برترین‌ها» */
@@ -31,6 +40,8 @@ object TopChartsRanker {
     const val SIZE = 10
 
     private data class Stats(val rating: Double?, val votes: Long)
+
+    private data class Scored(val post: Post, val rating: Double?, val votes: Long)
 
     private val cache = ConcurrentHashMap<Int, Stats>()
 
@@ -59,28 +70,84 @@ object TopChartsRanker {
         return stats
     }
 
-    private fun fame(e: TopChartEntry): Int =
+    private fun fame(e: Scored): Int =
         maxOf(Popularity.score(e.post.cleanTitle()), PopularityRemote.score(e.post.id) ?: 0)
 
     /** سنگینه (پارس HTML)؛ روی ترد پس‌زمینه صدا زده بشه */
     fun build(posts: List<Post>, size: Int = SIZE): TopChartsData {
         val entries = posts.map { p ->
             val s = statsOf(p)
-            TopChartEntry(post = p, rating = s.rating, votes = s.votes)
+            Scored(post = p, rating = s.rating, votes = s.votes)
         }
 
         val installed = entries.sortedWith(
-            compareByDescending<TopChartEntry> { it.votes }
+            compareByDescending<Scored> { it.votes }
                 .thenByDescending { fame(it) }
                 .thenByDescending { it.rating ?: 0.0 }
         ).take(size)
 
         val rated = entries.filter { it.rating != null }.sortedWith(
-            compareByDescending<TopChartEntry> { it.rating ?: 0.0 }
+            compareByDescending<Scored> { it.rating ?: 0.0 }
                 .thenByDescending { it.votes }
                 .thenByDescending { fame(it) }
         ).take(size)
 
-        return TopChartsData(installed = installed, rated = rated)
+        return TopChartsData(installed = installed.map(::toEntry), rated = rated.map(::toEntry))
     }
+
+    private fun toEntry(e: Scored): TopChartEntry {
+        val post = e.post
+        // پست برای باز شدن سریع صفحه‌ی جزئیات تو حافظه نگه داشته می‌شه (مثل PostCard)
+        PostMemory.put(post)
+        return TopChartEntry(
+            postId = post.id,
+            title = post.cleanTitle(),
+            imageUrl = try { post.featuredImageUrl() } catch (ex: Exception) { null },
+            category = post.cardCategory().orEmpty(),
+            rating = e.rating?.let { String.format(Locale.US, "%.1f", it) },
+            link = post.link.orEmpty()
+        )
+    }
+}
+
+/**
+ * خوندن بلوک «برترین‌ها» از HTML صفحه‌ی سایت (section با data-charts):
+ * تب «بیشترین نصب» (data-list=installs) و تب «بیشترین امتیاز» (data-list=rating).
+ */
+object TopChartsScraper {
+
+    /** null یعنی بلوک توی صفحه نبود یا هر دو لیست خالی بود */
+    fun parse(html: String, baseUrl: String): TopChartsData? {
+        val doc = Jsoup.parse(html, baseUrl)
+        val section = doc.selectFirst("section[data-charts]") ?: return null
+        fun rows(name: String): List<TopChartEntry> =
+            section.select(".charts-list[data-list=$name] a.chart-row")
+                .mapNotNull { rowOf(it) }
+                .take(TopChartsRanker.SIZE)
+
+        val data = TopChartsData(installed = rows("installs"), rated = rows("rating"))
+        return if (data.isEmpty) null else data
+    }
+
+    private fun rowOf(a: Element): TopChartEntry? {
+        val link = a.absUrl("href")
+        val title = a.selectFirst(".chart-info h3")?.text()?.trim().orEmpty()
+        if (link.isBlank() || title.isBlank()) return null
+        val image = a.selectFirst(".chart-icon img")?.absUrl("src")?.takeIf { it.isNotBlank() }
+        val category = a.selectFirst(".chart-info .meta-line")?.ownText()
+            ?.replace("·", " ")?.replace("\u00A0", " ")?.trim().orEmpty()
+        val rating = a.selectFirst(".chart-info .rating")?.text()?.trim()?.takeIf { it.isNotBlank() }
+        return TopChartEntry(
+            postId = null,
+            title = title,
+            imageUrl = image,
+            category = category,
+            rating = rating,
+            link = link
+        )
+    }
+
+    /** نامک رمزگشایی‌شده و حروف‌کوچک‌ی آدرس پست؛ کلید وصل کردن ردیف سایت به پست توی API */
+    fun slugKey(link: String): String? =
+        link.toHttpUrlOrNull()?.pathSegments?.lastOrNull { it.isNotBlank() }?.lowercase()
 }
