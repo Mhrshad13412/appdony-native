@@ -104,13 +104,8 @@ fun HomeScreen(
             }
         }
 
-        // «برترین‌ها»: ۱۰ تا از بیشترین نصب و بیشترین امتیاز، درست بعد از بلاک پلاس و قبل از ردیف‌ها
-        item(key = "top_charts") {
-            TopChartsBlock(data = topCharts, onPostClick = onPostClick)
-        }
-
         if (isLoading) {
-            items(3, key = { "skeleton_$it" }) {
+            items(1, key = { "skeleton_$it" }) {
                 Column {
                     SectionTitleSkeleton()
                     SectionRowSkeleton()
@@ -119,21 +114,28 @@ fun HomeScreen(
             }
         }
 
-        items(sections, key = { it.section.id }) { state ->
-            // وقتی این ردیف به صفحه نزدیک شد، داده‌ش گرفته می‌شه
-            LaunchedEffect(state.section.id) {
-                viewModel.loadSection(state.section.id)
+        // اولین بلوک (پربازدیدترین‌ها)
+        items(sections.take(1), key = { it.section.id }) { state ->
+            HomeSectionRow(state = state, viewModel = viewModel, onPostClick = onPostClick, onCategoryClick = onCategoryClick)
+        }
+
+        // «برترین‌ها»: ۱۰ تا از بیشترین نصب و بیشترین امتیاز، درست بعد از اولین بلوک (پربازدیدترین‌ها) و قبل از بقیه‌ی ردیف‌ها
+        item(key = "top_charts") {
+            TopChartsBlock(data = topCharts, onPostClick = onPostClick)
+        }
+
+        if (isLoading) {
+            items(2, key = { "skeleton_${it + 1}" }) {
+                Column {
+                    SectionTitleSkeleton()
+                    SectionRowSkeleton()
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
-            val onMore: () -> Unit = {
-                // ردیف‌های ویژه دسته‌ی واقعی ندارن؛ دسته‌ی اصلی تب باز می‌شه
-                val target = if (state.section.id < 0) viewModel.rootCategoryId else state.section.id
-                if (target != null) onCategoryClick(target, state.section.title)
-            }
-            if (state.plusStyle) {
-                PlusSimpleSection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
-            } else {
-                CategorySection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
-            }
+        }
+
+        items(sections.drop(1), key = { it.section.id }) { state ->
+            HomeSectionRow(state = state, viewModel = viewModel, onPostClick = onPostClick, onCategoryClick = onCategoryClick)
         }
 
         if (!isLoading && sections.isEmpty()) {
@@ -143,6 +145,30 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+/** یک ردیف صفحه‌ی اصلی؛ وقتی به صفحه نزدیک شد داده‌ش گرفته می‌شه */
+@Composable
+private fun HomeSectionRow(
+    state: SectionState,
+    viewModel: HomeViewModel,
+    onPostClick: (Int) -> Unit,
+    onCategoryClick: (Int, String) -> Unit
+) {
+    // وقتی این ردیف به صفحه نزدیک شد، داده‌ش گرفته می‌شه
+    LaunchedEffect(state.section.id) {
+        viewModel.loadSection(state.section.id)
+    }
+    val onMore: () -> Unit = {
+        // ردیف‌های ویژه دسته‌ی واقعی ندارن؛ دسته‌ی اصلی تب باز می‌شه
+        val target = if (state.section.id < 0) viewModel.rootCategoryId else state.section.id
+        if (target != null) onCategoryClick(target, state.section.title)
+    }
+    if (state.plusStyle) {
+        PlusSimpleSection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
+    } else {
+        CategorySection(state = state, onPostClick = onPostClick, onMoreClick = onMore)
     }
 }
 
