@@ -129,36 +129,39 @@ private fun Modifier.plusShine(): Modifier = composed {
 
 // چیپ دسته‌بندی و نشان «جدید» به رنگ طلایی (مخصوص کارت پلاس؛ بقیه‌ی کارت‌ها همون رنگ تم)
 @Composable
-private fun PlusChip(text: String, modifier: Modifier = Modifier) {
+private fun PlusChip(text: String, modifier: Modifier = Modifier, accent: Color = GoldColor, simple: Boolean = false) {
     val shape = RoundedCornerShape(14.dp)
+    // استایل ساده: مثل بقیه‌ی نشان‌ها، بوردر فقط توی حالت شیشه‌ای
+    val edge = if (simple) Modifier.glassBorder(1.dp, accent, shape) else Modifier.border(1.dp, accent, shape)
     Box(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-            .background(GoldColor.copy(alpha = 0.14f))
-            .border(1.dp, GoldColor, shape)
+            .background(accent.copy(alpha = 0.14f))
+            .then(edge)
             .padding(horizontal = 10.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = GoldColor, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text = text, color = accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun PlusNewBadge(modifier: Modifier = Modifier) {
+private fun PlusNewBadge(modifier: Modifier = Modifier, accent: Color = GoldColor, simple: Boolean = false) {
     val shape = RoundedCornerShape(14.dp)
+    val edge = if (simple) Modifier.glassBorder(1.dp, accent, shape) else Modifier.border(1.dp, accent, shape)
     Row(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-            .background(GoldColor.copy(alpha = 0.14f))
-            .border(1.dp, GoldColor, shape)
+            .background(accent.copy(alpha = 0.14f))
+            .then(edge)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = GoldColor, modifier = Modifier.size(11.dp))
+        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(11.dp))
         Spacer(modifier = Modifier.width(3.dp))
-        Text(text = "جدید", color = GoldColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(text = "جدید", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -204,6 +207,7 @@ private fun PlusDots(modifier: Modifier = Modifier) {
  * کارت «ویژه» (اپدونی پلاس): اسکرین‌شات بازی بزرگ پشت کارته،
  * آیکن برنامه پایین سمت راست و اسم بازی کنار آیکن.
  * ظاهر طلاییِ تک‌رنگ: نور محو زیر کارت، برق کج و نقطه‌های متحرک؛ چیپ‌ها هم طلایی‌ان.
+ * [simple] = true: «اپدونی پلاس ساده»؛ همون چیدمان ولی بدون نور، برق و نقطه‌ها و به رنگ تم (بوردرها فقط توی حالت شیشه‌ای).
  */
 @Composable
 fun FeaturedGameCard(
@@ -215,20 +219,22 @@ fun FeaturedGameCard(
     modifier: Modifier = Modifier,
     isNew: Boolean = false,
     androidReq: String? = null,
-    version: String? = null
+    version: String? = null,
+    simple: Boolean = false
 ) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
+    val accent = if (simple) scheme.primary else GoldColor
 
-    // فضای خالی (بیشتر پایین) برای اینکه نور زیر کارت بریده نشه
-    Box(modifier = modifier.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 24.dp)) {
+    // فضای خالی (بیشتر پایین) برای اینکه نور زیر کارت بریده نشه؛ توی استایل ساده نوری نیست پس کمتر
+    Box(modifier = modifier.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = if (simple) 10.dp else 24.dp)) {
         Box(
             modifier = Modifier
                 .width(248.dp)
                 .height(148.dp)
-                .plusGlow()
+                .then(if (simple) Modifier else Modifier.plusGlow())
                 .appdonyCard()
-                .plusShine()
+                .then(if (simple) Modifier else Modifier.plusShine())
                 .clickable { onClick() }
         ) {
             // اسکرین‌شات (اگه پیدا نشد خودِ تصویر شاخص)
@@ -258,20 +264,22 @@ fun FeaturedGameCard(
                     )
             )
 
-            // نقطه‌های متحرک (زیر نوشته‌ها)
-            PlusDots(modifier = Modifier.fillMaxSize())
+            // نقطه‌های متحرک (زیر نوشته‌ها)؛ فقط توی استایل پلاس
+            if (!simple) PlusDots(modifier = Modifier.fillMaxSize())
 
             // دسته‌بندی، بالای کارت
             if (!category.isNullOrBlank()) {
                 PlusChip(
                     text = category,
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                    accent = accent,
+                    simple = simple
                 )
             }
 
             // «جدید» (تا ۴ روز بعد از انتشار یا ویرایش)
             if (isNew) {
-                PlusNewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                PlusNewBadge(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), accent = accent, simple = simple)
             }
 
             // پایین کارت: آیکن برنامه (سمت راست، چون اپ راست‌به‌چپه) + اسم بازی
@@ -287,7 +295,10 @@ fun FeaturedGameCard(
                         .size(44.dp)
                         .clip(RoundedCornerShape(13.dp))
                         .background(scheme.surface)
-                        .border(1.5.dp, GoldColor, RoundedCornerShape(13.dp))
+                        .then(
+                            if (simple) Modifier.glassBorder(1.5.dp, accent, RoundedCornerShape(13.dp))
+                            else Modifier.border(1.5.dp, accent, RoundedCornerShape(13.dp))
+                        )
                 ) {
                     if (!iconUrl.isNullOrBlank()) {
                         AsyncImage(
@@ -313,13 +324,13 @@ fun FeaturedGameCard(
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (androidReq != null) {
-                                Icon(Icons.Filled.Android, contentDescription = null, tint = GoldColor, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Filled.Android, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(androidReq, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
                                 Spacer(modifier = Modifier.width(12.dp))
                             }
                             if (version != null) {
-                                Icon(Icons.Filled.Bolt, contentDescription = null, tint = GoldColor, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Filled.Bolt, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(version, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, style = TextStyle(textDirection = TextDirection.Ltr))
                             }
