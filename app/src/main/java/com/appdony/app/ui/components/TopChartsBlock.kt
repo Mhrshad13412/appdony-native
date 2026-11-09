@@ -37,8 +37,11 @@ import com.appdony.app.data.model.TopChartEntry
 import com.appdony.app.data.model.TopChartsData
 import com.appdony.app.ui.theme.AppdonyTextMuted
 
+// تعداد ردیف‌هایی که توی هر تبِ «برترین‌ها» نشون داده می‌شه
+private const val VISIBLE_COUNT = 3
+
 /**
- * بلوک «برترین‌ها»: ۱۰ تا از بیشترین نصب و ۱۰ تا از بیشترین امتیاز، دقیقاً همون چیزی که سایت توی بلوک «برترین‌ها»ش نشون می‌ده.
+ * بلوک «برترین‌ها»: ۳ تا از بیشترین نصب و ۳ تا از بیشترین امتیاز (از همون لیست رتبه‌بندی‌شده‌ی سایت).
  * ردیف‌ها همون AppRowItem ـن (کلاسیک: کارت مات؛ شیشه‌ای: شیشه‌ی منوی پایین) و کلیدِ دو حالتی هم با glassTrack/glassKnob.
  * [data] = null یعنی هنوز لود نشده (اسکلت)؛ اگه هر دو لیست خالی بود بلوک نمایش داده نمی‌شه.
  */
@@ -61,7 +64,7 @@ fun TopChartsBlock(
             TopChartsTabs(selected = tab, onSelect = { tab = it })
             Spacer(modifier = Modifier.height(8.dp))
             Crossfade(targetState = tab, label = "top_charts_list") { t ->
-                val list = if (t == 0) data.installed else data.rated
+                val list = (if (t == 0) data.installed else data.rated).take(VISIBLE_COUNT)
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (list.isEmpty()) {
                         Text(
