@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -62,6 +63,7 @@ import kotlinx.coroutines.delay
 fun AppTopBar(
     isLoggedIn: Boolean = false,
     userInitial: String = "",
+    avatarUrl: String = "",
     onSearchClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
     searchMode: Boolean = false,
@@ -223,11 +225,10 @@ fun AppTopBar(
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoggedIn && userInitial.isNotBlank()) {
-                    Text(
-                        text = userInitial.first().uppercase(),
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                    UserAvatar(
+                        url = avatarUrl,
+                        initial = userInitial,
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Icon(
