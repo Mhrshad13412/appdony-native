@@ -131,6 +131,8 @@ fun AppRoot() {
     val isLoggedIn by sessionManager.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
     val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
     val displayName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    val userEmail by sessionManager.userEmail.collectAsStateWithLifecycle(initialValue = "")
+    val avatarUrl by sessionManager.avatarUrl.collectAsStateWithLifecycle(initialValue = "")
     val canWritePost by sessionManager.canWritePost.collectAsStateWithLifecycle(initialValue = false)
     val canWriteBlog by sessionManager.canWriteBlog.collectAsStateWithLifecycle(initialValue = false)
 
@@ -217,6 +219,7 @@ fun AppRoot() {
                             isLoggedIn = isLoggedIn,
                             username = username,
                             displayName = displayName,
+                            avatarUrl = avatarUrl,
                             showAiAssistant = showAiAssistant,
                             fixedAi = fixedAi,
                             onLoginClick = { showLoginSheet = true },
@@ -234,6 +237,9 @@ fun AppRoot() {
                         isLoggedIn = isLoggedIn,
                         displayName = if (displayName.isNotBlank()) displayName else username,
                         username = username,
+                        email = userEmail,
+                        avatarUrl = avatarUrl,
+                        onProfile = { navController.navigate("settings") { launchSingleTop = true } },
                         onDismiss = { showAccountSheet = false },
                         onDownloads = { navController.navigateToTab("downloads") },
                         onSettings = { navController.navigate("settings") { launchSingleTop = true } },
@@ -298,6 +304,7 @@ fun MainContent(
     isLoggedIn: Boolean,
     username: String,
     displayName: String,
+    avatarUrl: String,
     showAiAssistant: Boolean,
     fixedAi: Boolean,
     onLoginClick: () -> Unit,
@@ -339,6 +346,7 @@ fun MainContent(
                     AppTopBar(
                         isLoggedIn = isLoggedIn,
                         userInitial = if (displayName.isNotBlank()) displayName else username,
+                        avatarUrl = avatarUrl,
                         onSearchClick = openSearch,
                         // مهمان هم منو رو می‌بینه (ورود از داخل منوئه)
                         onLoginClick = { onAccountClick() },
