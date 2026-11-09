@@ -29,6 +29,7 @@ class AppdonyApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         CrashReporter.install(this)
+        CrashReporter.uploadPending(this)
         ApiClient.init(this)
         PopularityRemote.init(this)
         AppForeground.install(this)
