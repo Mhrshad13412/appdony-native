@@ -574,19 +574,18 @@ private fun DetailContent(
             info.androidReq?.let { add("Android $it" to "نیازمندی") }
         }
     }
-    // وقتی هوش مصنوعیِ «ثابت گوشه» روشنه، قرصش درست بالای منو می‌شینه؛ دکمه‌ی ثابت بالاترش میاد تا روش نیفته
+    // دکمه‌ی دانلود ثابت درست بالای منو می‌شینه و دستیار هوش مصنوعیِ شناور (که روی کل اپ کشیده می‌شه) روی اون قرار می‌گیره؛
+    // یعنی دکمه پشت هوش مصنوعیه و دیگه برای فرار از اون بالا نمی‌ره
     val context = LocalContext.current
     val settings = remember { SettingsManager(context) }
-    val cornerAi by settings.aiCorner.collectAsStateWithLifecycle(initialValue = false)
     val fixedAiOn by settings.fixedAi.collectAsStateWithLifecycle(initialValue = true)
-    val aiPillExtra = if (cornerAi && !fixedAiOn) 70.dp else 0.dp
     // ارتفاع واقعی منوی پایین (بدون نوار سیستم): شیشه‌ای ≈ ۱۰۰dp، کلاسیک ≈ ۷۲dp، و وقتی ربات وسط منوئه ۲۴dp بیرون‌زدگی بالاش.
     // MainActivity فقط ۸۸dp رزرو می‌کنه؛ مابه‌التفاوتش رو اینجا اضافه می‌کنیم تا دکمه‌ی دانلود ثابت روی ربات وسط منو نیفته
     val glassNav = LocalGlassMode.current
     val navRealHeight = (if (glassNav) 100.dp else 72.dp) + (if (fixedAiOn) 24.dp else 0.dp)
     val navExtra = (navRealHeight - 88.dp).coerceAtLeast(0.dp)
     // برای بازی/برنامه یه دکمه‌ی دانلود ثابت بالای منو هست؛ آخر لیست زیرش نره
-    val stickyExtra = if (isBlog) 0.dp else 68.dp + aiPillExtra + navExtra
+    val stickyExtra = if (isBlog) 0.dp else 68.dp + navExtra
     Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = 24.dp + stickyExtra + LocalBottomBarClearance.current)) {
         if (isBlog) {
@@ -754,7 +753,7 @@ private fun DetailContent(
     if (!isBlog) {
         StickyDownload(
             info = info, onDownload = onDownload,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + navExtra + aiPillExtra + 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalBottomBarClearance.current + navExtra + 8.dp)
         )
     }
     }
