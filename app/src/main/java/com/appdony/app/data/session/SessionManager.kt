@@ -73,6 +73,16 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    /** نام، ایمیل و عکس پروفایل رو از وردپرس تازه می‌کنه (فقط وقتی کاربر هنوز واردشده‌ست) */
+    suspend fun saveProfile(displayName: String, email: String, avatarUrl: String) {
+        context.sessionDataStore.edit {
+            if (it[KEY_LOGGED_IN] != true) return@edit
+            if (displayName.isNotBlank()) it[KEY_DISPLAY_NAME] = displayName
+            if (email.isNotBlank()) it[KEY_EMAIL] = email
+            if (avatarUrl.isNotBlank()) it[KEY_AVATAR] = avatarUrl
+        }
+    }
+
     /** سطح دسترسی نوشتن رو ذخیره می‌کنه (بعد از ورود یا تازه‌سازی نشست) */
     suspend fun saveWriteAccess(canPost: Boolean, canBlog: Boolean) {
         context.sessionDataStore.edit {
