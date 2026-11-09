@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 fun AccountSheet(
     isLoggedIn: Boolean,
     displayName: String, username: String, onDismiss: () -> Unit,
+    email: String = "", avatarUrl: String = "", onProfile: () -> Unit = {},
     onDownloads: () -> Unit, onSettings: () -> Unit, onFavorites: () -> Unit,
     onAbout: () -> Unit, onLogin: () -> Unit, onLogout: () -> Unit,
     canWritePost: Boolean = false, canWriteBlog: Boolean = false,
@@ -95,22 +96,23 @@ fun AccountSheet(
                             .border(1.dp, glassRimBrush(), userCardShape)
                         else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                     )
+                    .clickable { onDismiss(); onProfile() }
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = displayName.firstOrNull()?.uppercase() ?: "U",
-                        color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
-                    )
-                }
+                UserAvatar(
+                    url = avatarUrl,
+                    initial = displayName,
+                    modifier = Modifier.size(52.dp),
+                    textSize = 22.sp
+                )
                 Spacer(Modifier.width(14.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(text = displayName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text(text = "@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    if (email.isNotBlank()) {
+                        Text(text = email, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1)
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
