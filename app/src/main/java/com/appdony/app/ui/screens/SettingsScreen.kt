@@ -1,6 +1,7 @@
 package com.appdony.app.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Update
@@ -39,10 +41,18 @@ import com.appdony.app.ui.components.AiMode
 import com.appdony.app.ui.components.AiModeSelector
 import com.appdony.app.ui.components.PillOption
 import com.appdony.app.ui.components.PillSelector
+import com.appdony.app.ui.components.UserAvatar
 import com.appdony.app.ui.components.appdonyCard
 import com.appdony.app.ui.components.glassTintOf
 import com.appdony.app.ui.components.isGlassDark
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -60,12 +70,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.appdony.app.data.api.WordPressAccount
 import com.appdony.app.data.preferences.ChatHistoryManager
 import com.appdony.app.data.preferences.FavoritesManager
 import com.appdony.app.data.preferences.FontSize
@@ -78,6 +92,7 @@ import com.appdony.app.data.session.SessionManager
 import com.appdony.app.util.AutoUpdateWorker
 import com.appdony.app.util.CacheUtils
 import com.appdony.app.util.CatOverlayService
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -174,45 +189,20 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        item {
-            SettingsGroup("ظاهر برنامه") {
-                PillSelector(
-                    options = listOf(
-                        PillOption("تاریک", "پس‌زمینه‌ی تیره؛ برای چشم راحت‌تر، مخصوصاً شب‌ها.", Icons.Outlined.DarkMode),
-                        PillOption("روشن", "پس‌زمینه‌ی روشن؛ مناسب روز و نور زیاد.", Icons.Outlined.LightMode)
-                    ),
-                    selectedIndex = if (themeState.mode == ThemeMode.DARK) 0 else 1,
-                    onSelect = { i -> scope.launch { themeManager.setMode(if (i == 0) ThemeMode.DARK else ThemeMode.LIGHT) } }
-                )
-                RowDivider()
-
-                val fontSizes = FontSize.values()
-                PillSelector(
-                    options = listOf(
-                        PillOption("فونت کوچک", "نوشته‌ها کوچیک‌تر می‌شن و جای بیشتری روی صفحه جا می‌شه.", Icons.Outlined.FormatSize, 18.dp),
-                        PillOption("فونت متوسط", "اندازه‌ی پیش‌فرض و متعادل برنامه.", Icons.Outlined.FormatSize, 24.dp),
-                        PillOption("فونت بزرگ", "نوشته‌ها درشت‌تر می‌شن تا راحت‌تر خونده بشن.", Icons.Outlined.FormatSize, 30.dp)
-                    ),
-                    selectedIndex = fontSizes.indexOf(themeState.fontSize).coerceAtLeast(0),
-                    onSelect = { i -> scope.launch { themeManager.setFontSize(fontSizes[i]) } }
-                )
-            }
-        }
-
-        item {
-            SettingsGroup("حالت") {
-                PillSelector(
-                    options = listOf(
-                        PillOption("شیشه‌ای", "منوی پایین نیمه‌شفاف و محو، مثل شیشه.", Icons.Outlined.Palette),
-                        PillOption("کلاسیک", "منوی پایین ساده و مات، مثل گوگل پلی.", Icons.Outlined.Visibility)
-                    ),
-                    selectedIndex = if (uiStyle == SettingsManager.STYLE_GLASS) 0 else 1,
-                    onSelect = { i ->
-                        scope.launch {
-                            settingsManager.setUiStyle(if (i == 0) SettingsManager.STYLE_GLASS else SettingsManager.STYLE_CLASSIC)
+        // تنظیمات حساب وردپرس (فقط کاربر واردشده)
+        if (isLoggedIn) {
+            item {
+                SettingsGroup("حساب کاربری") {
+                    AccountSettings(
+                        sessionManager = sessionManager,
+                        onLogout = {
+                            scope.launch {
+                                sessionManager.clearSession()
+                                Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
@@ -267,6 +257,45 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         item {
+            SettingsGroup("ظاهر برنامه و منوی پایین") {
+                PillSelector(
+                    options = listOf(
+                        PillOption("تاریک", "پس‌زمینه‌ی تیره؛ برای چشم راحت‌تر، مخصوصاً شب‌ها.", Icons.Outlined.DarkMode),
+                        PillOption("روشن", "پس‌زمینه‌ی روشن؛ مناسب روز و نور زیاد.", Icons.Outlined.LightMode)
+                    ),
+                    selectedIndex = if (themeState.mode == ThemeMode.DARK) 0 else 1,
+                    onSelect = { i -> scope.launch { themeManager.setMode(if (i == 0) ThemeMode.DARK else ThemeMode.LIGHT) } }
+                )
+                RowDivider()
+
+                val fontSizes = FontSize.values()
+                PillSelector(
+                    options = listOf(
+                        PillOption("فونت کوچک", "نوشته‌ها کوچیک‌تر می‌شن و جای بیشتری روی صفحه جا می‌شه.", Icons.Outlined.FormatSize, 18.dp),
+                        PillOption("فونت متوسط", "اندازه‌ی پیش‌فرض و متعادل برنامه.", Icons.Outlined.FormatSize, 24.dp),
+                        PillOption("فونت بزرگ", "نوشته‌ها درشت‌تر می‌شن تا راحت‌تر خونده بشن.", Icons.Outlined.FormatSize, 30.dp)
+                    ),
+                    selectedIndex = fontSizes.indexOf(themeState.fontSize).coerceAtLeast(0),
+                    onSelect = { i -> scope.launch { themeManager.setFontSize(fontSizes[i]) } }
+                )
+                RowDivider()
+
+                PillSelector(
+                    options = listOf(
+                        PillOption("شیشه‌ای", "منوی پایین نیمه‌شفاف و محو، مثل شیشه.", Icons.Outlined.Palette),
+                        PillOption("کلاسیک", "منوی پایین ساده و مات، مثل گوگل پلی.", Icons.Outlined.Visibility)
+                    ),
+                    selectedIndex = if (uiStyle == SettingsManager.STYLE_GLASS) 0 else 1,
+                    onSelect = { i ->
+                        scope.launch {
+                            settingsManager.setUiStyle(if (i == 0) SettingsManager.STYLE_GLASS else SettingsManager.STYLE_CLASSIC)
+                        }
+                    }
+                )
+            }
+        }
+
+        item {
             SettingsGroup("داده‌ها") {
                 SettingsActionRow("پاک کردن حافظه کش", cacheSize, Icons.Outlined.DeleteOutline) {
                     scope.launch {
@@ -294,20 +323,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                     scope.launch {
                         chatHistoryManager.clearHistory()
                         Toast.makeText(context, "تاریخچه چت پاک شد", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-
-        // «خروج از حساب» فقط برای کاربرِ واردشده؛ مهمان این بخش رو نمی‌بینه
-        if (isLoggedIn) {
-            item {
-                SettingsGroup("حساب کاربری") {
-                    SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.ExitToApp, color = MaterialTheme.colorScheme.error) {
-                        scope.launch {
-                            sessionManager.clearSession()
-                            Toast.makeText(context, "از حساب خارج شدید", Toast.LENGTH_SHORT).show()
-                        }
                     }
                 }
             }
@@ -401,4 +416,205 @@ private fun SettingsActionRow(
             if (subtitle.isNotBlank()) Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
     }
+}
+
+@Composable
+private fun AccountSettings(sessionManager: SessionManager, onLogout: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val username by sessionManager.username.collectAsStateWithLifecycle(initialValue = "")
+    val savedName by sessionManager.displayName.collectAsStateWithLifecycle(initialValue = "")
+    val savedEmail by sessionManager.userEmail.collectAsStateWithLifecycle(initialValue = "")
+    val avatarUrl by sessionManager.avatarUrl.collectAsStateWithLifecycle(initialValue = "")
+
+    var name by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+
+    // اطلاعات تازه‌ی حساب از وردپرس؛ اگه نشد، از نشست ذخیره‌شده پر می‌شه
+    LaunchedEffect(Unit) {
+        val result = WordPressAccount.fetch(sessionManager)
+        val user = result.getOrNull()
+        if (user != null) {
+            name = user.displayName()
+            firstName = user.firstName
+            lastName = user.lastName
+            email = user.email
+            bio = user.description
+        } else {
+            name = sessionManager.displayName.first()
+            email = sessionManager.userEmail.first()
+            Toast.makeText(context, result.exceptionOrNull()?.message ?: "اطلاعات حساب گرفته نشد", Toast.LENGTH_SHORT).show()
+        }
+        loading = false
+    }
+
+    val shownName = savedName.ifBlank { username }
+    val fieldColors = accountFieldColors()
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        UserAvatar(
+            url = avatarUrl,
+            initial = shownName,
+            modifier = Modifier.size(60.dp),
+            textSize = 24.sp
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(shownName, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("@$username", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            if (savedEmail.isNotBlank()) {
+                Text(savedEmail, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1)
+            }
+        }
+    }
+    RowDivider()
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("نام نمایشی") },
+            singleLine = true,
+            enabled = !loading && !saving,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                label = { Text("نام") },
+                singleLine = true,
+                enabled = !loading && !saving,
+                shape = RoundedCornerShape(16.dp),
+                colors = fieldColors,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(10.dp))
+            OutlinedTextField(
+                value = lastName,
+                onValueChange = { lastName = it },
+                label = { Text("نام خانوادگی") },
+                singleLine = true,
+                enabled = !loading && !saving,
+                shape = RoundedCornerShape(16.dp),
+                colors = fieldColors,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("ایمیل") },
+            singleLine = true,
+            enabled = !loading && !saving,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = bio,
+            onValueChange = { bio = it },
+            label = { Text("درباره من") },
+            minLines = 2,
+            maxLines = 4,
+            enabled = !loading && !saving,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = {
+                if (name.isBlank() || email.isBlank()) {
+                    Toast.makeText(context, "نام نمایشی و ایمیل نباید خالی باشه", Toast.LENGTH_SHORT).show()
+                } else {
+                    scope.launch {
+                        saving = true
+                        val result = WordPressAccount.update(
+                            sessionManager, name.trim(), firstName.trim(), lastName.trim(), email.trim(), bio.trim()
+                        )
+                        val user = result.getOrNull()
+                        if (user != null) {
+                            name = user.displayName()
+                            firstName = user.firstName
+                            lastName = user.lastName
+                            email = user.email
+                            bio = user.description
+                            Toast.makeText(context, "اطلاعات حساب ذخیره شد", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, result.exceptionOrNull()?.message ?: "ذخیره نشد", Toast.LENGTH_LONG).show()
+                        }
+                        saving = false
+                    }
+                }
+            },
+            enabled = !loading && !saving,
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White
+            ),
+            modifier = Modifier.fillMaxWidth().height(48.dp)
+        ) {
+            Text(if (saving) "در حال ذخیره..." else "ذخیره تغییرات", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+    RowDivider()
+
+    // رمز عبور و عکس پروفایل (گراواتار) از خود سایت عوض می‌شن
+    SettingsActionRow("تغییر رمز عبور و عکس پروفایل", "باز شدن پروفایل در سایت اپدونی", Icons.Outlined.OpenInBrowser) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://appdony.ir/wp-admin/profile.php"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            Toast.makeText(context, "مرورگری برای باز کردن لینک پیدا نشد", Toast.LENGTH_SHORT).show()
+        }
+    }
+    RowDivider()
+    SettingsActionRow("خروج از حساب", "", Icons.AutoMirrored.Filled.ExitToApp, color = MaterialTheme.colorScheme.error) {
+        onLogout()
+    }
+}
+
+@Composable
+private fun accountFieldColors(): TextFieldColors {
+    val scheme = MaterialTheme.colorScheme
+    val accent = scheme.primary
+    val container = scheme.background.copy(alpha = 0.45f)
+    return OutlinedTextFieldDefaults.colors(
+        focusedTextColor = scheme.onSurface,
+        unfocusedTextColor = scheme.onSurface,
+        disabledTextColor = scheme.onSurface.copy(alpha = 0.5f),
+        focusedContainerColor = container,
+        unfocusedContainerColor = container,
+        disabledContainerColor = container,
+        focusedBorderColor = accent,
+        unfocusedBorderColor = scheme.onSurface.copy(alpha = 0.14f),
+        disabledBorderColor = scheme.onSurface.copy(alpha = 0.08f),
+        focusedLabelColor = accent,
+        unfocusedLabelColor = scheme.onSurfaceVariant,
+        disabledLabelColor = scheme.onSurfaceVariant.copy(alpha = 0.6f),
+        cursorColor = accent
+    )
 }
