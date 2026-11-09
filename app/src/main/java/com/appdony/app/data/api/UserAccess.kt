@@ -60,6 +60,8 @@ object UserAccess {
             val user = result.user ?: return@withContext
             if (nonce.isNotBlank()) session.saveNonce(nonce)
             session.saveWriteAccess(user.canWritePosts(), user.canWriteBlog())
+            // نام، ایمیل و عکس پروفایل هم از وردپرس تازه می‌شن
+            session.saveProfile(user.displayName(), user.email, user.avatarUrl().orEmpty())
         } catch (e: Exception) {
             // بی‌صدا؛ دفعه‌ی بعد دوباره تلاش می‌شه
         }
